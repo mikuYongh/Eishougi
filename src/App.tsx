@@ -69,6 +69,7 @@ export default function App() {
                 <Route path="/workflows" element={<WorkflowList />} />
                 <Route path="/workflows/new" element={<WorkflowEdit />} />
                 <Route path="/workflows/:id" element={<WorkflowEdit />} />
+                <Route path="/workflows/:id/edit" element={<WorkflowEdit />} />
                 <Route path="/generate/:promptId?" element={<Generate />} />
                 <Route path="/video/:imagePath?" element={<VideoGenerate />} />
                 <Route path="/tagger" element={<Tagger />} />

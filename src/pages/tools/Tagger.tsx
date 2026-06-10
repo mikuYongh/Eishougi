@@ -1,104 +1,164 @@
-import { UploadCloud, Search, Tag, Copy, Plus, Image as ImageIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { UploadCloud, Image as ImageIcon, Sparkles, Copy, FileText, CheckCircle2, RefreshCw } from "lucide-react";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 
 export function Tagger() {
-  const [modelFormat, setModelFormat] = useState("wd14-vit-v2");
+  const [image, setImage] = useState<string | null>(null);
+  const [format, setFormat] = useState("danbooru");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [results, setResults] = useState<{ tag: string, confidence: number }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const mockTags = [
-    { text: "1girl", weight: 0.98 },
-    { text: "solo", weight: 0.95 },
-    { text: "long_hair", weight: 0.88 },
-    { text: "looking_at_viewer", weight: 0.85 },
-    { text: "smile", weight: 0.82 },
-    { text: "school_uniform", weight: 0.70 },
-  ];
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImage(URL.createObjectURL(file));
+      setResults([]);
+    }
+  };
+
+  const handleAnalyze = () => {
+    if (!image) return;
+    setIsAnalyzing(true);
+    // Mock analysis delay
+    setTimeout(() => {
+      setResults([
+        { tag: "1girl", confidence: 0.99 },
+        { tag: "solo", confidence: 0.95 },
+        { tag: "cyberpunk", confidence: 0.88 },
+        { tag: "neon_lights", confidence: 0.85 },
+        { tag: "glowing_eyes", confidence: 0.76 },
+        { tag: "jacket", confidence: 0.72 },
+        { tag: "looking_at_viewer", confidence: 0.65 },
+        { tag: "cityscape", confidence: 0.60 },
+        { tag: "rain", confidence: 0.55 },
+        { tag: "night", confidence: 0.50 }
+      ]);
+      setIsAnalyzing(false);
+    }, 1500);
+  };
 
   return (
-    <div className="flex flex-col h-full relative z-10 gap-6 max-w-4xl mx-auto w-full">
+    <div className="flex flex-col h-full relative z-10 gap-6 max-w-5xl mx-auto w-full">
       
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-white drop-shadow-md flex items-center gap-2">
-          <span className="text-blue-400">🔍</span> 图片反推
-        </h2>
-        <p className="text-sm mt-1 text-white/60 font-medium">上传图片获取 WD14 标签</p>
+      {/* PageHeader */}
+      <div className="flex items-center justify-between flex-shrink-0">
+        <div>
+          <h2 className="text-2xl font-bold text-white drop-shadow-md flex items-center gap-2">
+            <span className="text-orange-400">🔍</span> 图片反推 (Tagger)
+          </h2>
+          <p className="text-sm mt-1 text-white/60 font-medium">上传图片，使用 WD14 模型提取特征标签，一键转化为提示词</p>
+        </div>
       </div>
 
-      <div className="flex gap-6">
-        {/* Left Col - Config & Upload */}
-        <div className="w-[300px] flex flex-col gap-4 flex-shrink-0">
-          {/* ImageUploader */}
-          <div className="glass-panel h-64 rounded-xl border-2 border-dashed border-white/10 hover:border-blue-400/50 bg-black/10 hover:bg-white/5 transition-all flex flex-col items-center justify-center gap-4 cursor-pointer">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
-              <UploadCloud size={24} className="text-white/40" />
-            </div>
-            <div className="text-center">
-              <p className="text-[13px] font-bold text-white/80">拖拽上传图片</p>
-            </div>
+      <div className="flex gap-6 flex-1 min-h-0">
+        
+        {/* Left Column - Uploader */}
+        <div className="w-1/2 flex flex-col gap-4">
+          <div className="glass-panel p-1 flex-1 rounded-2xl flex flex-col relative overflow-hidden group">
+            <div className="absolute inset-0 bg-black/20 z-0"></div>
+            
+            {image ? (
+              <div className="relative w-full h-full z-10 flex flex-col items-center justify-center p-4">
+                <img src={image} alt="Upload" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+                <button 
+                  onClick={() => setImage(null)}
+                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 backdrop-blur-md text-white flex items-center justify-center hover:bg-red-500/80 transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  <RefreshCw size={18} />
+                </button>
+              </div>
+            ) : (
+              <div 
+                className="relative w-full h-full z-10 flex flex-col items-center justify-center border-2 border-dashed border-white/10 hover:border-orange-500/50 m-2 rounded-xl bg-black/30 cursor-pointer transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <div className="w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <UploadCloud size={32} className="text-orange-400/80" />
+                </div>
+                <h3 className="text-lg font-bold text-white/90 mb-1">拖拽或点击上传图片</h3>
+                <p className="text-xs text-white/40">支持 JPG, PNG, WEBP (最大 10MB)</p>
+              </div>
+            )}
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
           </div>
 
-          {/* Format Select */}
-          <div className="glass-panel p-4 space-y-2 relative z-50">
-            <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest block">模型格式选择</label>
-            <GlassDropdown 
-              value={modelFormat}
-              onChange={setModelFormat}
-              options={[
-                { label: "wd14-vit-v2 (推荐)", value: "wd14-vit-v2" },
-                { label: "wd14-convnext-v2", value: "wd14-convnext-v2" }
-              ]}
-              accentColor="blue"
-            />
+          <div className="glass-panel p-5 rounded-2xl flex items-center gap-4">
+            <div className="flex-1 relative z-20">
+              <label className="text-[10px] text-white/40 mb-1.5 block uppercase tracking-wider font-bold">输出格式 (Format)</label>
+              <GlassDropdown 
+                value={format}
+                onChange={setFormat}
+                options={[
+                  { label: "Danbooru (动漫标签)", value: "danbooru" },
+                  { label: "DeepDanbooru", value: "deepdanbooru" },
+                  { label: "自然语言描述 (BLIP)", value: "blip" }
+                ]}
+                accentColor="orange"
+              />
+            </div>
+            <button 
+              onClick={handleAnalyze}
+              disabled={!image || isAnalyzing}
+              className={`mt-5 flex items-center gap-2 px-6 py-2.5 rounded-xl text-[14px] font-bold shadow-[0_4px_15px_rgba(255,152,0,0.3)] transition-all ${!image ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] cursor-pointer text-white'}`}
+              style={{ background: image ? "linear-gradient(135deg, #FF9800, #F44336)" : "rgba(255,255,255,0.1)", border: image ? "1px solid rgba(255,255,255,0.2)" : "none" }}
+            >
+              {isAnalyzing ? <RefreshCw size={18} className="animate-spin" /> : <Sparkles size={18} />}
+              {isAnalyzing ? '正在反推...' : '开始反推'}
+            </button>
           </div>
-
-          {/* AnalyzeButton */}
-          <button 
-            className="w-full py-3.5 rounded-xl font-bold text-white text-[14px] flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all cursor-pointer"
-            style={{ background: "linear-gradient(135deg, #42A5F5, #7E57C2)" }}
-          >
-            <Search size={16} /> 开始分析标签
-          </button>
         </div>
 
-        {/* Right Col - Results */}
-        <div className="flex-1 glass-panel flex flex-col min-w-0">
-          <div className="px-5 py-3 border-b border-white/5 bg-black/10 flex items-center justify-between">
-            <h3 className="text-[13px] font-bold text-white/80 flex items-center gap-2">
-              <Tag size={14} className="text-blue-400" /> 分析结果
-            </h3>
-            {/* Actions (创建提示词/复制) */}
-            <div className="flex gap-2">
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-[11px] font-bold border border-white/10 transition-colors cursor-pointer">
-                <Copy size={12} /> 复制标签
-              </button>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-[11px] font-bold border border-blue-500/20 transition-colors cursor-pointer">
-                <Plus size={12} /> 创建为提示词
-              </button>
-            </div>
-          </div>
-
-          {/* TagResult (TagChip 网格) */}
-          <div className="p-5 flex-1 overflow-y-auto">
-            <div className="flex flex-wrap gap-2">
-              {mockTags.map((tag, i) => (
-                <div 
-                  key={i} 
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+        {/* Right Column - Results */}
+        <div className="w-1/2 flex flex-col">
+          <div className="glass-panel rounded-2xl flex flex-col flex-1 overflow-hidden relative">
+            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/20">
+              <h3 className="text-[14px] font-bold text-white/90 flex items-center gap-2">
+                <FileText size={16} className="text-orange-400" /> 反推结果
+              </h3>
+              <div className="flex gap-2">
+                <button 
+                  disabled={results.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-bold transition-colors disabled:opacity-50"
                 >
-                  <span className="text-[13px] font-medium text-white/90">{tag.text}</span>
-                  <span className="text-[10px] text-white/40 font-mono">{tag.weight.toFixed(2)}</span>
+                  <Copy size={12} /> 复制文本
+                </button>
+                <button 
+                  disabled={results.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-[11px] font-bold border border-orange-500/20 transition-colors disabled:opacity-50"
+                >
+                  <CheckCircle2 size={12} /> 创建为提示词项目
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 p-5 overflow-y-auto">
+              {results.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {results.map((r, i) => (
+                    <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-black/40 border border-white/5 hover:border-orange-500/30 transition-colors cursor-pointer group">
+                      <span className="text-[13px] font-mono text-white/90">{r.tag}</span>
+                      <span className="text-[10px] text-orange-400/60 group-hover:text-orange-400">{(r.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              
-              {/* Empty state placeholder when no tags */}
-              {mockTags.length === 0 && (
-                <div className="w-full h-full flex flex-col items-center justify-center text-white/30 gap-2 mt-10">
-                  <ImageIcon size={32} />
-                  <p className="text-xs font-bold uppercase tracking-widest">请先上传图片进行反推</p>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-white/30">
+                  <ImageIcon size={48} className="mb-4 opacity-20" />
+                  <p className="text-[13px] font-bold uppercase tracking-widest">等待上传与反推</p>
                 </div>
               )}
             </div>
+            
+            {results.length > 0 && (
+              <div className="p-4 bg-black/40 border-t border-white/5">
+                <textarea 
+                  readOnly 
+                  value={results.map(r => r.tag).join(", ")}
+                  className="w-full h-24 bg-transparent border-none outline-none text-white/60 text-[12px] font-mono resize-none leading-relaxed"
+                />
+              </div>
+            )}
           </div>
         </div>
 

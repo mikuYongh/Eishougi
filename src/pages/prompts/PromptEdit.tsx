@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud } from "lucide-react";
-import { usePromptStore, PromptProject, LoraConfig } from "../../stores/promptStore";
+import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X } from "lucide-react";
+import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 
 export function PromptEdit() {
@@ -13,8 +13,9 @@ export function PromptEdit() {
   const [project, setProject] = useState<Partial<PromptProject>>({
     title: "", description: "", coverImage: "", positivePrompt: "", negativePrompt: "", artistPrompt: "",
     width: 1024, height: 1024, steps: 20, cfgScale: 7.0, seed: "-1",
-    baseModel: "sd_xl_base_1.0.safetensors", vaeModel: "auto", loraConfigs: []
+    baseModel: "sd_xl_base_1.0.safetensors", vaeModel: "auto", loraConfigs: [], tags: []
   });
+  const [tagInput, setTagInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -42,6 +43,21 @@ export function PromptEdit() {
       loras[index] = { ...loras[index], ...updates };
       return { ...prev, loraConfigs: loras };
     });
+  };
+
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      const newTag = tagInput.trim();
+      if (!project.tags?.includes(newTag)) {
+        updateField('tags', [...(project.tags || []), newTag]);
+      }
+      setTagInput("");
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    updateField('tags', project.tags?.filter(t => t !== tagToRemove));
   };
 
   const addLora = () => {
@@ -108,6 +124,22 @@ export function PromptEdit() {
                 className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white/60 text-xs outline-none focus:border-blue-500/50 transition-colors"
                 placeholder="简要描述这个项目的用途或预期效果..."
               />
+            </div>
+            <div>
+              <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1.5 block">标签 (Tags)</label>
+              <div className="w-full bg-black/40 border border-white/10 rounded-xl p-2 min-h-[46px] flex flex-wrap gap-2 focus-within:border-blue-500/50 transition-colors">
+                {project.tags?.map(tag => (
+                  <span key={tag} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[11px] font-bold">
+                    {tag}
+                    <button onClick={() => removeTag(tag)} className="hover:text-red-400 transition-colors cursor-pointer"><X size={12}/></button>
+                  </span>
+                ))}
+                <input 
+                  type="text" value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleAddTag}
+                  className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-white/80 text-[12px] px-2 h-7"
+                  placeholder="输入标签后按回车添加..."
+                />
+              </div>
             </div>
           </div>
 

@@ -10,7 +10,7 @@ interface GlassDropdownProps {
   options: Option[];
   value: string;
   onChange: (val: string) => void;
-  accentColor?: "pink" | "orange" | "blue" | "purple" | "green";
+  accentColor?: "pink" | "orange" | "blue" | "purple" | "green" | "yellow";
   className?: string;
   small?: boolean;
 }
@@ -42,9 +42,10 @@ export function GlassDropdown({
     blue: { text: "text-blue-400", bg: "bg-blue-500/10", border: "hover:border-blue-400/50" },
     purple: { text: "text-purple-400", bg: "bg-purple-500/10", border: "hover:border-purple-500/50" },
     green: { text: "text-green-400", bg: "bg-green-500/10", border: "hover:border-green-400/50" },
+    yellow: { text: "text-yellow-400", bg: "bg-yellow-500/10", border: "hover:border-yellow-400/50" },
   };
 
-  const c = colors[accentColor];
+  const c = colors[accentColor] || colors.pink;
   const selectedLabel = options.find(o => o.value === value)?.label || value;
 
   return (
