@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import { usePromptStore } from '../stores/promptStore';
 import { useAgentStore } from '../stores/agentStore';
@@ -23,6 +23,83 @@ export function useAgent() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [mcpTools, setMcpTools] = useState<any[]>([]);
+  const [mcpEnabled, setMcpEnabled] = useState(false);
+
+  const sanitizeSchema = (schema: any): any => {
+    if (!schema || typeof schema !== 'object') return { type: "object", properties: {} };
+    if (Array.isArray(schema)) {
+      return schema.map(sanitizeSchema);
+    }
+    const cleaned: any = {};
+    for (const key of Object.keys(schema)) {
+      if (key === '$defs' || key === '$ref' || key === '$schema') continue;
+      const val = schema[key];
+      if (key === 'anyOf' && Array.isArray(val)) {
+        cleaned.type = 'string';
+      } else if (key === 'allOf' && Array.isArray(val)) {
+        Object.assign(cleaned, sanitizeSchema(val.find((v: any) => v.type) || val[0] || {}));
+      } else if (key === 'enum' && Array.isArray(val)) {
+        cleaned[key] = val.filter((v: any) => typeof v === 'string').slice(0, 50);
+        if (cleaned[key].length === 0) delete cleaned[key];
+      } else if (typeof val === 'object' && val !== null) {
+        cleaned[key] = sanitizeSchema(val);
+      } else {
+        cleaned[key] = val;
+      }
+    }
+    if (!cleaned.type) cleaned.type = "object";
+    return cleaned;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchMcpTools = async () => {
+      const { mcpServers } = useSettingsStore.getState().settings;
+      const enabledServers = mcpServers?.filter(s => s.enabled) || [];
+      if (enabledServers.length === 0) {
+        setMcpTools([]);
+        setMcpEnabled(false);
+        return;
+      }
+
+      const allTools: any[] = [];
+      for (const server of enabledServers) {
+        try {
+          const rustTools = await invoke<any[]>('list_mcp_tools', { url: server.url });
+          for (const t of rustTools) {
+            allTools.push({
+              type: "function",
+              function: {
+                name: t.name,
+                description: (t.description || "").substring(0, 1024),
+                parameters: sanitizeSchema(t.input_schema) || { type: "object", properties: {} }
+              },
+              _mcp: { url: server.url }
+            });
+          }
+          console.log(`[Agent] MCP server "${server.name}" loaded ${rustTools.length} tools`);
+        } catch (e) {
+          console.warn(`[Agent] MCP server "${server.name}" failed to connect:`, e);
+        }
+      }
+      if (!cancelled) {
+        setMcpTools(allTools);
+        setMcpEnabled(allTools.length > 0);
+      }
+    };
+
+    fetchMcpTools();
+
+    const unsub = useSettingsStore.subscribe((s, prev) => {
+      if (s.settings.mcpServers !== prev.settings.mcpServers) {
+        fetchMcpTools();
+      }
+    });
+
+    return () => { cancelled = true; unsub(); };
+  }, []);
 
   // Tools definition
   const ALL_TOOLS = [
@@ -331,23 +408,34 @@ export function useAgent() {
         return m;
       }));
 
+      const allTools = [...ALL_TOOLS, ...mcpTools];
+      console.log("[Agent] Sending", allTools.length, "tools to LLM (local:", ALL_TOOLS.length, "MCP:", mcpTools.length, ")");
+
+      let bodyJson: string;
+      try {
+        bodyJson = JSON.stringify({
+          model: llm.model || 'agnes-2.0-flash',
+          messages: [
+            { role: 'system', content: agentSettings.systemPrompt },
+            ...mappedMessages
+          ],
+          tools: allTools,
+          stream: true,
+          temperature: llm.temperature !== undefined ? llm.temperature : 0.7,
+          max_tokens: llm.maxTokens !== undefined ? llm.maxTokens : 2048,
+        });
+      } catch (e) {
+        console.error("[Agent] JSON.stringify failed:", e);
+        throw e;
+      }
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${llm.apiKey}`
         },
-        body: JSON.stringify({
-          model: llm.model || 'agnes-2.0-flash',
-          messages: [
-            { role: 'system', content: agentSettings.systemPrompt },
-            ...mappedMessages
-          ],
-          tools: ALL_TOOLS,
-          stream: true,
-          temperature: llm.temperature !== undefined ? llm.temperature : 0.7,
-          max_tokens: llm.maxTokens !== undefined ? llm.maxTokens : 2048,
-        }),
+        body: bodyJson,
         signal: abortController.signal
       });
 
@@ -448,7 +536,7 @@ export function useAgent() {
                   cfgScale: parsedArgs.cfg_scale || 7.0,
                   seed: parsedArgs.seed || "-1",
                   samplerName: "euler",
-                  scheduler: "normal",
+                  scheduler: "beta57",
                   baseModel: parsedArgs.base_model || "sd_xl_base_1.0.safetensors",
                   vaeModel: parsedArgs.vae_model || "auto",
                   loraConfigs: parsedArgs.lora_configs || null,
@@ -630,9 +718,23 @@ export function useAgent() {
                 }
                 res = { status: "success", message: `Image added to prompt ${parsedArgs.prompt_id} instance images.` };
               } else {
-                throw new Error("Unknown tool: " + fnName);
+                const mcpTool = mcpTools.find((t: any) => t.function.name === fnName);
+                if (mcpTool?._mcp?.url) {
+                  try {
+                    const result = await invoke<string>('call_mcp_tool', {
+                      url: mcpTool._mcp.url,
+                      name: fnName,
+                      arguments: parsedArgs
+                    });
+                    resultStr = result;
+                  } catch (mcpErr: any) {
+                    resultStr = JSON.stringify({ error: "MCP tool call failed: " + mcpErr.toString() });
+                  }
+                } else {
+                  throw new Error("Unknown tool: " + fnName);
+                }
               }
-              resultStr = JSON.stringify(res);
+              if (!resultStr) resultStr = JSON.stringify(res);
             } catch (invokeErr: any) {
               resultStr = JSON.stringify({ error: invokeErr.toString() });
             }

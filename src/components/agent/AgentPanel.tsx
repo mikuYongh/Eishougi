@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, type KeyboardEvent } from "react";
 import { useAgent } from "../../hooks/useAgent";
 import { useAgentStore } from "../../stores/agentStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import type { McpServerConfig } from "../../stores/settingsStore";
 import { invoke } from "@tauri-apps/api/core";
 import type { ChatMessage } from "../../hooks/useAgent";
 import ReactMarkdown from 'react-markdown';
@@ -41,6 +42,15 @@ export function AgentPanel() {
   const { sessions, activeSessionId, createSession, switchSession, deleteSession, settings, updateSettings } = useAgentStore();
   
   const [tempSystemPrompt, setTempSystemPrompt] = useState(settings.systemPrompt);
+  const mcp = useSettingsStore.getState().settings.mcpServers || [];
+  const [tempMcpServers, setTempMcpServers] = useState<McpServerConfig[]>(() => 
+    JSON.parse(JSON.stringify(mcp))
+  );
+
+  useEffect(() => {
+    const servers = useSettingsStore.getState().settings.mcpServers || [];
+    setTempMcpServers(JSON.parse(JSON.stringify(servers)));
+  }, [viewMode]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +63,7 @@ export function AgentPanel() {
 
   // Auto-upgrade system prompt for older sessions
   useEffect(() => {
-    if (!settings.systemPrompt.includes('WORKFLOW_CLARIFICATION')) {
+    if (!settings.systemPrompt.includes('MCP_TOOLS')) {
       const defaultSystemPrompt = `You are NEXUS, a highly capable AI Agent designed for 詠唱机 EISHOUGI.
 You assist the user in generating high-quality prompts, creating workflows, and generating images.
 Always respond in the user's language. Keep answers concise.
@@ -74,9 +84,17 @@ When a user explicitly wants to manage ComfyUI pipeline workflows (import/delete
 
 ## PROMPT CREATION RULES:
 When using create_prompt or update_prompt:
-1. MUST translate positive/negative prompts to high-quality English keywords.
-2. MUST auto-generate negative_prompt for the scene (lowres, bad anatomy, bad hands, missing fingers, extra digit, worst quality, etc).
-3. CAN specify model params: base_model, lora_configs [{name, strength, enabled}], width, height, steps, cfg_scale, seed.
+1. If MCP tools (search_tags) are available, use them FIRST to convert the scene description into accurate Danbooru English tags. Then compose the positive_prompt from the returned tags.
+2. If MCP tools are NOT available, you MUST translate the positive_prompt into high-quality English keywords based on your own Danbooru tag knowledge.
+3. You MUST auto-generate suitable negative_prompt keywords tailored to the specific scene to avoid bad generations (e.g. lowres, bad anatomy, bad hands, missing fingers, extra digit, worst quality, etc).
+4. CAN specify model params: base_model, lora_configs [{name, strength, enabled}], width, height, steps, cfg_scale, seed.
+
+## MCP TOOLS — Danbooru Tag Search (MCP_TOOLS):
+When MCP tools (search_tags, get_related_tags, get_artist_recommendations) are loaded:
+- search_tags(query, use_segmentation, top_k, limit, category): Convert natural language into English Danbooru tags. use_segmentation=true for full scenes. category="character" for character names.
+- get_related_tags(tags, limit): Find tags commonly co-occurring with selected tags, enrich prompts with complementary details.
+- get_artist_recommendations(tags, limit): Find artists skilled at drawing specific elements, suggest @artist_name references.
+Use these proactively when creating prompts to ensure tags are valid Danbooru keywords.
 
 ## INSTANCE IMAGES:
 - Use get_generated_images to browse history (filter by prompt_id optional).
@@ -137,6 +155,7 @@ When asked to set model/LoRA on a project → use update_prompt.`;
 
   const handleSaveSettings = () => {
     updateSettings({ systemPrompt: tempSystemPrompt });
+    useSettingsStore.getState().updateSettings({ mcpServers: tempMcpServers });
     setViewMode('chat');
   };
 
@@ -400,7 +419,49 @@ When asked to set model/LoRA on a project → use update_prompt.`;
                     <li className="flex items-center justify-between"><span>• search_prompts</span> <span className="text-[10px] bg-[var(--accent-2)]/20 px-1.5 py-0.5 rounded text-[var(--accent-2)]">ACTIVE</span></li>
                     <li className="flex items-center justify-between"><span>• create_prompt</span> <span className="text-[10px] bg-[var(--accent-2)]/20 px-1.5 py-0.5 rounded text-[var(--accent-2)]">ACTIVE</span></li>
                     <li className="flex items-center justify-between"><span>• generate_image</span> <span className="text-[10px] bg-[var(--accent-2)]/20 px-1.5 py-0.5 rounded text-[var(--accent-2)]">ACTIVE</span></li>
+                    {tempMcpServers.filter(s => s.enabled).length > 0 && (
+                      <li className="flex items-center justify-between"><span>• MCP: {tempMcpServers.filter(s => s.enabled).length} server(s)</span> <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.5 rounded text-purple-400">EXT</span></li>
+                    )}
                   </ul>
+                </div>
+
+                <div className="p-4 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)]">
+                  <h4 className="font-bold text-[var(--text-primary)] text-sm mb-3 flex items-center gap-2">
+                    <Sparkles size={14} className="text-purple-400" /> MCP 外部工具服务器
+                  </h4>
+                  <div className="space-y-3">
+                    {tempMcpServers.map((srv, i) => (
+                      <div key={i} className={`p-3 rounded-lg border transition-colors ${srv.enabled ? 'bg-purple-500/5 border-purple-500/20' : 'bg-[var(--bg-layer-1)] border-[var(--glass-border)] opacity-60'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-[var(--text-primary)]">{srv.name}</span>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={srv.enabled}
+                              onChange={() => {
+                                const updated = [...tempMcpServers];
+                                updated[i] = { ...updated[i], enabled: !updated[i].enabled };
+                                setTempMcpServers(updated);
+                              }}
+                              className="sr-only peer"
+                            />
+                            <div className="w-8 h-4 bg-[var(--glass-border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:bg-purple-500 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all" />
+                          </label>
+                        </div>
+                        <input
+                          type="text"
+                          value={srv.url}
+                          onChange={(e) => {
+                            const updated = [...tempMcpServers];
+                            updated[i] = { ...updated[i], url: e.target.value };
+                            setTempMcpServers(updated);
+                          }}
+                          className="w-full bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-secondary)] font-mono outline-none focus:border-purple-500/50"
+                          placeholder="MCP Server URL"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

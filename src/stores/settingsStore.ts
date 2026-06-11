@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export interface McpServerConfig {
+  name: string;
+  enabled: boolean;
+  url: string;
+}
+
 export interface AppSettings {
   comfyUrl: string;
   llm: {
@@ -11,6 +17,7 @@ export interface AppSettings {
     temperature: number;
     maxTokens: number;
   };
+  mcpServers: McpServerConfig[];
   slimToolsMode: boolean;
   wallpaperPath: string;
   appTheme: 'dark' | 'light' | 'system';
@@ -46,6 +53,13 @@ const defaultSettings: AppSettings = {
     maxTokens: 2048
   },
   slimToolsMode: false,
+  mcpServers: [
+    {
+      name: "Danbooru 标签搜索",
+      enabled: true,
+      url: "https://sakizuki-danboorusearchonline.ms.show/mcp/mcp"
+    }
+  ],
   wallpaperPath: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2560&auto=format&fit=crop',
   appTheme: 'dark',
   colorTheme: 'sakura',
@@ -74,6 +88,17 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'eishougi-settings',
+      merge(persisted: unknown, current: SettingsState) {
+        const p = persisted as Partial<SettingsState> | null;
+        return {
+          ...current,
+          ...(p || {}),
+          settings: {
+            ...current.settings,
+            ...(p?.settings || {}),
+          },
+        };
+      },
     }
   )
 );
