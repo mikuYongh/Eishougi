@@ -9,6 +9,7 @@ export function WorkflowEdit() {
   const navigate = useNavigate();
   const workflows = useWorkflowStore((state) => state.workflows);
   const updateWorkflow = useWorkflowStore((state) => state.updateWorkflow);
+  const addWorkflow = useWorkflowStore((state) => state.addWorkflow);
   
   const [workflow, setWorkflow] = useState<Partial<WorkflowProject>>({
     name: "", description: "", type: "text2img", jsonContent: "{\n  // 在此处粘贴 ComfyUI API 格式的 JSON\n}", tags: []
@@ -24,6 +25,13 @@ export function WorkflowEdit() {
   const handleSave = () => {
     if (id && id !== 'new') {
       updateWorkflow(id, workflow);
+    } else {
+      addWorkflow({
+        ...workflow as WorkflowProject,
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
     }
     navigate('/workflows');
   };
