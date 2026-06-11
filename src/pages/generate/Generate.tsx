@@ -176,7 +176,7 @@ export function Generate() {
                 <img src={results[0]} alt="Generated" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
                 
                 <div className="absolute bottom-6 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md text-white text-[13px] font-bold hover:bg-black/80 transition-colors shadow-lg border border-white/10">
+                  <button onClick={() => window.open(results[0], '_blank')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md text-white text-[13px] font-bold hover:bg-black/80 transition-colors shadow-lg border border-white/10">
                     <Maximize2 size={16} /> 放大
                   </button>
                   <a href={results[0]} download="generated.png" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/80 backdrop-blur-md text-white text-[13px] font-bold hover:bg-blue-500 transition-colors shadow-lg border border-blue-400/50">
