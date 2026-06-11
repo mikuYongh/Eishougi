@@ -244,6 +244,12 @@ export class ComfyService {
         loraConfigs = [];
       }
 
+      const seedInt = parseInt(project.seed);
+      const finalSeed = (isNaN(seedInt) || seedInt < 0) ? Math.floor(Math.random() * 1000000000) : seedInt;
+      const finalPositive = project.artistPrompt 
+        ? `${project.positivePrompt}, ${project.artistPrompt}` 
+        : project.positivePrompt;
+
       for (const key in workflow) {
         const node = workflow[key];
         if (!node.inputs) continue;
@@ -254,27 +260,31 @@ export class ComfyService {
           if (node.inputs.cfg !== undefined) node.inputs.cfg = project.cfgScale;
           if (project.sampler && node.inputs.sampler_name !== undefined) node.inputs.sampler_name = project.sampler;
           if (project.scheduler && node.inputs.scheduler !== undefined) node.inputs.scheduler = project.scheduler;
-          
-          const seedInt = parseInt(project.seed);
-          const finalSeed = (isNaN(seedInt) || seedInt < 0) ? Math.floor(Math.random() * 1000000000) : seedInt;
-          if (node.inputs.seed !== undefined) node.inputs.seed = finalSeed;
           if (node.inputs.noise_seed !== undefined) node.inputs.noise_seed = finalSeed;
+          if (node.inputs.seed !== undefined) node.inputs.seed = finalSeed;
+          console.log("[ComfyService] KSampler node", key, "injected:", {
+            steps: node.inputs.steps,
+            cfg: node.inputs.cfg,
+            sampler_name: node.inputs.sampler_name,
+            scheduler: node.inputs.scheduler,
+            noise_seed: node.inputs.noise_seed,
+            seed: node.inputs.seed
+          });
         }
 
-        // 2. Positive Prompt (CLIPTextEncode or Simple String)
+        // 2. Positive Prompt (CLIPTextEncode / Simple String / StringConcatenate)
         if (node.class_type === "CLIPTextEncode" && node._meta?.title?.includes("Positive")) {
-          // Only overwrite if text is a primitive (not an array connection)
           if (typeof node.inputs.text === 'string') {
-            const finalPositive = project.artistPrompt 
-              ? `${project.positivePrompt}, ${project.artistPrompt}` 
-              : project.positivePrompt;
             node.inputs.text = finalPositive;
           }
         } else if (node.class_type === "Simple String" || node.class_type === "SimpleString") {
-          const finalPositive = project.artistPrompt 
-            ? `${project.positivePrompt}, ${project.artistPrompt}` 
-            : project.positivePrompt;
           node.inputs.string = finalPositive;
+        } else if (node.class_type === "StringConcatenate") {
+          if (typeof node.inputs.string_b === 'string') {
+            node.inputs.string_b = finalPositive;
+          } else if (typeof node.inputs.string_a === 'string') {
+            node.inputs.string_a = finalPositive;
+          }
         }
 
         // 3. Negative Prompt (CLIPTextEncode)
@@ -302,6 +312,12 @@ export class ComfyService {
         if (node.class_type === "SDXLEmptyLatentSizePicker+") {
           if (project.resolution) {
             node.inputs.resolution = project.resolution;
+          }
+          if (project.width && project.width > 0) {
+            node.inputs.width_override = project.width;
+          }
+          if (project.height && project.height > 0) {
+            node.inputs.height_override = project.height;
           }
         } else if (node.class_type.includes("EmptyLatent") || node.class_type.includes("SizePicker") || node.class_type.includes("Latent")) {
           if (node.inputs.width !== undefined) node.inputs.width = project.width;
@@ -341,6 +357,35 @@ export class ComfyService {
           }
         }
       }
+
+      const summary: any = {};
+      for (const key in workflow) {
+        const node = workflow[key];
+        if (!node.inputs) continue;
+        const ct = node.class_type || "";
+        const t = node._meta?.title || "";
+        if (ct.includes("KSampler") || ct.includes("CLIPTextEncode") || ct.includes("Simple String") || ct.includes("StringConcatenate") || ct.includes("EmptyLatent") || ct.includes("SizePicker") || ct.includes("Loader") || ct.includes("Anything Everywhere") || ct.includes("Power Lora") || ct.includes("Ollama") || ct.includes("ToriiGate") || ct.includes("Captioner")) {
+          const info: any = { class_type: ct, title: t };
+          if (ct.includes("KSampler")) {
+            info.params = { steps: node.inputs.steps, cfg: node.inputs.cfg, sampler: node.inputs.sampler_name, scheduler: node.inputs.scheduler };
+          } else if (ct.includes("CLIPTextEncode")) {
+            info.text_input = typeof node.inputs.text === 'string' ? node.inputs.text.substring(0, 60) : `link->[${node.inputs.text}]`;
+          } else if (ct === "Simple String" || ct === "SimpleString") {
+            info.text = node.inputs.string?.substring?.(0, 60) || node.inputs.string;
+          } else if (ct === "StringConcatenate") {
+            info.string_a = typeof node.inputs.string_a === 'string' ? node.inputs.string_a.substring(0, 40) : node.inputs.string_a;
+            info.string_b = typeof node.inputs.string_b === 'string' ? node.inputs.string_b.substring(0, 40) : node.inputs.string_b;
+          } else if (ct.includes("Loader")) {
+            info.model = node.inputs.unet_name || node.inputs.ckpt_name || node.inputs.clip_name || node.inputs.vae_name || "?";
+          } else if (ct.includes("Anything Everywhere")) {
+            info.inputs = JSON.stringify(node.inputs);
+          } else if (ct.includes("Ollama") || ct.includes("ToriiGate") || ct.includes("Captioner")) {
+            info.prompt_source = JSON.stringify(node.inputs.prompt || node.inputs.string || node.inputs.system);
+          }
+          summary[key] = info;
+        }
+      }
+      console.log("[ComfyService] Workflow node summary:", JSON.stringify(summary, null, 2));
 
       console.log("[ComfyService] Final injected workflow payload:", JSON.stringify(workflow, null, 2));
       return workflow;
