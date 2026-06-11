@@ -514,13 +514,13 @@ export function useAgent() {
                 if (!wfId) {
                   const workflows = useWorkflowStore.getState().workflows;
                   if (workflows.length > 0) {
-                    // Sort to get the most recently updated workflow
                     const sortedWfs = [...workflows].sort((a, b) => b.updatedAt - a.updatedAt);
                     wfId = sortedWfs[0].id;
                   }
                 }
                 
-                await useQueueStore.getState().addJob(project, wfId);
+                const batchCount = parsedArgs.batch_count || 1;
+                await useQueueStore.getState().addJob(project, wfId, batchCount);
                 res = { status: "queued", message: `Generation request added for prompt ${parsedArgs.prompt_id} using workflow ${wfId || 'default'}. Please check the queue or Generate page.` };
               } else if (fnName === 'get_queue_status') {
                 const state = useQueueStore.getState();
@@ -608,11 +608,12 @@ export function useAgent() {
               } else if (fnName === 'add_instance_image') {
                 const currentPrompt = await invoke('get_prompt', { id: parsedArgs.prompt_id }) as any;
                 if (!currentPrompt) throw new Error(`Prompt ID ${parsedArgs.prompt_id} not found`);
-                const existing: string[] = currentPrompt.instanceImages || [];
-                if (!existing.includes(parsedArgs.image_url)) {
+                const existing: any[] = currentPrompt.images || [];
+                const existingUrls = existing.map((img: any) => img.filePath);
+                if (!existingUrls.includes(parsedArgs.image_url)) {
                   const updatedPrompt = {
                     ...currentPrompt,
-                    instanceImages: [...existing, parsedArgs.image_url],
+                    images: [...existing, { id: "img_" + Date.now(), promptId: parsedArgs.prompt_id, filePath: parsedArgs.image_url, fileName: "", createdAt: Date.now() }],
                     updatedAt: Date.now()
                   };
                   await invoke('update_prompt', { prompt: updatedPrompt });

@@ -106,15 +106,15 @@ export function History() {
     try {
       const currentPrompt = await invoke('get_prompt', { id: targetPromptId }) as any;
       if (!currentPrompt) return;
-      const existing: string[] = currentPrompt.instanceImages || [];
-      if (existing.includes(imageUrl)) {
+      const existing: any[] = currentPrompt.images || [];
+      if (existing.some((img: any) => img.filePath === imageUrl)) {
         setAddSuccess('already');
         setTimeout(() => { setAddSuccess(null); setAddingToPrompt(null); }, 1500);
         return;
       }
       const updatedPrompt = {
         ...currentPrompt,
-        instanceImages: [...existing, imageUrl],
+        images: [...existing, { id: "img_" + Date.now(), promptId: targetPromptId, filePath: imageUrl, fileName: "", createdAt: Date.now() }],
         updatedAt: Date.now()
       };
       await invoke('update_prompt', { prompt: updatedPrompt });
