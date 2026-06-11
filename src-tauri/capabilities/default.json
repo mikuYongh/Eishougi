@@ -11,6 +11,14 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "core:window:allow-start-dragging",
-    "shell:allow-open"
+    "shell:allow-open",
+    "core:path:allow-basename",
+    "core:path:allow-dirname",
+    "core:path:allow-extname",
+    "core:path:allow-is-absolute",
+    "core:path:allow-join",
+    "core:path:allow-normalize",
+    "core:path:allow-resolve",
+    "core:path:allow-resolve-directory"
   ]
 }
