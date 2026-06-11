@@ -15,14 +15,25 @@ export interface QueueJob {
   createdAt: number;
 }
 
+export interface CompletionNotification {
+  id: string;
+  jobId: string;
+  projectId: string;
+  projectTitle: string;
+  images: string[];
+  createdAt: number;
+}
+
 interface QueueStore {
   jobs: QueueJob[];
   isConnected: boolean;
+  completedNotifications: CompletionNotification[];
   addJob: (project: any, workflowId?: string, batchCount?: number) => Promise<void>;
   removeJob: (id: string) => void;
   clearCompleted: () => void;
   connect: () => Promise<void>;
   disconnect: () => void;
+  dismissNotification: (id: string) => void;
 }
 
 export const useQueueStore = create<QueueStore>((set, get) => {
@@ -69,6 +80,20 @@ export const useQueueStore = create<QueueStore>((set, get) => {
 
         if (completedJob) {
           const job = completedJob as QueueJob;
+          set(state => ({
+            completedNotifications: [
+              {
+                id: "notif_" + Date.now(),
+                jobId: job.id,
+                projectId: job.projectId,
+                projectTitle: job.projectTitle,
+                images: job.images || [],
+                createdAt: Date.now()
+              },
+              ...state.completedNotifications
+            ].slice(0, 5)
+          }));
+
           try {
             const project = await invoke('get_prompt', { id: job.projectId }) as any;
             if (project) {
@@ -123,6 +148,7 @@ export const useQueueStore = create<QueueStore>((set, get) => {
   return {
   jobs: [],
   isConnected: false,
+  completedNotifications: [],
 
   connect: async () => {
     console.log("[Queue] connect: starting WebSocket connection...");
@@ -209,6 +235,10 @@ export const useQueueStore = create<QueueStore>((set, get) => {
 
   clearCompleted: () => {
     set(state => ({ jobs: state.jobs.filter(j => j.status === 'pending' || j.status === 'generating') }));
+  },
+
+  dismissNotification: (id) => {
+    set(state => ({ completedNotifications: state.completedNotifications.filter(n => n.id !== id) }));
   }
   };
 });

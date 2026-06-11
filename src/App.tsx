@@ -7,6 +7,7 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { StatusBar } from "./components/layout/StatusBar";
 import { AgentPanel } from "./components/agent/AgentPanel";
+import { CompletionToast } from "./components/ui/CompletionToast";
 
 import { Dashboard } from "./pages/Dashboard";
 import {
@@ -71,8 +72,9 @@ export default function App() {
           <Sidebar />
 
           {/* Main Area */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-transparent">
+          <div className="flex-1 flex flex-col overflow-hidden bg-transparent relative">
             <TopBar />
+            <CompletionToast />
             <div className="flex-1 overflow-y-auto px-5 py-5">
               <Routes>
                 <Route path="/" element={<Dashboard />} />
