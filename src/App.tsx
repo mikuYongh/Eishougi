@@ -18,7 +18,7 @@ import { usePromptStore } from "./stores/promptStore";
 import { useWorkflowStore } from "./stores/workflowStore";
 
 export default function App() {
-  const { wallpaperPath, appTheme, blurLevel } = useSettingsStore();
+  const { wallpaperPath, appTheme, colorTheme, blurLevel } = useSettingsStore();
   const fetchPrompts = usePromptStore((state) => state.fetchPrompts);
   const fetchWorkflows = useWorkflowStore((state) => state.fetchWorkflows);
 
@@ -26,6 +26,9 @@ export default function App() {
     fetchPrompts();
     fetchWorkflows();
   }, [fetchPrompts, fetchWorkflows]);
+
+  // Determine effective theme (handling 'system' if needed, but for now fallback to dark)
+  const isLight = appTheme === 'light';
 
   return (
     <BrowserRouter>
@@ -40,15 +43,15 @@ export default function App() {
           }}
         />
         {/* Theme Overlays */}
-        {appTheme === "dark" ? (
-          <>
-            <div className="absolute inset-0 bg-[#0A0816]/60 mix-blend-multiply transition-colors duration-700" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0A0816]/90 transition-colors duration-700" />
-          </>
-        ) : (
+        {isLight ? (
           <>
             <div className="absolute inset-0 bg-white/40 mix-blend-overlay transition-colors duration-700" />
             <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-white/60 transition-colors duration-700" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-[var(--glass-bg)] mix-blend-multiply transition-colors duration-700" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 transition-colors duration-700" />
           </>
         )}
         {/* Noise overlay for texture */}
@@ -60,7 +63,7 @@ export default function App() {
       </div>
 
       {/* App Window */}
-      <div className={`relative z-10 w-screen h-screen flex flex-col bg-transparent transition-colors duration-700 ${appTheme === "light" ? "light-theme" : ""}`}>
+      <div className={`relative z-10 w-screen h-screen flex flex-col bg-transparent transition-colors duration-700 ${isLight ? "light-mode" : ""} theme-${colorTheme}`}>
         <TitleBar />
 
         <div className="flex-1 flex overflow-hidden">
