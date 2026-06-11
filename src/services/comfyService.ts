@@ -113,7 +113,16 @@ export class ComfyService {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to queue prompt: ${response.statusText}`);
+        let errDetail = "";
+        try {
+          const errJson = await response.json();
+          errDetail = JSON.stringify(errJson);
+        } catch (e) {
+          try {
+            errDetail = await response.text();
+          } catch(e2) {}
+        }
+        throw new Error(`Failed to queue prompt: ${response.status} ${response.statusText}. Detail: ${errDetail}`);
       }
 
       return await response.json();
@@ -141,10 +150,99 @@ export class ComfyService {
     }
   }
 
-  // Inject user PromptProject parameters into a raw ComfyUI JSON workflow
-  injectParameters(workflowStr: string, project: any): any {
+  // Analyze a workflow to extract its settings (model, LoRAs, whether it uses size picker, etc.)
+  analyzeWorkflow(workflowStr: string): {
+    hasSizePicker: boolean;
+    baseModel: string | null;
+    vaeModel: string | null;
+    samplerName: string | null;
+    scheduler: string | null;
+    loras: { name: string; strength: number; enabled: boolean }[];
+  } {
+    const result = {
+      hasSizePicker: false,
+      baseModel: null as string | null,
+      vaeModel: null as string | null,
+      samplerName: null as string | null,
+      scheduler: null as string | null,
+      loras: [] as { name: string; strength: number; enabled: boolean }[]
+    };
+
     try {
       const workflow = JSON.parse(workflowStr);
+      for (const key in workflow) {
+        const node = workflow[key];
+        if (!node.inputs) continue;
+
+        // Check for SDXLEmptyLatentSizePicker+
+        if (node.class_type === "SDXLEmptyLatentSizePicker+") {
+          result.hasSizePicker = true;
+        }
+
+        // Check for models
+        if (node.class_type === "UNETLoader" || node.class_type === "CheckpointLoaderSimple") {
+          const modelVal = node.inputs.unet_name || node.inputs.ckpt_name;
+          if (modelVal) result.baseModel = modelVal;
+        }
+        if (node.class_type === "VAELoader") {
+          if (node.inputs.vae_name) result.vaeModel = node.inputs.vae_name;
+        }
+
+        // Check for KSampler parameters
+        if (node.class_type.includes("KSampler")) {
+          if (node.inputs.sampler_name) result.samplerName = node.inputs.sampler_name;
+          if (node.inputs.scheduler) result.scheduler = node.inputs.scheduler;
+        }
+
+        // Check for LoRAs in Power Lora Loader (rgthree)
+        if (node.class_type === "Power Lora Loader (rgthree)") {
+          for (let i = 1; i <= 20; i++) {
+            const loraKey = `lora_${i}`;
+            const loraSlot = node.inputs[loraKey];
+            if (loraSlot && loraSlot.lora && loraSlot.lora !== "None") {
+              result.loras.push({
+                name: loraSlot.lora,
+                strength: typeof loraSlot.strength === 'number' ? loraSlot.strength : 1.0,
+                enabled: typeof loraSlot.on === 'boolean' ? loraSlot.on : true
+              });
+            }
+          }
+        }
+        // General LoraLoader
+        if (node.class_type === "LoraLoader") {
+          if (node.inputs.lora_name) {
+            result.loras.push({
+              name: node.inputs.lora_name,
+              strength: typeof node.inputs.strength_model === 'number' ? node.inputs.strength_model : 1.0,
+              enabled: true
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to analyze workflow:", e);
+    }
+    return result;
+  }
+
+  // Inject user PromptProject parameters into a raw ComfyUI JSON workflow
+  injectParameters(workflowStr: string, project: any): any {
+    console.log("[ComfyService] injectParameters started.");
+    console.log("[ComfyService] Input project settings:", JSON.stringify(project, null, 2));
+    try {
+      const workflow = JSON.parse(workflowStr);
+
+      let loraConfigs = project.loraConfigs;
+      if (typeof loraConfigs === 'string') {
+        try {
+          loraConfigs = JSON.parse(loraConfigs);
+        } catch (e) {
+          loraConfigs = [];
+        }
+      }
+      if (!Array.isArray(loraConfigs)) {
+        loraConfigs = [];
+      }
 
       for (const key in workflow) {
         const node = workflow[key];
@@ -154,6 +252,8 @@ export class ComfyService {
         if (node.class_type.includes("KSampler")) {
           if (node.inputs.steps !== undefined) node.inputs.steps = project.steps;
           if (node.inputs.cfg !== undefined) node.inputs.cfg = project.cfgScale;
+          if (project.sampler && node.inputs.sampler_name !== undefined) node.inputs.sampler_name = project.sampler;
+          if (project.scheduler && node.inputs.scheduler !== undefined) node.inputs.scheduler = project.scheduler;
           
           const seedInt = parseInt(project.seed);
           const finalSeed = (isNaN(seedInt) || seedInt < 0) ? Math.floor(Math.random() * 1000000000) : seedInt;
@@ -163,58 +263,86 @@ export class ComfyService {
 
         // 2. Positive Prompt (CLIPTextEncode or Simple String)
         if (node.class_type === "CLIPTextEncode" && node._meta?.title?.includes("Positive")) {
-          node.inputs.text = project.positivePrompt;
+          // Only overwrite if text is a primitive (not an array connection)
+          if (typeof node.inputs.text === 'string') {
+            const finalPositive = project.artistPrompt 
+              ? `${project.positivePrompt}, ${project.artistPrompt}` 
+              : project.positivePrompt;
+            node.inputs.text = finalPositive;
+          }
         } else if (node.class_type === "Simple String" || node.class_type === "SimpleString") {
-          node.inputs.string = project.positivePrompt;
+          const finalPositive = project.artistPrompt 
+            ? `${project.positivePrompt}, ${project.artistPrompt}` 
+            : project.positivePrompt;
+          node.inputs.string = finalPositive;
         }
 
         // 3. Negative Prompt (CLIPTextEncode)
         if (node.class_type === "CLIPTextEncode" && node._meta?.title?.includes("Negative")) {
-          node.inputs.text = project.negativePrompt;
+          if (typeof node.inputs.text === 'string') {
+            node.inputs.text = project.negativePrompt;
+          }
         }
 
         // 4. UNet / Base Model
         if (node.class_type === "UNETLoader" || node.class_type === "CheckpointLoaderSimple") {
-          const skipModel = !project.baseModel || project.baseModel.trim() === '' || project.baseModel === 'sd_xl_base_1.0.safetensors';
-          if (node.inputs.unet_name !== undefined && !skipModel) node.inputs.unet_name = project.baseModel;
-          if (node.inputs.ckpt_name !== undefined && !skipModel) node.inputs.ckpt_name = project.baseModel;
+          if (project.baseModel && project.baseModel.trim() !== '' && project.baseModel !== 'sd_xl_base_1.0.safetensors') {
+            if (node.inputs.unet_name !== undefined) node.inputs.unet_name = project.baseModel;
+            if (node.inputs.ckpt_name !== undefined) node.inputs.ckpt_name = project.baseModel;
+          }
+        }
+        // VAE Model
+        if (node.class_type === "VAELoader") {
+          if (project.vaeModel && project.vaeModel.trim() !== '' && project.vaeModel !== 'auto') {
+            if (node.inputs.vae_name !== undefined) node.inputs.vae_name = project.vaeModel;
+          }
         }
 
         // 5. Resolution / Empty Latent
-        if (node.class_type.includes("EmptyLatent") || node.class_type.includes("SizePicker") || node.class_type.includes("Latent")) {
+        if (node.class_type === "SDXLEmptyLatentSizePicker+") {
+          if (project.resolution) {
+            node.inputs.resolution = project.resolution;
+          }
+        } else if (node.class_type.includes("EmptyLatent") || node.class_type.includes("SizePicker") || node.class_type.includes("Latent")) {
           if (node.inputs.width !== undefined) node.inputs.width = project.width;
           if (node.inputs.height !== undefined) node.inputs.height = project.height;
           if (node.inputs.width_override !== undefined) node.inputs.width_override = project.width;
           if (node.inputs.height_override !== undefined) node.inputs.height_override = project.height;
-          // IMPORTANT: Do NOT override "resolution" string properties because many custom nodes (like SDXLEmptyLatentSizePicker+) 
-          // use strict enums like "896x1088 (0.82)". Forcing "1024x1024" will trigger 400 Bad Request!
         }
 
         // 6. Power Lora Loader (rgthree)
         if (node.class_type === "Power Lora Loader (rgthree)") {
-          if (project.loraConfigs && project.loraConfigs.length > 0) {
-            // Disable all first
+          if (loraConfigs && loraConfigs.length > 0) {
+            // Match LoRAs in slots by name and apply override configs
             for (let i = 1; i <= 20; i++) {
-              const loraKey = `lora_${i}`;
-              if (node.inputs[loraKey]) {
-                node.inputs[loraKey].on = false;
+              const slotKey = `lora_${i}`;
+              const slot = node.inputs[slotKey];
+              if (slot && slot.lora && slot.lora !== "None") {
+                const config = loraConfigs.find((lc: any) => lc.name === slot.lora);
+                if (config) {
+                  slot.on = config.enabled;
+                  slot.strength = config.strength;
+                }
               }
             }
-            // Enable according to project config
-            project.loraConfigs.forEach((lora: any, idx: number) => {
-              const slot = `lora_${idx + 1}`;
-              if (node.inputs[slot]) {
-                node.inputs[slot].on = lora.enabled;
-                node.inputs[slot].lora = lora.name;
-                node.inputs[slot].strength = lora.strength;
-              } else {
-                node.inputs[slot] = { on: lora.enabled, lora: lora.name, strength: lora.strength };
-              }
-            });
+          }
+        }
+
+        // 7. General LoraLoader
+        if (node.class_type === "LoraLoader") {
+          if (loraConfigs && loraConfigs.length > 0 && node.inputs.lora_name) {
+            const config = loraConfigs.find((lc: any) => lc.name === node.inputs.lora_name);
+            if (config) {
+              // Note: Standard LoraLoader does not have an 'on' flag, but we can set model/clip strength to 0 if disabled
+              const str = config.enabled ? config.strength : 0;
+              if (node.inputs.strength_model !== undefined) node.inputs.strength_model = str;
+              if (node.inputs.strength_clip !== undefined) node.inputs.strength_clip = str;
+            }
           }
         }
       }
 
+      console.log("[ComfyService] Final injected workflow payload:", JSON.stringify(workflow, null, 2));
       return workflow;
     } catch (e) {
       console.error("Failed to inject parameters into workflow JSON", e);
@@ -224,3 +352,4 @@ export class ComfyService {
 }
 
 export const comfyService = new ComfyService();
+
