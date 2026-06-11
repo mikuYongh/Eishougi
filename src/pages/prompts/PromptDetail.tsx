@@ -25,7 +25,7 @@ export function PromptDetail() {
     steps: 20,
     cfg_scale: 5.5,
     sampler_name: "euler",
-    scheduler: "normal",
+    scheduler: "beta57",
     lora_configs: [
       { name: "detail_enhancer", strength: 0.8, enabled: true },
       { name: "add_detail", strength: 0.6, enabled: true },

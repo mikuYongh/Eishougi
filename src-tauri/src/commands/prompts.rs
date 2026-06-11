@@ -104,7 +104,13 @@ pub async fn update_prompt(state: State<'_, AppState>, mut prompt: Prompt) -> Re
     let db = state.db.lock().await;
     prompt.updated_at = now();
     
-    db.conn.execute(
+    println!("[Rust] update_prompt id={}, positive_prompt(first 80)={}, steps={}", 
+        prompt.id, 
+        &prompt.positive_prompt.chars().take(80).collect::<String>(),
+        prompt.steps
+    );
+    
+    let rows = db.conn.execute(
         "UPDATE prompts SET 
             title = ?1, description = ?2, positive_prompt = ?3, negative_prompt = ?4, artist_prompt = ?5,
             seed = ?6, width = ?7, height = ?8, steps = ?9, cfg_scale = ?10, sampler_name = ?11, scheduler = ?12,
@@ -117,6 +123,8 @@ pub async fn update_prompt(state: State<'_, AppState>, mut prompt: Prompt) -> Re
             prompt.id
         ]
     ).map_err(|e| e.to_string())?;
+    
+    println!("[Rust] update_prompt affected {} rows", rows);
 
     db.conn.execute("DELETE FROM prompt_images WHERE prompt_id = ?1", params![prompt.id.clone()]).map_err(|e| e.to_string())?;
     

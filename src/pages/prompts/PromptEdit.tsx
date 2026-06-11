@@ -38,9 +38,11 @@ export function PromptEdit() {
     }
   }, [id, prompts]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (id && id !== 'new') {
-      updatePrompt(id, project);
+      console.log("[PromptEdit] saving positivePrompt:", project.positivePrompt?.substring(0, 50), "negativePrompt:", project.negativePrompt?.substring(0, 50));
+      await updatePrompt(id, project);
+      console.log("[PromptEdit] save complete");
     }
     // For 'new', we'd addPrompt. Simplified for demo.
     navigate('/prompts');

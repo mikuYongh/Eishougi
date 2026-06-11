@@ -81,7 +81,7 @@ export function Generate() {
   const [overrideCfgScale, setOverrideCfgScale] = useState<number>(5.0);
   const [overrideSeed, setOverrideSeed] = useState<string>("-1");
   const [overrideSampler, setOverrideSampler] = useState<string>("euler");
-  const [overrideScheduler, setOverrideScheduler] = useState<string>("normal");
+  const [overrideScheduler, setOverrideScheduler] = useState<string>("beta57");
 
   // Prompts and style selectors states
   const [positivePrompt, setPositivePrompt] = useState<string>("");
@@ -110,8 +110,8 @@ export function Generate() {
       setOverrideSteps(project.steps || 20);
       setOverrideCfgScale(project.cfgScale || 5.0);
       setOverrideSeed(String(project.seed ?? "-1"));
-      setOverrideSampler(project.sampler || "euler");
-      setOverrideScheduler(project.scheduler || "normal");
+      setOverrideSampler(project.sampler || "euler_ancestral");
+      setOverrideScheduler(project.scheduler || "beta57");
       setPositivePrompt(project.positivePrompt || "");
       setNegativePrompt(project.negativePrompt || "");
     }
@@ -225,7 +225,9 @@ export function Generate() {
     
     // Auto-save generation choices back to the project database
     try {
+      console.log("[Generate] auto-saving positivePrompt:", positivePrompt?.substring(0, 50), "negativePrompt:", negativePrompt?.substring(0, 50));
       await updatePrompt(project.id, mergedProject);
+      console.log("[Generate] auto-save complete");
     } catch(e) {
       console.warn("Failed to auto-save prompt configurations:", e);
     }
@@ -490,6 +492,8 @@ export function Generate() {
                     value={overrideScheduler}
                     onChange={setOverrideScheduler}
                     options={[
+                      { label: "beta57", value: "beta57" },
+                      { label: "beta", value: "beta" },
                       { label: "normal", value: "normal" },
                       { label: "karras", value: "karras" },
                       { label: "exponential", value: "exponential" },

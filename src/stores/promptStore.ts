@@ -63,8 +63,8 @@ function toRustPrompt(p: PromptProject): any {
     steps: p.steps || 20,
     cfgScale: p.cfgScale || 5.0,
     seed: p.seed || '-1',
-    samplerName: p.sampler || 'euler',
-    scheduler: p.scheduler || 'normal',
+    samplerName: p.sampler || 'euler_ancestral',
+    scheduler: p.scheduler || 'beta57',
     baseModel: p.baseModel || '',
     vaeModel: p.vaeModel || '',
     resolution: p.resolution || null,
@@ -145,14 +145,30 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
   updatePrompt: async (id, data) => {
     try {
       const currentPrompt = get().prompts.find((p) => p.id === id);
-      if (!currentPrompt) return;
+      if (!currentPrompt) {
+        console.error("[updatePrompt] Prompt not found in store:", id);
+        return;
+      }
       const updatedPrompt = { ...currentPrompt, ...data, updatedAt: Date.now() };
-      await invoke('update_prompt', { prompt: toRustPrompt(updatedPrompt) });
+      const rustPayload = toRustPrompt(updatedPrompt);
+      console.log("[updatePrompt] saving to backend:", {
+        id: rustPayload.id,
+        positivePrompt: rustPayload.positivePrompt?.substring(0, 80) + "...",
+        negativePrompt: rustPayload.negativePrompt?.substring(0, 80) + "...",
+        samplerName: rustPayload.samplerName,
+        scheduler: rustPayload.scheduler,
+        steps: rustPayload.steps,
+        width: rustPayload.width,
+        height: rustPayload.height,
+        baseModel: rustPayload.baseModel,
+      });
+      const result = await invoke('update_prompt', { prompt: rustPayload });
+      console.log("[updatePrompt] backend returned:", result ? "OK" : "empty", result);
       set((state) => ({
         prompts: state.prompts.map((p) => (p.id === id ? updatedPrompt : p)),
       }));
     } catch (error) {
-      console.error('Failed to update prompt:', error);
+      console.error('[updatePrompt] Failed:', error);
     }
   },
   toggleFavorite: async (id) => {
