@@ -49,23 +49,35 @@ export class ComfyService {
       try {
         if (typeof event.data === 'string') {
           const msg = JSON.parse(event.data);
+          console.log("[ComfyWS] received message type:", msg.type, msg.type === 'executed' ? 'has output:' + !!msg.data?.output : '');
           if (msg.type === 'progress') {
             onProgress({ value: msg.data.value, max: msg.data.max, node: msg.data.node });
           } else if (msg.type === 'executed') {
-            // Node execution complete, check for images
             if (msg.data.output && msg.data.output.images) {
               const comfyUrl = getComfyUrl();
               const images = msg.data.output.images.map((img: any) => 
                 `${comfyUrl}/view?filename=${img.filename}&subfolder=${img.subfolder}&type=${img.type}`
               );
+              console.log("[ComfyWS] calling onComplete with images:", images.length);
               onComplete(images);
+            } else {
+              console.log("[ComfyWS] executed msg without output images:", JSON.stringify(msg.data));
             }
           } else if (msg.type === 'execution_error') {
+            console.error("[ComfyWS] execution_error:", msg.data?.exception_message);
             onError(msg.data.exception_message || "Execution error in ComfyUI");
+          } else if (msg.type === 'execution_success') {
+            console.log("[ComfyWS] execution_success for prompt:", msg.data?.prompt_id);
+          } else if (msg.type === 'executing') {
+            console.log("[ComfyWS] executing node:", msg.data?.node);
+          } else if (msg.type === 'execution_cached') {
+            console.log("[ComfyWS] execution_cached for prompt:", msg.data?.prompt_id);
           }
+        } else {
+          console.log("[ComfyWS] received non-string data:", typeof event.data);
         }
       } catch (e) {
-        console.error("Failed to parse ComfyUI message", e);
+        console.error("[ComfyWS] Failed to parse message:", e, event.data);
       }
     };
 
