@@ -102,10 +102,10 @@ export function PromptList() {
             {paginatedPrompts.map((p) => (
               <div key={p.id} className="glass-panel rounded-xl flex flex-col group border border-white/5 hover:border-blue-400/30 transition-all hover:shadow-[0_8px_30px_rgba(66,165,245,0.1)] overflow-hidden">
                 
-                {p.coverImage && (
+                {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) && (
                   <div className="h-24 w-full relative overflow-hidden flex-shrink-0 bg-black/40">
                     <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors z-10" />
-                    <img src={p.coverImage} alt={p.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
+                    <img src={p.coverImage || p.instanceImages?.[0]} alt={p.title} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500" />
                     <div className="absolute top-2 right-2 z-20">
                       <button 
                         onClick={() => toggleFavorite(p.id)}
@@ -123,7 +123,7 @@ export function PromptList() {
                       <h3 className="text-[14px] font-bold text-white/90 truncate mb-1" title={p.title}>{p.title}</h3>
                       <p className="text-[11px] text-white/50 line-clamp-1">{p.description || "暂无描述"}</p>
                     </div>
-                    {!p.coverImage && (
+                    {(!p.coverImage && (!p.instanceImages || p.instanceImages.length === 0)) && (
                       <button onClick={() => toggleFavorite(p.id)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer flex-shrink-0">
                         <Star size={14} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-white/30"} />
                       </button>
@@ -157,7 +157,10 @@ export function PromptList() {
                     >
                       <Edit3 size={12} /> 编辑
                     </button>
-                    <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-[11px] font-bold transition-colors cursor-pointer">
+                    <button 
+                      onClick={() => navigate(`/generate/${p.id}`)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-[11px] font-bold transition-colors cursor-pointer"
+                    >
                       <Rocket size={12} /> 生成
                     </button>
                   </div>
@@ -173,8 +176,8 @@ export function PromptList() {
                 
                 {/* Square Thumbnail */}
                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-black/40 flex-shrink-0 relative">
-                  {p.coverImage ? (
-                    <img src={p.coverImage} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="cover"/>
+                  {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) ? (
+                    <img src={p.coverImage || p.instanceImages?.[0]} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="cover"/>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/10">
                       <ImageIcon size={20} />
@@ -217,7 +220,10 @@ export function PromptList() {
                   >
                     <Edit3 size={14} /> 配置
                   </button>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-[12px] font-bold border border-blue-500/20 transition-colors cursor-pointer">
+                  <button 
+                    onClick={() => navigate(`/generate/${p.id}`)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-[12px] font-bold border border-blue-500/20 transition-colors cursor-pointer"
+                  >
                     <Rocket size={14} /> 生成
                   </button>
                 </div>

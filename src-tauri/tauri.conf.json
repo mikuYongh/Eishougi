@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Prompt Muse",
+  "productName": "詠唱机",
   "version": "0.1.0",
   "identifier": "com.promptmuse.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Prompt Muse",
+        "title": "詠唱机 EISHOUGI",
         "label": "main",
         "width": 1440,
         "height": 900,

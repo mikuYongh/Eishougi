@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { UploadCloud, Image as ImageIcon, Sparkles, Copy, FileText, CheckCircle2, RefreshCw } from "lucide-react";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
+import { llmService } from "../../services/llmService";
 
 export function Tagger() {
   const [image, setImage] = useState<string | null>(null);
@@ -17,25 +18,34 @@ export function Tagger() {
     }
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!image) return;
     setIsAnalyzing(true);
-    // Mock analysis delay
-    setTimeout(() => {
-      setResults([
-        { tag: "1girl", confidence: 0.99 },
-        { tag: "solo", confidence: 0.95 },
-        { tag: "cyberpunk", confidence: 0.88 },
-        { tag: "neon_lights", confidence: 0.85 },
-        { tag: "glowing_eyes", confidence: 0.76 },
-        { tag: "jacket", confidence: 0.72 },
-        { tag: "looking_at_viewer", confidence: 0.65 },
-        { tag: "cityscape", confidence: 0.60 },
-        { tag: "rain", confidence: 0.55 },
-        { tag: "night", confidence: 0.50 }
-      ]);
+    
+    try {
+      // In a real app we'd need to convert the selected file to a base64 string
+      // Let's get the file from the input ref
+      const file = fileInputRef.current?.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64data = reader.result as string;
+          try {
+            const tags = await llmService.tagImage(base64data);
+            setResults(tags);
+          } catch (e: any) {
+            alert(e.message);
+          } finally {
+            setIsAnalyzing(false);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        setIsAnalyzing(false);
+      }
+    } catch (e) {
       setIsAnalyzing(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -77,7 +87,10 @@ export function Tagger() {
                   <UploadCloud size={32} className="text-orange-400/80" />
                 </div>
                 <h3 className="text-lg font-bold text-white/90 mb-1">拖拽或点击上传图片</h3>
-                <p className="text-xs text-white/40">支持 JPG, PNG, WEBP (最大 10MB)</p>
+                <p className="text-xs text-white/40 mb-3">支持 JPG, PNG, WEBP (最大 10MB)</p>
+                <div className="text-[10px] text-white/30 px-4 text-center">
+                  * 反推模型将调用本地或云端的 agnes-2.0-flash 多模态视觉模型进行高精度特征提取。
+                </div>
               </div>
             )}
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />

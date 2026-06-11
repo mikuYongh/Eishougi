@@ -1,0 +1,303 @@
+{
+  "11": {
+    "inputs": {
+      "samples": [
+        "62",
+        0
+      ],
+      "vae": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
+  },
+  "12": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "保存图像"
+    }
+  },
+  "13": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "加载VAE"
+    }
+  },
+  "14": {
+    "inputs": {
+      "unet_name": "animayume_v05.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNet加载器"
+    }
+  },
+  "16": {
+    "inputs": {
+      "resolution": "896x1088 (0.82)",
+      "batch_size": 1,
+      "width_override": 0,
+      "height_override": 0
+    },
+    "class_type": "SDXLEmptyLatentSizePicker+",
+    "_meta": {
+      "title": "🔧 Empty Latent Size Picker"
+    }
+  },
+  "17": {
+    "inputs": {
+      "text": [
+        "68",
+        0
+      ],
+      "clip": [
+        "56",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "18": {
+    "inputs": {
+      "text": "lazyneg, lazyhand, censored, mosaic censoring, photorealistic, realistic, artist name, signature, lowres, bad anatomy, bad hands, text, error, missing fingers, extra fingers, fewer digits, cropped, worst quality, low quality, jpeg artifacts, watermark, username, sketch, jpeg Closed eyes, artifacts, signature, watermark, username, simple background, conjoined, bad ai-generated, shiny clothes, shiny skin, gold skin, white hair,white head, halo,three hands,score_1,score_2,score_3,artist name,@ogipote",
+      "clip": [
+        "56",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "27": {
+    "inputs": {},
+    "class_type": "Anything Everywhere",
+    "_meta": {
+      "title": "Anything Everywhere"
+    }
+  },
+  "50": {
+    "inputs": {
+      "string_a": "",
+      "string_b": "highly detailed, fantasy art,hakurei_reimu,masterpiece, best quality, score_9, year 2025，highres,nasterpiece,,cure arcana shadow,nsfw,cutout lingerie,highly detailed, fantasy art, erotic, lewd, unsatisfied, vaginal fluids, partially exposed pussy, heart earrings, no man, wearing panties, white skin, cute, natural pose, rbq,Ahegao,face markings/symbols,heart symbol written on thighs (or: thigh text: \"❤️\"),being internally ejaculated into,being internally ejaculated into,nipples exposed,double nipple stimulator,partially exposed pussy,anal plug with cat tail,peekaboo vagina, on bed, messy, spreading pussy with hands, lying flat, legs apart, no pubic hair, no penis, legs up, cute, unsatisfied, vaginal fluids,@picpicgram,",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "连接"
+    }
+  },
+  "56": {
+    "inputs": {
+      "clip_name": "qwen_3_06b_base.safetensors",
+      "type": "stable_diffusion",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "加载CLIP"
+    }
+  },
+  "57": {
+    "inputs": {
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": false,
+        "lora": "AnimaP3-NP43iV2.safetensors",
+        "strength": 1
+      },
+      "lora_2": {
+        "on": false,
+        "lora": "FComic1to1000_Anima.safetensors",
+        "strength": 0
+      },
+      "lora_3": {
+        "on": true,
+        "lora": "anima-rl-v0.1.safetensors",
+        "strength": 1
+      },
+      "lora_4": {
+        "on": false,
+        "lora": "anima-prone bone (pov).safetensors",
+        "strength": 1
+      },
+      "lora_5": {
+        "on": false,
+        "lora": "sagging-anima-v3.1b.safetensors",
+        "strength": 1
+      },
+      "lora_6": {
+        "on": true,
+        "lora": "anima-highres-aesthetic-boost.safetensors",
+        "strength": 1
+      },
+      "lora_7": {
+        "on": true,
+        "lora": "yzs_anima_v0.3.safetensors",
+        "strength": 1
+      },
+      "lora_8": {
+        "on": false,
+        "lora": "ogipote-animap3-000039.safetensors",
+        "strength": 1
+      },
+      "lora_9": {
+        "on": false,
+        "lora": "agefxv3-3.safetensors",
+        "strength": 1
+      },
+      "lora_10": {
+        "on": false,
+        "lora": "anima-base-1-masterpiece-v51.safetensors",
+        "strength": 1
+      },
+      "lora_11": {
+        "on": true,
+        "lora": "anima_a11iss_v1.3-epoch20.safetensors",
+        "strength": 1
+      },
+      "lora_12": {
+        "on": false,
+        "lora": "mixed_styles_anima_preview3_v4.safetensors",
+        "strength": 1
+      },
+      "lora_13": {
+        "on": false,
+        "lora": "2200s.safetensors",
+        "strength": 1
+      },
+      "lora_14": {
+        "on": false,
+        "lora": "curearcanashadow_v0.1_anima.safetensors",
+        "strength": 1
+      },
+      "lora_15": {
+        "on": false,
+        "lora": "anima-turbo-lora-v0.2.safetensors",
+        "strength": 1
+      },
+      "➕ Add Lora": "",
+      "model": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader (rgthree)"
+    }
+  },
+  "62": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 722622006084161,
+      "steps": 30,
+      "cfg": 5,
+      "sampler_name": "dpmpp_2m_sde_gpu",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 10000,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "57",
+        0
+      ],
+      "positive": [
+        "17",
+        0
+      ],
+      "negative": [
+        "18",
+        0
+      ],
+      "latent_image": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "K采样器（高级）"
+    }
+  },
+  "66": {
+    "inputs": {
+      "model_path": "Minthy/ToriiGate-0.5",
+      "device": "cuda",
+      "dtype": "bfloat16",
+      "max_pixels_mp": 1,
+      "keep_model_alive": false,
+      "max_new_tokens": "randomize",
+      "temperature": "randomize",
+      "decoding": "randomize",
+      "show_generation_progress": "randomize",
+      "seed": 913546026029084
+    },
+    "class_type": "ToriiGate_Captioner",
+    "_meta": {
+      "title": "ToriiGate Captioner"
+    }
+  },
+  "68": {
+    "inputs": {
+      "system": "你是一个图片提示词生成大师，我需要你准确的将提示词翻译成英文提示词，你只需要返回生成后的提示词，除此之外都不要返回,如果文本里面没含有任何改善图像的提示词时，你可以将这些补充进去:highly detailed, fantasy art，masterpiece, best quality, score_9, year 2025，highres",
+      "prompt": [
+        "71",
+        0
+      ],
+      "think": false,
+      "keep_context": false,
+      "format": "text",
+      "connectivity": [
+        "70",
+        0
+      ]
+    },
+    "class_type": "OllamaGenerateV2",
+    "_meta": {
+      "title": "Ollama Generate"
+    }
+  },
+  "70": {
+    "inputs": {
+      "url": "http://127.0.0.1:11434",
+      "model": "gemma-tagger:latest",
+      "keep_alive": -1,
+      "keep_alive_unit": "minutes"
+    },
+    "class_type": "OllamaConnectivityV2",
+    "_meta": {
+      "title": "Ollama Connectivity"
+    }
+  },
+  "71": {
+    "inputs": {
+      "string": " Hatsune Miku,rpgchara,transparent background, reference sheet, chibi, full body,A sprite sheet of full-body pixel art characters arranged in a 12×12 grid,featuring front,side,and back views."
+    },
+    "class_type": "Simple String",
+    "_meta": {
+      "title": "Simple String"
+    }
+  }
+}

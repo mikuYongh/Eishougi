@@ -1,21 +1,31 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X } from "lucide-react";
+import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X, History } from "lucide-react";
 import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
+import { useModelStore } from "../../stores/modelStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
+import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
+import { invoke } from "@tauri-apps/api/core";
+import { HistoryImagePicker } from "../../components/ui/HistoryImagePicker";
 
 export function PromptEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
   const prompts = usePromptStore((state) => state.prompts);
   const updatePrompt = usePromptStore((state) => state.updatePrompt);
+  const { checkpoints, loras, fetchModels } = useModelStore();
+
+  useEffect(() => {
+    fetchModels();
+  }, [fetchModels]);
   
   const [project, setProject] = useState<Partial<PromptProject>>({
     title: "", description: "", coverImage: "", positivePrompt: "", negativePrompt: "", artistPrompt: "",
     width: 1024, height: 1024, steps: 20, cfgScale: 7.0, seed: "-1",
-    baseModel: "sd_xl_base_1.0.safetensors", vaeModel: "auto", loraConfigs: [], tags: []
+    baseModel: "sd_xl_base_1.0.safetensors", vaeModel: "auto", loraConfigs: [], tags: [], instanceImages: []
   });
   const [tagInput, setTagInput] = useState("");
+  const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -60,10 +70,11 @@ export function PromptEdit() {
     updateField('tags', project.tags?.filter(t => t !== tagToRemove));
   };
 
-  const addLora = () => {
+  const addLora = (loraName: string) => {
+    if (!loraName) return;
     setProject(prev => ({
       ...prev,
-      loraConfigs: [...(prev.loraConfigs || []), { name: "new_lora.safetensors", strength: 0.8, enabled: true }]
+      loraConfigs: [...(prev.loraConfigs || []), { name: loraName, strength: 0.8, enabled: true }]
     }));
   };
 
@@ -222,6 +233,42 @@ export function PromptEdit() {
             </div>
           </div>
 
+          {/* Reference Images */}
+          <div className="glass-panel p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[13px] font-bold text-white/90 flex items-center gap-2">
+                <ImageIcon size={16} className="text-blue-400" /> 实例图片 (Reference)
+              </h3>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setShowHistoryPicker(true)} 
+                  className="px-3 py-1 bg-blue-500/20 text-blue-400 text-[11px] font-bold rounded-lg hover:bg-blue-500/30 transition-colors cursor-pointer border border-blue-500/30 flex items-center gap-1"
+                >
+                  <History size={12} /> 选历史图
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              {project.instanceImages?.map((img, i) => (
+                <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-blue-500/30 shadow-[0_0_10px_rgba(66,165,245,0.2)]">
+                  <img src={img} className="w-full h-full object-cover" alt="instance" />
+                  <button 
+                    onClick={() => updateField('instanceImages', project.instanceImages!.filter((_, idx) => idx !== i))} 
+                    className="absolute top-0 right-0 bg-red-500/80 text-white p-0.5 rounded-bl-lg hover:bg-red-500 transition-colors cursor-pointer"
+                  >
+                    <X size={12}/>
+                  </button>
+                </div>
+              ))}
+              {(!project.instanceImages || project.instanceImages.length === 0) && (
+                <div className="w-full h-16 flex items-center justify-center border border-dashed border-white/10 rounded-lg text-white/30 text-[11px] font-bold tracking-widest">
+                  暂无参考图
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="glass-panel p-5">
             <h3 className="text-[13px] font-bold text-white/90 mb-4 flex items-center gap-2">
               <ImageIcon size={16} className="text-blue-400" /> 分辨率与画幅
@@ -250,16 +297,15 @@ export function PromptEdit() {
               <Cpu size={16} className="text-purple-400" /> 基础模型
             </h3>
             <div className="space-y-4">
-              <div className="relative z-30">
+              <div className="relative z-40">
                 <label className="text-[10px] text-white/40 mb-1.5 block uppercase tracking-wider font-bold">Checkpoint</label>
-                <GlassDropdown 
+                <SearchableDropdown 
                   value={project.baseModel || ""}
                   onChange={v => updateField('baseModel', v)}
-                  options={[
-                    { label: "sd_xl_base_1.0.safetensors", value: "sd_xl_base_1.0.safetensors" },
-                    { label: "animagine-xl-3.1.safetensors", value: "animagine-xl-3.1.safetensors" }
-                  ]}
+                  options={checkpoints.map(c => ({ label: c, value: c }))}
                   accentColor="purple"
+                  placeholder="选择基础模型..."
+                  searchPlaceholder="搜索模型文件..."
                 />
               </div>
               <div className="relative z-20">
@@ -282,9 +328,6 @@ export function PromptEdit() {
               <h3 className="text-[13px] font-bold text-white/90 flex items-center gap-2">
                 <Layers size={16} className="text-orange-400" /> LoRA 列表
               </h3>
-              <button onClick={addLora} className="w-6 h-6 rounded bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer">
-                <Plus size={14} />
-              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-2">
@@ -305,12 +348,33 @@ export function PromptEdit() {
                   暂未添加 LoRA
                 </div>
               )}
+              
+              <div className="mt-4 relative z-30">
+                <SearchableDropdown
+                  value=""
+                  placeholder="➕ 搜索并添加 LoRA..."
+                  searchPlaceholder="输入 LoRA 名称进行搜索..."
+                  options={loras.map(l => ({ label: l, value: l }))}
+                  onChange={addLora}
+                  accentColor="orange"
+                />
+              </div>
             </div>
           </div>
 
         </div>
 
       </div>
+      
+      {showHistoryPicker && (
+        <HistoryImagePicker 
+          onSelect={url => {
+            updateField('instanceImages', [...(project.instanceImages || []), url]);
+            setShowHistoryPicker(false);
+          }} 
+          onClose={() => setShowHistoryPicker(false)} 
+        />
+      )}
     </div>
   );
 }

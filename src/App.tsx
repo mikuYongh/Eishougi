@@ -1,10 +1,11 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useSettingsStore } from "./stores/settingsStore";
 import { TitleBar } from "./components/layout/TitleBar";
 import { Sidebar } from "./components/layout/Sidebar";
 import { TopBar } from "./components/layout/TopBar";
 import { StatusBar } from "./components/layout/StatusBar";
-import { AgentPanel } from "./components/layout/AgentPanel";
+import { AgentPanel } from "./components/agent/AgentPanel";
 
 import { Dashboard } from "./pages/Dashboard";
 import {
@@ -13,9 +14,18 @@ import {
   Generate, VideoGenerate,
   Tagger, Gallery, History, Settings,
 } from "./pages";
+import { usePromptStore } from "./stores/promptStore";
+import { useWorkflowStore } from "./stores/workflowStore";
 
 export default function App() {
   const { wallpaperPath, appTheme, blurLevel } = useSettingsStore();
+  const fetchPrompts = usePromptStore((state) => state.fetchPrompts);
+  const fetchWorkflows = useWorkflowStore((state) => state.fetchWorkflows);
+
+  useEffect(() => {
+    fetchPrompts();
+    fetchWorkflows();
+  }, [fetchPrompts, fetchWorkflows]);
 
   return (
     <BrowserRouter>

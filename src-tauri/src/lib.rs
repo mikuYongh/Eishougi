@@ -41,6 +41,23 @@ pub fn run() {
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::greet,
+            commands::prompts::create_prompt,
+            commands::prompts::get_prompt,
+            commands::prompts::update_prompt,
+            commands::prompts::delete_prompt,
+            commands::prompts::list_prompts,
+            commands::workflows::create_workflow,
+            commands::workflows::get_workflow,
+            commands::workflows::update_workflow,
+            commands::workflows::delete_workflow,
+            commands::workflows::list_workflows,
+            commands::history::save_generated_image,
+            commands::history::get_generated_image,
+            commands::history::list_generated_images,
+            commands::history::delete_generated_image,
+            commands::files::save_base64_image,
+            commands::files::read_image_base64,
+            commands::files::read_text_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -51,7 +51,7 @@ export function TitleBar() {
       <div className="flex items-center gap-2.5 flex-1">
         <Sparkles size={14} className="text-pink-400" />
         <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-white/80">
-          Prompt Muse
+          詠唱机 EISHOUGI
         </span>
         {!isTauri && (
           <span className="text-[9px] font-bold ml-2 px-1.5 py-[1px] rounded bg-pink-500/20 text-pink-300 border border-pink-500/30">

@@ -1,55 +1,63 @@
-import { create } from "zustand";
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
-type AppTheme = "dark" | "light";
+export interface AppSettings {
+  comfyUrl: string;
+  llm: {
+    provider: 'openai' | 'anthropic' | 'ollama' | 'agnes';
+    apiKey: string;
+    apiUrl: string;
+    model: string;
+  };
+  slimToolsMode: boolean;
+  wallpaperPath: string;
+  appTheme: 'dark' | 'light' | 'system';
+  blurLevel: number;
+}
 
 interface SettingsState {
+  settings: AppSettings;
   wallpaperPath: string;
-  setWallpaperPath: (path: string) => void;
-  resetWallpaper: () => void;
-  
-  appTheme: AppTheme;
-  setAppTheme: (theme: AppTheme) => void;
-  toggleTheme: () => void;
-  
   blurLevel: number;
+  appTheme: 'dark' | 'light' | 'system';
+  updateSettings: (newSettings: Partial<AppSettings>) => void;
+  setWallpaperPath: (path: string) => void;
   setBlurLevel: (level: number) => void;
+  setAppTheme: (theme: 'dark' | 'light' | 'system') => void;
+  resetWallpaper: () => void;
 }
 
-const DEFAULT_WALLPAPER = "/anime_bg.png";
-const DEFAULT_BLUR = 20;
+const defaultSettings: AppSettings = {
+  comfyUrl: import.meta.env.VITE_COMFY_URL || 'http://127.0.0.1:8188',
+  llm: {
+    provider: 'agnes',
+    apiKey: import.meta.env.VITE_LLM_API_KEY || '',
+    apiUrl: import.meta.env.VITE_LLM_API_URL || 'https://apihub.agnes-ai.com/v1',
+    model: import.meta.env.VITE_LLM_MODEL || 'agnes-2.0-flash'
+  },
+  slimToolsMode: false,
+  wallpaperPath: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2560&auto=format&fit=crop',
+  appTheme: 'dark',
+  blurLevel: 20,
+};
 
-// Migration: If user had the old default cached, force upgrade it
-let initialWallpaper = localStorage.getItem("prompt-muse-wallpaper");
-if (!initialWallpaper || initialWallpaper === "/bg.png") {
-  initialWallpaper = DEFAULT_WALLPAPER;
-  localStorage.setItem("prompt-muse-wallpaper", DEFAULT_WALLPAPER);
-}
-
-export const useSettingsStore = create<SettingsState>((set) => ({
-  wallpaperPath: initialWallpaper,
-  setWallpaperPath: (path) => {
-    localStorage.setItem("prompt-muse-wallpaper", path);
-    set({ wallpaperPath: path });
-  },
-  resetWallpaper: () => {
-    localStorage.setItem("prompt-muse-wallpaper", DEFAULT_WALLPAPER);
-    set({ wallpaperPath: DEFAULT_WALLPAPER });
-  },
-  
-  appTheme: (localStorage.getItem("prompt-muse-theme-mode") as AppTheme) || "dark",
-  setAppTheme: (theme) => {
-    localStorage.setItem("prompt-muse-theme-mode", theme);
-    set({ appTheme: theme });
-  },
-  toggleTheme: () => set((state) => {
-    const newTheme = state.appTheme === "dark" ? "light" : "dark";
-    localStorage.setItem("prompt-muse-theme-mode", newTheme);
-    return { appTheme: newTheme };
-  }),
-  
-  blurLevel: parseInt(localStorage.getItem("prompt-muse-blur") || String(DEFAULT_BLUR)),
-  setBlurLevel: (level) => {
-    localStorage.setItem("prompt-muse-blur", String(level));
-    set({ blurLevel: level });
-  },
-}));
+export const useSettingsStore = create<SettingsState>()(
+  persist(
+    (set) => ({
+      settings: defaultSettings,
+      wallpaperPath: defaultSettings.wallpaperPath,
+      blurLevel: defaultSettings.blurLevel,
+      appTheme: defaultSettings.appTheme,
+      updateSettings: (newSettings) => set((state) => ({
+        settings: { ...state.settings, ...newSettings }
+      })),
+      setWallpaperPath: (path) => set({ wallpaperPath: path }),
+      setBlurLevel: (level) => set({ blurLevel: level }),
+      setAppTheme: (theme) => set({ appTheme: theme }),
+      resetWallpaper: () => set({ wallpaperPath: defaultSettings.wallpaperPath }),
+    }),
+    {
+      name: 'eishougi-settings',
+    }
+  )
+);

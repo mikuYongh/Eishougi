@@ -86,7 +86,7 @@ export function AgentPanel() {
               <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-pink-400 to-purple-500" />
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles size={14} className="text-pink-400" />
-                <span className="font-bold text-white">你好！我是 Prompt Muse AI</span>
+                <span className="font-bold text-white">你好！我是 詠唱机 EISHOUGI AI</span>
               </div>
               我可以帮你搜索提示词、创建提示词、触发生成任务等。在设置页配置 API Key 后即可开始对话。
             </div>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface LoraConfig {
   name: string;
@@ -35,89 +35,131 @@ export interface PromptProject {
   isFavorite: boolean;
   createdAt: number;
   updatedAt: number;
+  instanceImages?: string[];
 }
 
 interface PromptStore {
   prompts: PromptProject[];
-  addPrompt: (prompt: PromptProject) => void;
-  removePrompt: (id: string) => void;
-  updatePrompt: (id: string, data: Partial<PromptProject>) => void;
-  toggleFavorite: (id: string) => void;
+  fetchPrompts: () => Promise<void>;
+  addPrompt: (prompt: PromptProject) => Promise<void>;
+  removePrompt: (id: string) => Promise<void>;
+  updatePrompt: (id: string, data: Partial<PromptProject>) => Promise<void>;
+  toggleFavorite: (id: string) => Promise<void>;
 }
 
-const mockPrompts: PromptProject[] = [
-  {
-    id: "1",
-    title: "赛博朋克夜之城",
-    description: "具有强烈霓虹灯光效的赛博朋克城市全景，高画质设定。",
-    coverImage: "https://images.unsplash.com/photo-1515630278258-407f66498911?q=80&w=600&auto=format&fit=crop",
-    positivePrompt: "masterpiece, best quality, cyberpunk city, neon lights, rainy street, highly detailed, 8k resolution, cinematic lighting",
-    negativePrompt: "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality",
-    artistPrompt: "by greg rutkowski, by makoto shinkai",
-    width: 1024,
-    height: 576,
-    steps: 30,
-    cfgScale: 7.0,
-    seed: "-1",
-    sampler: "euler",
-    scheduler: "normal",
-    baseModel: "sd_xl_base_1.0.safetensors",
-    vaeModel: "auto",
-    loraConfigs: [
-      { name: "cyberpunk_neon_v1.safetensors", strength: 0.8, enabled: true }
-    ],
-    tags: ["场景", "赛博朋克", "夜景"],
-    isFavorite: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  {
-    id: "2",
-    title: "二次元机甲少女",
-    description: "标准动漫质感，适用于人物生成设定图。",
-    coverImage: "https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=600&auto=format&fit=crop",
-    positivePrompt: "1girl, solo, mecha musume, mechanical parts, glowing armor, dynamic pose, looking at viewer, masterpiece, high quality, anime style",
-    negativePrompt: "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, jpeg artifacts",
-    artistPrompt: "",
-    width: 832,
-    height: 1216,
-    steps: 25,
-    cfgScale: 6.0,
-    seed: "12345678",
-    sampler: "dpmpp_2m",
-    scheduler: "karras",
-    baseModel: "animagine-xl-3.1.safetensors",
-    vaeModel: "sdxl_vae.safetensors",
-    loraConfigs: [
-      { name: "mecha_details_xl.safetensors", strength: 0.65, enabled: true },
-      { name: "anime_flat_color.safetensors", strength: 0.4, enabled: false }
-    ],
-    tags: ["人物", "二次元", "机甲"],
-    isFavorite: false,
-    createdAt: Date.now() - 86400000,
-    updatedAt: Date.now() - 86400000
-  }
-];
+// Mapper to Rust
+function toRustPrompt(p: PromptProject): any {
+  return {
+    id: p.id,
+    title: p.title || '',
+    description: p.description || '',
+    positivePrompt: p.positivePrompt || '',
+    negativePrompt: p.negativePrompt || '',
+    artistPrompt: p.artistPrompt || '',
+    width: p.width || 1024,
+    height: p.height || 1024,
+    steps: p.steps || 25,
+    cfgScale: p.cfgScale || 7.0,
+    seed: p.seed || '-1',
+    samplerName: p.sampler || 'euler',
+    scheduler: p.scheduler || 'normal',
+    baseModel: p.baseModel || '',
+    vaeModel: p.vaeModel || '',
+    loraConfigs: JSON.stringify(p.loraConfigs || []),
+    tags: (p.tags || []).map((t, i) => ({ id: `tag_${Date.now()}_${i}`, name: t, color: '#ff6b9d', createdAt: Date.now() })),
+    isFavorite: p.isFavorite || false,
+    isPinned: false,
+    createdAt: p.createdAt || Date.now(),
+    updatedAt: p.updatedAt || Date.now(),
+    images: (p.instanceImages || []).map((path, i) => ({
+      id: `pimg_${Date.now()}_${i}`,
+      promptId: p.id,
+      filePath: path,
+      fileName: `image_${i}.png`,
+      createdAt: Date.now()
+    }))
+  };
+}
 
-export const usePromptStore = create<PromptStore>()(
-  persist(
-    (set) => ({
-      prompts: mockPrompts,
-      addPrompt: (prompt) =>
-        set((state) => ({ prompts: [...state.prompts, prompt] })),
-      removePrompt: (id) =>
-        set((state) => ({ prompts: state.prompts.filter((p) => p.id !== id) })),
-      updatePrompt: (id, data) =>
-        set((state) => ({
-          prompts: state.prompts.map((p) => (p.id === id ? { ...p, ...data } : p)),
-        })),
-      toggleFavorite: (id) =>
-        set((state) => ({
-          prompts: state.prompts.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p)),
-        })),
-    }),
-    {
-      name: 'prompt-storage',
+// Mapper from Rust
+function fromRustPrompt(r: any): PromptProject {
+  let loras = [];
+  try { loras = JSON.parse(r.loraConfigs || '[]'); } catch(e) {}
+  return {
+    id: r.id,
+    title: r.title,
+    description: r.description,
+    positivePrompt: r.positivePrompt,
+    negativePrompt: r.negativePrompt,
+    artistPrompt: r.artistPrompt,
+    width: r.width,
+    height: r.height,
+    steps: r.steps,
+    cfgScale: r.cfgScale,
+    seed: r.seed,
+    sampler: r.samplerName,
+    scheduler: r.scheduler,
+    baseModel: r.baseModel || '',
+    vaeModel: r.vaeModel || '',
+    loraConfigs: loras,
+    tags: (r.tags || []).map((t: any) => t.name),
+    isFavorite: r.isFavorite,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    instanceImages: (r.images || []).map((img: any) => img.filePath)
+  };
+}
+
+export const usePromptStore = create<PromptStore>((set, get) => ({
+  prompts: [],
+  fetchPrompts: async () => {
+    try {
+      const rustPrompts = await invoke<any[]>('list_prompts');
+      set({ prompts: rustPrompts.map(fromRustPrompt) });
+    } catch (error) {
+      console.error('Failed to fetch prompts:', error);
     }
-  )
-);
+  },
+  addPrompt: async (prompt) => {
+    try {
+      await invoke('create_prompt', { prompt: toRustPrompt(prompt) });
+      set((state) => ({ prompts: [prompt, ...state.prompts] }));
+    } catch (error) {
+      console.error('Failed to add prompt:', error);
+    }
+  },
+  removePrompt: async (id) => {
+    try {
+      await invoke('delete_prompt', { id });
+      set((state) => ({ prompts: state.prompts.filter((p) => p.id !== id) }));
+    } catch (error) {
+      console.error('Failed to remove prompt:', error);
+    }
+  },
+  updatePrompt: async (id, data) => {
+    try {
+      const currentPrompt = get().prompts.find((p) => p.id === id);
+      if (!currentPrompt) return;
+      const updatedPrompt = { ...currentPrompt, ...data, updatedAt: Date.now() };
+      await invoke('update_prompt', { prompt: toRustPrompt(updatedPrompt) });
+      set((state) => ({
+        prompts: state.prompts.map((p) => (p.id === id ? updatedPrompt : p)),
+      }));
+    } catch (error) {
+      console.error('Failed to update prompt:', error);
+    }
+  },
+  toggleFavorite: async (id) => {
+    try {
+      const currentPrompt = get().prompts.find((p) => p.id === id);
+      if (!currentPrompt) return;
+      const updatedPrompt = { ...currentPrompt, isFavorite: !currentPrompt.isFavorite };
+      await invoke('update_prompt', { prompt: toRustPrompt(updatedPrompt) });
+      set((state) => ({
+        prompts: state.prompts.map((p) => (p.id === id ? updatedPrompt : p)),
+      }));
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+    }
+  },
+}));
