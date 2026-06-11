@@ -51,6 +51,7 @@ pub fn run() {
             commands::workflows::update_workflow,
             commands::workflows::delete_workflow,
             commands::workflows::list_workflows,
+            commands::workflows::set_default_workflow,
             commands::history::save_generated_image,
             commands::history::get_generated_image,
             commands::history::list_generated_images,
@@ -58,6 +59,12 @@ pub fn run() {
             commands::files::save_base64_image,
             commands::files::read_image_base64,
             commands::files::read_text_file,
+            commands::favorites::get_favorite_prompts,
+            commands::favorites::add_favorite_prompt,
+            commands::favorites::delete_favorite_prompt,
+            commands::styles::get_custom_styles,
+            commands::styles::add_custom_style,
+            commands::styles::delete_custom_style,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

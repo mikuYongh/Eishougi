@@ -98,3 +98,13 @@ pub async fn list_workflows(state: State<'_, AppState>) -> Result<Vec<Workflow>,
     
     Ok(workflows)
 }
+
+#[tauri::command]
+pub async fn set_default_workflow(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let db = state.db.lock().await;
+    
+    db.conn.execute("UPDATE workflows SET is_default = 0", []).map_err(|e| e.to_string())?;
+    db.conn.execute("UPDATE workflows SET is_default = 1 WHERE id = ?1", params![id]).map_err(|e| e.to_string())?;
+    
+    Ok(())
+}

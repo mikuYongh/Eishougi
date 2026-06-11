@@ -5,6 +5,8 @@ pub fn run(conn: &Connection) -> Result<()> {
 
     let migrations: Vec<(&str, i32)> = vec![
         (MIGRATION_V1, 1),
+        (MIGRATION_V2, 2),
+        (MIGRATION_V3, 3),
     ];
 
     for (sql, ver) in migrations {
@@ -16,6 +18,10 @@ pub fn run(conn: &Connection) -> Result<()> {
 
     Ok(())
 }
+
+const MIGRATION_V3: &str = r#"
+ALTER TABLE prompts ADD COLUMN workflow_id TEXT;
+"#;
 
 const MIGRATION_V1: &str = r#"
 CREATE TABLE IF NOT EXISTS prompts (
@@ -113,3 +119,25 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 
 CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id, created_at);
 "#;
+
+const MIGRATION_V2: &str = r#"
+ALTER TABLE prompts ADD COLUMN resolution TEXT;
+
+CREATE TABLE IF NOT EXISTS favorite_prompts (
+    id         TEXT PRIMARY KEY NOT NULL,
+    content    TEXT NOT NULL,
+    type       TEXT NOT NULL, -- 'positive' | 'negative'
+    label      TEXT,          -- optional description/remark
+    created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS custom_styles (
+    id         TEXT PRIMARY KEY NOT NULL,
+    name       TEXT NOT NULL,
+    trigger    TEXT NOT NULL,
+    category   TEXT NOT NULL DEFAULT '自定义',
+    preview    TEXT,
+    created_at INTEGER NOT NULL
+);
+"#;
+

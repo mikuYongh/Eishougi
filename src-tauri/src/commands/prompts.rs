@@ -18,12 +18,12 @@ pub async fn create_prompt(state: State<'_, AppState>, mut prompt: Prompt) -> Re
         "INSERT INTO prompts (
             id, title, description, positive_prompt, negative_prompt, artist_prompt,
             seed, width, height, steps, cfg_scale, sampler_name, scheduler,
-            base_model, lora_configs, vae_model, is_favorite, is_pinned, created_at, updated_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+            base_model, lora_configs, vae_model, resolution, workflow_id, is_favorite, is_pinned, created_at, updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22)",
         params![
             prompt.id, prompt.title, prompt.description, prompt.positive_prompt, prompt.negative_prompt, prompt.artist_prompt,
             prompt.seed, prompt.width, prompt.height, prompt.steps, prompt.cfg_scale, prompt.sampler_name, prompt.scheduler,
-            prompt.base_model, prompt.lora_configs, prompt.vae_model, prompt.is_favorite, prompt.is_pinned, prompt.created_at, prompt.updated_at
+            prompt.base_model, prompt.lora_configs, prompt.vae_model, prompt.resolution, prompt.workflow_id, prompt.is_favorite, prompt.is_pinned, prompt.created_at, prompt.updated_at
         ]
     ).map_err(|e| e.to_string())?;
 
@@ -63,6 +63,8 @@ pub async fn get_prompt(state: State<'_, AppState>, id: String) -> Result<Option
             base_model: row.get("base_model")?,
             lora_configs: row.get("lora_configs")?,
             vae_model: row.get("vae_model")?,
+            resolution: row.get("resolution")?,
+            workflow_id: row.get("workflow_id")?,
             is_favorite: row.get("is_favorite")?,
             is_pinned: row.get("is_pinned")?,
             created_at: row.get("created_at")?,
@@ -106,12 +108,12 @@ pub async fn update_prompt(state: State<'_, AppState>, mut prompt: Prompt) -> Re
         "UPDATE prompts SET 
             title = ?1, description = ?2, positive_prompt = ?3, negative_prompt = ?4, artist_prompt = ?5,
             seed = ?6, width = ?7, height = ?8, steps = ?9, cfg_scale = ?10, sampler_name = ?11, scheduler = ?12,
-            base_model = ?13, lora_configs = ?14, vae_model = ?15, is_favorite = ?16, is_pinned = ?17, updated_at = ?18
-        WHERE id = ?19 AND deleted_at IS NULL",
+            base_model = ?13, lora_configs = ?14, vae_model = ?15, resolution = ?16, workflow_id = ?17, is_favorite = ?18, is_pinned = ?19, updated_at = ?20
+        WHERE id = ?21 AND deleted_at IS NULL",
         params![
             prompt.title, prompt.description, prompt.positive_prompt, prompt.negative_prompt, prompt.artist_prompt,
             prompt.seed, prompt.width, prompt.height, prompt.steps, prompt.cfg_scale, prompt.sampler_name, prompt.scheduler,
-            prompt.base_model, prompt.lora_configs, prompt.vae_model, prompt.is_favorite, prompt.is_pinned, prompt.updated_at,
+            prompt.base_model, prompt.lora_configs, prompt.vae_model, prompt.resolution, prompt.workflow_id, prompt.is_favorite, prompt.is_pinned, prompt.updated_at,
             prompt.id
         ]
     ).map_err(|e| e.to_string())?;
@@ -183,6 +185,8 @@ pub async fn list_prompts(state: State<'_, AppState>, filter: Option<PromptFilte
             base_model: row.get("base_model")?,
             lora_configs: row.get("lora_configs")?,
             vae_model: row.get("vae_model")?,
+            resolution: row.get("resolution")?,
+            workflow_id: row.get("workflow_id")?,
             is_favorite: row.get("is_favorite")?,
             is_pinned: row.get("is_pinned")?,
             created_at: row.get("created_at")?,

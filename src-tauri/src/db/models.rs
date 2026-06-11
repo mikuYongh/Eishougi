@@ -19,6 +19,8 @@ pub struct Prompt {
     pub base_model: Option<String>,
     pub lora_configs: Option<String>,  // JSON string
     pub vae_model: Option<String>,
+    pub resolution: Option<String>,
+    pub workflow_id: Option<String>,
     pub is_favorite: bool,
     pub is_pinned: bool,
     pub created_at: i64,
@@ -27,6 +29,28 @@ pub struct Prompt {
     // 非数据库字段（JOIN 查询填充）
     pub tags: Option<Vec<Tag>>,
     pub images: Option<Vec<PromptImage>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FavoritePrompt {
+    pub id: String,
+    pub content: String,
+    #[serde(rename = "type")]
+    pub prompt_type: String, // 'positive' | 'negative'
+    pub label: Option<String>,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomStyle {
+    pub id: String,
+    pub name: String,
+    pub trigger: String,
+    pub category: String,
+    pub preview: Option<String>,
+    pub created_at: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
