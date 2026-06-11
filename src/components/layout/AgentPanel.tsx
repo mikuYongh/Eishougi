@@ -6,7 +6,7 @@ export function AgentPanel() {
 
   return (
     <div
-      className="flex-shrink-0 flex flex-col relative z-10 transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] bg-black/40 border-l border-white/10 shadow-[-4px_0_30px_rgba(0,0,0,0.1)]"
+      className="flex-shrink-0 flex flex-col relative z-10 transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] bg-[var(--glass-bg)] border-l border-[var(--glass-border)] shadow-[-4px_0_30px_rgba(0,0,0,0.1)]"
       style={{
         width: isExpanded ? "var(--spacing-agent-w)" : "60px",
         backdropFilter: "blur(24px)",
@@ -18,50 +18,50 @@ export function AgentPanel() {
       {/* Collapse/Expand Handle */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="absolute top-1/2 -translate-y-1/2 -left-[18px] w-[18px] h-[60px] flex items-center justify-center bg-black/60 hover:bg-pink-500/20 border border-white/10 border-r-transparent hover:border-pink-500/30 text-white/50 hover:text-pink-400 rounded-l-md cursor-pointer transition-all duration-300 backdrop-blur-xl z-20 shadow-[-2px_0_10px_rgba(0,0,0,0.2)]"
+        className="absolute top-1/2 -translate-y-1/2 -left-[18px] w-[18px] h-[60px] flex items-center justify-center bg-[var(--glass-bg)] hover:bg-[var(--accent-1)]/20 border border-[var(--glass-border)] border-r-transparent hover:border-[var(--accent-1)]/30 text-[var(--text-muted)] hover:text-[var(--accent-1)] rounded-l-md cursor-pointer transition-all duration-300 backdrop-blur-xl z-20 shadow-[-2px_0_10px_rgba(0,0,0,0.2)]"
       >
         {isExpanded ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
       {/* Header */}
       <div
-        className={`flex items-center px-4 py-4 flex-shrink-0 transition-all duration-300 border-b border-white/10 ${isExpanded ? "justify-start" : "justify-center"}`}
+        className={`flex items-center px-4 py-4 flex-shrink-0 transition-all duration-300 border-b border-[var(--glass-border)] ${isExpanded ? "justify-start" : "justify-center"}`}
       >
         {isExpanded ? (
           <>
             <div className="flex items-center gap-2">
-              <div className="flex items-center justify-center w-6 h-6 rounded bg-pink-500/20 text-pink-400">
+              <div className="flex items-center justify-center w-6 h-6 rounded bg-[var(--accent-1)]/20 text-[var(--accent-1)]">
                 <Bot size={14} />
               </div>
-              <span className="text-[13px] font-bold text-white/90">AI 助手</span>
+              <span className="text-[13px] font-bold text-[var(--text-primary)]">AI 助手</span>
             </div>
             
             {/* Actions */}
-            <div className="flex items-center gap-2.5 ml-auto text-white/50">
-              <button className="hover:text-white transition-colors cursor-pointer" title="历史记录">
+            <div className="flex items-center gap-2.5 ml-auto text-[var(--text-muted)]">
+              <button className="hover:text-[var(--text-primary)] transition-colors cursor-pointer" title="历史记录">
                 <History size={14} />
               </button>
-              <button className="hover:text-white transition-colors cursor-pointer" title="配置">
+              <button className="hover:text-[var(--text-primary)] transition-colors cursor-pointer" title="配置">
                 <Settings size={14} />
               </button>
-              <button className="hover:text-pink-400 transition-colors cursor-pointer" title="新建对话">
+              <button className="hover:text-[var(--accent-1)] transition-colors cursor-pointer" title="新建对话">
                 <Plus size={16} />
               </button>
             </div>
           </>
         ) : (
           <div className="flex flex-col gap-6 items-center pt-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 group relative">
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--accent-1)]/20 text-[var(--accent-1)] group relative">
               <Bot size={16} />
             </div>
             <div className="w-6 h-px bg-white/10" />
-            <button className="text-white/40 hover:text-pink-400 transition-colors cursor-pointer" title="新建对话">
+            <button className="text-[var(--text-muted)] hover:text-[var(--accent-1)] transition-colors cursor-pointer" title="新建对话">
               <Plus size={18} />
             </button>
-            <button className="text-white/40 hover:text-white transition-colors cursor-pointer" title="历史记录">
+            <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer" title="历史记录">
               <History size={16} />
             </button>
-            <button className="text-white/40 hover:text-white transition-colors cursor-pointer" title="配置">
+            <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer" title="配置">
               <Settings size={16} />
             </button>
           </div>
@@ -81,12 +81,12 @@ export function AgentPanel() {
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div className="flex flex-col gap-3">
             <div
-              className="p-3.5 rounded-xl text-xs leading-relaxed relative overflow-hidden bg-white/5 text-white/80 border border-white/10"
+              className="p-3.5 rounded-xl text-xs leading-relaxed relative overflow-hidden bg-white/5 text-[var(--text-primary)] border border-[var(--glass-border)]"
             >
-              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-pink-400 to-purple-500" />
+              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[var(--accent-1)] to-[var(--accent-2)]" />
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles size={14} className="text-pink-400" />
-                <span className="font-bold text-white">你好！我是 詠唱机 EISHOUGI AI</span>
+                <Sparkles size={14} className="text-[var(--accent-1)]" />
+                <span className="font-bold text-[var(--text-primary)]">你好！我是 詠唱机 EISHOUGI AI</span>
               </div>
               我可以帮你搜索提示词、创建提示词、触发生成任务等。在设置页配置 API Key 后即可开始对话。
             </div>
@@ -95,16 +95,16 @@ export function AgentPanel() {
 
         {/* Input */}
         <div
-          className="p-4 flex-shrink-0 border-t border-white/10"
+          className="p-4 flex-shrink-0 border-t border-[var(--glass-border)]"
         >
-          <div className="flex items-end gap-2 p-1.5 rounded-xl bg-black/20 border border-white/10 shadow-[inset_0_2px_10px_rgba(0,0,0,0.1)] focus-within:border-pink-500/30 focus-within:bg-white/5 transition-all">
+          <div className="flex items-end gap-2 p-1.5 rounded-xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] shadow-[inset_0_2px_10px_rgba(0,0,0,0.1)] focus-within:border-[var(--accent-1)]/30 focus-within:bg-white/5 transition-all">
             <textarea
-              className="flex-1 resize-none bg-transparent px-3 py-2 text-xs outline-none font-sans h-9 text-white placeholder:text-white/30"
+              className="flex-1 resize-none bg-transparent px-3 py-2 text-xs outline-none font-sans h-9 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
               placeholder="输入消息... (Ctrl+Enter 发送)"
               rows={1}
             />
             <button
-              className="w-9 h-9 rounded-lg flex items-center justify-center cursor-pointer flex-shrink-0 transition-transform hover:scale-105 shadow-[0_0_10px_rgba(255,107,157,0.4)]"
+              className="w-9 h-9 rounded-lg flex items-center justify-center cursor-pointer flex-shrink-0 transition-transform hover:scale-105 shadow-[0_0_10px_rgba(var(--accent-1-rgb), 0.4)]"
               style={{
                 background: "linear-gradient(135deg, #FF6B9D, #B388FF)",
                 color: "#fff",

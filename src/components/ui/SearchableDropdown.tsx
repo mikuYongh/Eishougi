@@ -30,18 +30,18 @@ export function SearchableDropdown({
 
   const colors = {
     blue: {
-      bg: "bg-blue-500/20",
-      border: "border-blue-500/50",
+      bg: "bg-[var(--accent-2)]/20",
+      border: "border-[var(--accent-2)]/50",
       text: "text-blue-400",
-      hover: "hover:bg-blue-500/30",
+      hover: "hover:bg-[var(--accent-2)]/30",
       shadow: "shadow-[0_0_15px_rgba(59,130,246,0.3)]",
     },
     purple: {
-      bg: "bg-purple-500/20",
-      border: "border-purple-500/50",
-      text: "text-purple-400",
-      hover: "hover:bg-purple-500/30",
-      shadow: "shadow-[0_0_15px_rgba(168,85,247,0.3)]",
+      bg: "bg-[var(--accent-2)]/20",
+      border: "border-[var(--accent-2)]/50",
+      text: "text-[var(--accent-2)]",
+      hover: "hover:bg-[var(--accent-2)]/30",
+      shadow: "shadow-[0_0_15px_rgba(var(--accent-2-rgb), 0.3)]",
     },
     orange: {
       bg: "bg-orange-500/20",
@@ -83,27 +83,27 @@ export function SearchableDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg bg-black/40 border transition-all cursor-pointer ${isOpen ? theme.border + ' ' + theme.shadow : 'border-white/10 hover:border-white/20'}`}
+        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--glass-bg)] border transition-all cursor-pointer ${isOpen ? theme.border + ' ' + theme.shadow : 'border-[var(--glass-border)] hover:border-[var(--glass-border-active)]'}`}
       >
-        <span className={`text-[12px] truncate ${selectedOption ? 'text-white/90' : 'text-white/40'}`}>
+        <span className={`text-[12px] truncate ${selectedOption ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 ' + theme.text : 'text-white/40'}`} />
+        <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 ' + theme.text : 'text-[var(--text-muted)]'}`} />
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-2 bg-[#1A1625]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute z-50 w-full mt-2 bg-[#1A1625]/95 backdrop-blur-xl border border-[var(--glass-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in slide-in-from-top-2 duration-200">
           
-          <div className="p-2 border-b border-white/5 flex-shrink-0">
+          <div className="p-2 border-b border-[var(--glass-border)] flex-shrink-0">
             <div className="relative flex items-center">
-              <Search size={14} className="absolute left-2.5 text-white/40" />
+              <Search size={14} className="absolute left-2.5 text-[var(--text-muted)]" />
               <input
                 ref={inputRef}
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full bg-black/30 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-[12px] text-white outline-none focus:border-white/30 transition-colors"
+                className="w-full bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-lg pl-8 pr-3 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--glass-border-active)] transition-colors"
               />
             </div>
           </div>
@@ -118,14 +118,14 @@ export function SearchableDropdown({
                     onChange(option.value);
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-[12px] flex items-center justify-between transition-colors cursor-pointer ${value === option.value ? theme.bg + ' ' + theme.text : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-[12px] flex items-center justify-between transition-colors cursor-pointer ${value === option.value ? theme.bg + ' ' + theme.text : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]'}`}
                 >
                   <span className="truncate pr-2">{option.label}</span>
                   {value === option.value && <Check size={14} />}
                 </button>
               ))
             ) : (
-              <div className="px-3 py-4 text-center text-[11px] text-white/30">
+              <div className="px-3 py-4 text-center text-[11px] text-[var(--text-muted)]">
                 未找到匹配项
               </div>
             )}

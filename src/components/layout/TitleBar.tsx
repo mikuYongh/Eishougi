@@ -43,18 +43,18 @@ export function TitleBar() {
     <div
       className="titlebar-drag flex items-center h-[var(--spacing-titlebar-h)] flex-shrink-0 px-4 relative z-20"
       style={{ 
-        background: "rgba(10, 8, 15, 0.6)", 
+        background: "var(--glass-bg)", 
         backdropFilter: "blur(16px)", 
-        borderBottom: "1px solid rgba(255,255,255,0.08)" 
+        borderBottom: "1px solid var(--glass-border)" 
       }}
     >
       <div className="flex items-center gap-2.5 flex-1">
-        <Sparkles size={14} className="text-pink-400" />
-        <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-white/80">
+        <Sparkles size={14} className="text-[var(--accent-1)]" />
+        <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-[var(--text-secondary)]">
           詠唱机 EISHOUGI
         </span>
         {!isTauri && (
-          <span className="text-[9px] font-bold ml-2 px-1.5 py-[1px] rounded bg-pink-500/20 text-pink-300 border border-pink-500/30">
+          <span className="text-[9px] font-bold ml-2 px-1.5 py-[1px] rounded bg-[var(--accent-1)]/20 text-[var(--accent-1)] border border-[var(--accent-1)]/30">
             DEV
           </span>
         )}

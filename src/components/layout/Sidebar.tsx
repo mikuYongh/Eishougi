@@ -20,9 +20,9 @@ export function Sidebar() {
     <div
       className="w-[var(--spacing-sidebar-w)] flex-shrink-0 flex flex-col pt-3 relative"
       style={{
-        background: "rgba(15, 10, 25, 0.4)",
+        background: "var(--glass-bg)",
         backdropFilter: "blur(24px)",
-        borderRight: "1px solid rgba(255, 255, 255, 0.08)",
+        borderRight: "1px solid var(--glass-border)",
         boxShadow: "1px 0 24px rgba(0,0,0,0.3)",
       }}
     >
@@ -31,8 +31,8 @@ export function Sidebar() {
 
       {/* Section label */}
       <div className="px-3 pb-2 pt-1.5 flex items-center gap-2">
-        <div className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-purple-400 to-pink-400" />
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/50">
+        <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-1)]" />
+        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--text-muted)]">
           导航菜单
         </span>
       </div>
@@ -50,17 +50,17 @@ export function Sidebar() {
               className={cn(
                 "group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer text-left text-[13px] font-medium transition-all duration-300 relative overflow-hidden",
                 isActive
-                  ? "text-white shadow-[0_0_15px_rgba(179,136,255,0.15)]"
-                  : "text-white/60 hover:text-white"
+                  ? "text-[var(--text-primary)] shadow-[0_0_15px_rgba(0,0,0,0.1)]"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               )}
               style={{
-                background: isActive ? "rgba(255,255,255,0.08)" : "transparent",
-                border: isActive ? "1px solid rgba(255,255,255,0.12)" : "1px solid transparent",
+                background: isActive ? "var(--glass-border-active)" : "transparent",
+                border: isActive ? "1px solid var(--glass-border)" : "1px solid transparent",
               }}
             >
               {/* Hover highlight background */}
               <div className={cn(
-                "absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 transition-opacity duration-300",
+                "absolute inset-0 bg-gradient-to-r from-[var(--glass-border)] to-transparent opacity-0 transition-opacity duration-300",
                 !isActive && "group-hover:opacity-100"
               )} />
               
@@ -68,15 +68,15 @@ export function Sidebar() {
                 <span
                   className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3/5 rounded-r-full"
                   style={{
-                    background: "linear-gradient(135deg, #FF6B9D, #B388FF)",
-                    boxShadow: "0 0 10px rgba(179,136,255,0.6)"
+                    background: "var(--accent-1)",
+                    boxShadow: "0 0 10px var(--accent-1)"
                   }}
                 />
               )}
               
               <span className={cn(
                 "flex-shrink-0 transition-transform duration-300",
-                isActive ? "scale-110 drop-shadow-[0_0_8px_rgba(179,136,255,0.5)]" : "group-hover:scale-110"
+                isActive ? "scale-110 drop-shadow-[0_0_8px_rgba(0,0,0,0.5)]" : "group-hover:scale-110"
               )}>
                 {item.icon}
               </span>
@@ -89,28 +89,33 @@ export function Sidebar() {
       {/* Light/Dark Mode Toggle */}
       <div
         className="flex items-center justify-center p-3 mt-auto"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}
+        style={{ borderTop: "1px solid var(--glass-border)" }}
       >
         <div 
-          onClick={toggleTheme}
-          className="relative flex items-center w-full h-10 rounded-xl cursor-pointer overflow-hidden p-1 bg-black/20 border border-white/5 shadow-[inset_0_2px_10px_rgba(0,0,0,0.3)] transition-colors group"
+          onClick={() => {
+            // Let the UI do standard toggle or rely on settings
+            // But we actually do not use toggleTheme from store since we might want setting page
+            // Or we keep the toggle working.
+            toggleTheme();
+          }}
+          className="relative flex items-center w-full h-10 rounded-xl cursor-pointer overflow-hidden p-1 bg-[var(--bg-layer-2)] border border-[var(--glass-border)] shadow-[inset_0_2px_10px_rgba(0,0,0,0.1)] transition-colors group"
         >
           {/* Active Slider */}
           <div 
             className="absolute h-8 w-[calc(50%-4px)] rounded-lg transition-transform duration-500 shadow-md"
             style={{
-              background: "linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))",
+              background: "var(--glass-border-active)",
               backdropFilter: "blur(10px)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              border: "1px solid var(--glass-border)",
               transform: appTheme === "dark" ? "translateX(0)" : "translateX(100%)",
               marginLeft: appTheme === "dark" ? "2px" : "6px",
             }}
           />
           
-          <div className={`flex-1 flex items-center justify-center z-10 transition-colors duration-500 ${appTheme === "dark" ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]" : "text-white/30"}`}>
+          <div className={`flex-1 flex items-center justify-center z-10 transition-colors duration-500 ${appTheme === "dark" ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
             <Moon size={16} className={appTheme === "dark" ? "animate-[pulse_4s_ease-in-out_infinite]" : ""} />
           </div>
-          <div className={`flex-1 flex items-center justify-center z-10 transition-colors duration-500 ${appTheme === "light" ? "text-yellow-300 drop-shadow-[0_0_8px_rgba(253,224,71,0.6)]" : "text-white/30"}`}>
+          <div className={`flex-1 flex items-center justify-center z-10 transition-colors duration-500 ${appTheme === "light" ? "text-yellow-500" : "text-[var(--text-muted)]"}`}>
             <Sun size={16} className={appTheme === "light" ? "animate-[spin_10s_linear_infinite]" : ""} />
           </div>
         </div>
