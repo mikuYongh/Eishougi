@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X, History } from "lucide-react";
-import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
+import { usePromptStore, type PromptProject, type LoraConfig, type ControlNetConfig } from "../../stores/promptStore";
 import { useModelStore } from "../../stores/modelStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import { invoke } from "@tauri-apps/api/core";
@@ -14,6 +15,7 @@ export function PromptEdit() {
   const prompts = usePromptStore((state) => state.prompts);
   const updatePrompt = usePromptStore((state) => state.updatePrompt);
   const { checkpoints, loras, fetchModels } = useModelStore();
+  const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
   useEffect(() => {
     fetchModels();
@@ -82,31 +84,31 @@ export function PromptEdit() {
     <div className="flex flex-col h-full relative z-10 gap-6 max-w-6xl mx-auto w-full">
       
       {/* Header Actions */}
-      <div className="flex items-center justify-between flex-shrink-0 bg-black/20 p-4 rounded-2xl border border-white/5 backdrop-blur-md">
+      <div className="flex items-center justify-between flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate('/prompts')}
-            className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer border border-white/10"
+            className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
           >
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h2 className="text-xl font-bold text-white drop-shadow-md">
+            <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md">
               {id === 'new' ? '新建提示词项目' : '编辑提示词项目'}
             </h2>
-            <p className="text-[12px] text-white/50">{project.title || "未命名项目"}</p>
+            <p className="text-[12px] text-[var(--text-muted)]">{project.title || "未命名项目"}</p>
           </div>
         </div>
         
         <div className="flex gap-3">
           <button 
             onClick={handleSave}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer border border-white/10"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-white/10 hover:bg-white/20 text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
           >
             <Save size={16} /> 保存项目
           </button>
           <button 
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all text-white cursor-pointer"
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all text-[var(--text-primary)] cursor-pointer"
             style={{ background: "linear-gradient(135deg, #42A5F5, #7E57C2)", border: "1px solid rgba(255,255,255,0.2)" }}
           >
             <Play size={16} fill="currentColor" /> 立即生成
@@ -121,33 +123,33 @@ export function PromptEdit() {
           
           <div className="glass-panel p-5 space-y-4">
             <div>
-              <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1.5 block">项目名称</label>
+              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">项目名称</label>
               <input 
                 type="text" value={project.title} onChange={e => updateField('title', e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white/90 text-sm outline-none focus:border-blue-500/50 transition-colors font-bold"
+                className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold"
                 placeholder="例如：赛博朋克夜之城"
               />
             </div>
             <div>
-              <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1.5 block">项目描述</label>
+              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">项目描述</label>
               <input 
                 type="text" value={project.description} onChange={e => updateField('description', e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-white/60 text-xs outline-none focus:border-blue-500/50 transition-colors"
+                className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-[var(--text-muted)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors"
                 placeholder="简要描述这个项目的用途或预期效果..."
               />
             </div>
             <div>
-              <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest mb-1.5 block">标签 (Tags)</label>
-              <div className="w-full bg-black/40 border border-white/10 rounded-xl p-2 min-h-[46px] flex flex-wrap gap-2 focus-within:border-blue-500/50 transition-colors">
+              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">标签 (Tags)</label>
+              <div className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-2 min-h-[46px] flex flex-wrap gap-2 focus-within:border-[var(--accent-2)]/50 transition-colors">
                 {project.tags?.map(tag => (
-                  <span key={tag} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[11px] font-bold">
+                  <span key={tag} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--accent-2)]/20 text-blue-400 border border-[var(--accent-2)]/30 text-[11px] font-bold">
                     {tag}
                     <button onClick={() => removeTag(tag)} className="hover:text-red-400 transition-colors cursor-pointer"><X size={12}/></button>
                   </span>
                 ))}
                 <input 
                   type="text" value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleAddTag}
-                  className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-white/80 text-[12px] px-2 h-7"
+                  className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-[var(--text-primary)] text-[12px] px-2 h-7"
                   placeholder="输入标签后按回车添加..."
                 />
               </div>
@@ -159,7 +161,7 @@ export function PromptEdit() {
               <label className="text-[11px] font-bold text-blue-400 uppercase tracking-widest mb-1.5 block">正向提示词 (Positive Prompt)</label>
               <textarea 
                 value={project.positivePrompt} onChange={e => updateField('positivePrompt', e.target.value)}
-                className="w-full flex-1 bg-black/30 border border-white/5 rounded-xl px-4 py-3 text-white/80 text-[13px] font-mono outline-none focus:border-blue-500/50 transition-colors resize-none leading-relaxed"
+                className="w-full flex-1 bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-xl px-4 py-3 text-[var(--text-primary)] text-[13px] font-mono outline-none focus:border-[var(--accent-2)]/50 transition-colors resize-none leading-relaxed"
                 placeholder="masterpiece, best quality..."
               />
             </div>
@@ -167,7 +169,7 @@ export function PromptEdit() {
               <label className="text-[11px] font-bold text-red-400 uppercase tracking-widest mb-1.5 block">负向提示词 (Negative Prompt)</label>
               <textarea 
                 value={project.negativePrompt} onChange={e => updateField('negativePrompt', e.target.value)}
-                className="w-full flex-1 bg-black/30 border border-white/5 rounded-xl px-4 py-3 text-white/60 text-[13px] font-mono outline-none focus:border-red-500/50 transition-colors resize-none leading-relaxed"
+                className="w-full flex-1 bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-xl px-4 py-3 text-[var(--text-muted)] text-[13px] font-mono outline-none focus:border-red-500/50 transition-colors resize-none leading-relaxed"
                 placeholder="lowres, bad anatomy..."
               />
             </div>
@@ -175,22 +177,22 @@ export function PromptEdit() {
 
           <div className="glass-panel p-5 grid grid-cols-3 gap-6">
             <div>
-              <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest mb-2 block">迭代步数 (Steps)</label>
+              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">迭代步数 (Steps)</label>
               <div className="flex items-center gap-3">
-                <input type="range" min="1" max="150" value={project.steps} onChange={e => updateField('steps', parseInt(e.target.value))} className="flex-1 h-1 bg-black/40 rounded-lg appearance-none cursor-pointer accent-blue-400" />
-                <span className="text-[13px] font-mono font-bold text-white/80 w-8 text-right">{project.steps}</span>
+                <input type="range" min="1" max="150" value={project.steps} onChange={e => updateField('steps', parseInt(e.target.value))} className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-blue-400" />
+                <span className="text-[13px] font-mono font-bold text-[var(--text-primary)] w-8 text-right">{project.steps}</span>
               </div>
             </div>
             <div>
-              <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest mb-2 block">提示词引导 (CFG)</label>
+              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">提示词引导 (CFG)</label>
               <div className="flex items-center gap-3">
-                <input type="range" min="1" max="30" step="0.5" value={project.cfgScale} onChange={e => updateField('cfgScale', parseFloat(e.target.value))} className="flex-1 h-1 bg-black/40 rounded-lg appearance-none cursor-pointer accent-blue-400" />
-                <span className="text-[13px] font-mono font-bold text-white/80 w-8 text-right">{project.cfgScale}</span>
+                <input type="range" min="1" max="30" step="0.5" value={project.cfgScale} onChange={e => updateField('cfgScale', parseFloat(e.target.value))} className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-blue-400" />
+                <span className="text-[13px] font-mono font-bold text-[var(--text-primary)] w-8 text-right">{project.cfgScale}</span>
               </div>
             </div>
             <div>
-              <label className="text-[11px] font-bold text-white/50 uppercase tracking-widest mb-2 block">随机种子 (Seed)</label>
-              <input type="text" value={project.seed} onChange={e => updateField('seed', e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-white/80 text-xs font-mono outline-none focus:border-blue-500/50" />
+              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">随机种子 (Seed)</label>
+              <input type="text" value={project.seed} onChange={e => updateField('seed', e.target.value)} className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-lg px-3 py-1.5 text-[var(--text-primary)] text-xs font-mono outline-none focus:border-[var(--accent-2)]/50" />
             </div>
           </div>
 
@@ -201,26 +203,26 @@ export function PromptEdit() {
           
           {/* Cover Image Uploader */}
           <div className="glass-panel p-5">
-            <h3 className="text-[13px] font-bold text-white/90 mb-4 flex items-center gap-2">
+            <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
               <ImageIcon size={16} className="text-blue-400" /> 示范预览图
             </h3>
             <div 
-              className="h-48 w-full rounded-xl border-2 border-dashed border-white/10 hover:border-blue-400/50 bg-black/30 flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer transition-colors"
+              className="h-48 w-full rounded-xl border-2 border-dashed border-[var(--glass-border)] hover:border-blue-400/50 bg-[var(--glass-bg-hover)] flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer transition-colors"
               onClick={() => fileInputRef.current?.click()}
             >
               {project.coverImage ? (
-                <>
-                  <img src={project.coverImage} alt="Cover" className="w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-opacity" />
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-bold text-white">点击更换图片</span>
+                <div className="absolute inset-0 z-0 group-hover/cover:bg-[var(--bg-layer-2)] transition-colors flex items-center justify-center cursor-pointer">
+                  <img src={project.coverImage} alt="Cover" className={`w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover/cover:opacity-100 transition-opacity">
+                    <span className="bg-[var(--glass-bg)] backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--text-primary)]">点击更换图片</span>
                   </div>
-                </>
+                </div>
               ) : (
                 <>
                   <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                    <UploadCloud size={20} className="text-white/40 group-hover:text-blue-400 transition-colors" />
+                    <UploadCloud size={20} className="text-[var(--text-muted)] group-hover:text-blue-400 transition-colors" />
                   </div>
-                  <span className="text-[11px] font-bold text-white/50">点击或拖拽上传封面</span>
+                  <span className="text-[11px] font-bold text-[var(--text-muted)]">点击或拖拽上传封面</span>
                 </>
               )}
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
@@ -236,13 +238,13 @@ export function PromptEdit() {
           {/* Reference Images */}
           <div className="glass-panel p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[13px] font-bold text-white/90 flex items-center gap-2">
+              <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2">
                 <ImageIcon size={16} className="text-blue-400" /> 实例图片 (Reference)
               </h3>
               <div className="flex gap-2">
                 <button 
                   onClick={() => setShowHistoryPicker(true)} 
-                  className="px-3 py-1 bg-blue-500/20 text-blue-400 text-[11px] font-bold rounded-lg hover:bg-blue-500/30 transition-colors cursor-pointer border border-blue-500/30 flex items-center gap-1"
+                  className="px-3 py-1 bg-[var(--accent-2)]/20 text-blue-400 text-[11px] font-bold rounded-lg hover:bg-[var(--accent-2)]/30 transition-colors cursor-pointer border border-[var(--accent-2)]/30 flex items-center gap-1"
                 >
                   <History size={12} /> 选历史图
                 </button>
@@ -251,18 +253,18 @@ export function PromptEdit() {
             
             <div className="flex flex-wrap gap-3">
               {project.instanceImages?.map((img, i) => (
-                <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-blue-500/30 shadow-[0_0_10px_rgba(66,165,245,0.2)]">
-                  <img src={img} className="w-full h-full object-cover" alt="instance" />
+                <div key={i} className="w-16 h-16 rounded-xl overflow-hidden border border-[var(--glass-border)] relative group">
+                  <img src={img} className={`w-full h-full object-cover transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} alt="instance" />
                   <button 
                     onClick={() => updateField('instanceImages', project.instanceImages!.filter((_, idx) => idx !== i))} 
-                    className="absolute top-0 right-0 bg-red-500/80 text-white p-0.5 rounded-bl-lg hover:bg-red-500 transition-colors cursor-pointer"
+                    className="absolute top-0 right-0 bg-red-500/80 text-[var(--text-primary)] p-0.5 rounded-bl-lg hover:bg-red-500 transition-colors cursor-pointer"
                   >
                     <X size={12}/>
                   </button>
                 </div>
               ))}
               {(!project.instanceImages || project.instanceImages.length === 0) && (
-                <div className="w-full h-16 flex items-center justify-center border border-dashed border-white/10 rounded-lg text-white/30 text-[11px] font-bold tracking-widest">
+                <div className="w-full h-16 flex items-center justify-center border border-dashed border-[var(--glass-border)] rounded-lg text-[var(--text-muted)] text-[11px] font-bold tracking-widest">
                   暂无参考图
                 </div>
               )}
@@ -270,7 +272,7 @@ export function PromptEdit() {
           </div>
 
           <div className="glass-panel p-5">
-            <h3 className="text-[13px] font-bold text-white/90 mb-4 flex items-center gap-2">
+            <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
               <ImageIcon size={16} className="text-blue-400" /> 分辨率与画幅
             </h3>
             <div className="grid grid-cols-2 gap-2">
@@ -283,7 +285,7 @@ export function PromptEdit() {
                 <button 
                   key={i}
                   onClick={() => { updateField('width', res.w); updateField('height', res.h); }}
-                  className={`py-2 px-3 rounded-xl flex flex-col items-center gap-1 border transition-colors cursor-pointer ${project.width === res.w && project.height === res.h ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-black/20 border-white/5 text-white/60 hover:bg-white/5'}`}
+                  className={`py-2 px-3 rounded-xl flex flex-col items-center gap-1 border transition-colors cursor-pointer ${project.width === res.w && project.height === res.h ? 'bg-[var(--accent-2)]/20 border-[var(--accent-2)]/50 text-blue-400' : 'bg-[var(--bg-layer-1)] border-[var(--glass-border)] text-[var(--text-muted)] hover:bg-white/5'}`}
                 >
                   <span className="text-[11px] font-bold">{res.label}</span>
                   <span className="text-[10px] font-mono opacity-60">{res.w} x {res.h}</span>
@@ -293,12 +295,12 @@ export function PromptEdit() {
           </div>
 
           <div className="glass-panel p-5 relative z-40">
-            <h3 className="text-[13px] font-bold text-white/90 mb-4 flex items-center gap-2">
-              <Cpu size={16} className="text-purple-400" /> 基础模型
+            <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+              <Cpu size={16} className="text-[var(--accent-2)]" /> 基础模型
             </h3>
             <div className="space-y-4">
               <div className="relative z-40">
-                <label className="text-[10px] text-white/40 mb-1.5 block uppercase tracking-wider font-bold">Checkpoint</label>
+                <label className="text-[10px] text-[var(--text-muted)] mb-1.5 block uppercase tracking-wider font-bold">Checkpoint</label>
                 <SearchableDropdown 
                   value={project.baseModel || ""}
                   onChange={v => updateField('baseModel', v)}
@@ -309,7 +311,7 @@ export function PromptEdit() {
                 />
               </div>
               <div className="relative z-20">
-                <label className="text-[10px] text-white/40 mb-1.5 block uppercase tracking-wider font-bold">VAE</label>
+                <label className="text-[10px] text-[var(--text-muted)] mb-1.5 block uppercase tracking-wider font-bold">VAE</label>
                 <GlassDropdown 
                   value={project.vaeModel || ""}
                   onChange={v => updateField('vaeModel', v)}
@@ -325,26 +327,26 @@ export function PromptEdit() {
 
           <div className="glass-panel p-5 flex-1 flex flex-col">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[13px] font-bold text-white/90 flex items-center gap-2">
+              <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2">
                 <Layers size={16} className="text-orange-400" /> LoRA 列表
               </h3>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-2">
               {project.loraConfigs?.map((lora, i) => (
-                <div key={i} className="p-3 rounded-xl bg-black/30 border border-white/5 space-y-3">
+                <div key={i} className="p-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-bold text-white/80 truncate pr-2">{lora.name}</span>
+                    <span className="text-[12px] font-bold text-[var(--text-primary)] truncate pr-2">{lora.name}</span>
                     <button className="text-red-400/50 hover:text-red-400 cursor-pointer transition-colors"><Trash2 size={14} /></button>
                   </div>
                   <div className="flex items-center gap-3">
-                    <input type="range" min="0" max="2" step="0.05" value={lora.strength} onChange={e => updateLora(i, { strength: parseFloat(e.target.value) })} className="flex-1 h-1 bg-black/40 rounded-lg appearance-none cursor-pointer accent-orange-400" />
+                    <input type="range" min="0" max="2" step="0.05" value={lora.strength} onChange={e => updateLora(i, { strength: parseFloat(e.target.value) })} className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-orange-400" />
                     <span className="text-[11px] font-mono font-bold text-orange-400 w-8 text-right">{lora.strength.toFixed(2)}</span>
                   </div>
                 </div>
               ))}
               {(!project.loraConfigs || project.loraConfigs.length === 0) && (
-                <div className="h-24 flex items-center justify-center text-[11px] text-white/30 font-bold uppercase tracking-widest border border-dashed border-white/10 rounded-xl">
+                <div className="h-24 flex items-center justify-center text-[11px] text-[var(--text-muted)] font-bold uppercase tracking-widest border border-dashed border-[var(--glass-border)] rounded-xl">
                   暂未添加 LoRA
                 </div>
               )}

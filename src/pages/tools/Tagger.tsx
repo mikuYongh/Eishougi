@@ -1,9 +1,11 @@
 import { useState, useRef } from "react";
 import { UploadCloud, Image as ImageIcon, Sparkles, Copy, FileText, CheckCircle2, RefreshCw } from "lucide-react";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { llmService } from "../../services/llmService";
 
 export function Tagger() {
+  const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   const [image, setImage] = useState<string | null>(null);
   const [format, setFormat] = useState("danbooru");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -54,10 +56,10 @@ export function Tagger() {
       {/* PageHeader */}
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h2 className="text-2xl font-bold text-white drop-shadow-md flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
             <span className="text-orange-400">🔍</span> 图片反推 (Tagger)
           </h2>
-          <p className="text-sm mt-1 text-white/60 font-medium">上传图片，使用 WD14 模型提取特征标签，一键转化为提示词</p>
+          <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">上传图片，使用 WD14 模型提取特征标签，一键转化为提示词</p>
         </div>
       </div>
 
@@ -66,29 +68,29 @@ export function Tagger() {
         {/* Left Column - Uploader */}
         <div className="w-1/2 flex flex-col gap-4">
           <div className="glass-panel p-1 flex-1 rounded-2xl flex flex-col relative overflow-hidden group">
-            <div className="absolute inset-0 bg-black/20 z-0"></div>
+            <div className="absolute inset-0 bg-[var(--bg-layer-1)] z-0"></div>
             
             {image ? (
-              <div className="relative w-full h-full z-10 flex flex-col items-center justify-center p-4">
-                <img src={image} alt="Upload" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+              <div className="relative w-full h-full z-10 flex flex-col items-center justify-center p-2 group/img">
+                <img src={image} alt="Upload" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} />
                 <button 
                   onClick={() => setImage(null)}
-                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 backdrop-blur-md text-white flex items-center justify-center hover:bg-red-500/80 transition-colors opacity-0 group-hover:opacity-100"
+                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-[var(--glass-bg)] backdrop-blur-md text-[var(--text-primary)] flex items-center justify-center hover:bg-red-500/80 transition-colors opacity-0 group-hover:opacity-100"
                 >
                   <RefreshCw size={18} />
                 </button>
               </div>
             ) : (
               <div 
-                className="relative w-full h-full z-10 flex flex-col items-center justify-center border-2 border-dashed border-white/10 hover:border-orange-500/50 m-2 rounded-xl bg-black/30 cursor-pointer transition-colors"
+                className="relative w-full h-full z-10 flex flex-col items-center justify-center border-2 border-dashed border-[var(--glass-border)] hover:border-orange-500/50 m-2 rounded-xl bg-[var(--glass-bg-hover)] cursor-pointer transition-colors"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <div className="w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                   <UploadCloud size={32} className="text-orange-400/80" />
                 </div>
-                <h3 className="text-lg font-bold text-white/90 mb-1">拖拽或点击上传图片</h3>
-                <p className="text-xs text-white/40 mb-3">支持 JPG, PNG, WEBP (最大 10MB)</p>
-                <div className="text-[10px] text-white/30 px-4 text-center">
+                <h3 className="text-lg font-bold text-[var(--text-primary)] mb-1">拖拽或点击上传图片</h3>
+                <p className="text-xs text-[var(--text-muted)] mb-3">支持 JPG, PNG, WEBP (最大 10MB)</p>
+                <div className="text-[10px] text-[var(--text-muted)] px-4 text-center">
                   * 反推模型将调用本地或云端的 agnes-2.0-flash 多模态视觉模型进行高精度特征提取。
                 </div>
               </div>
@@ -98,7 +100,7 @@ export function Tagger() {
 
           <div className="glass-panel p-5 rounded-2xl flex items-center gap-4">
             <div className="flex-1 relative z-20">
-              <label className="text-[10px] text-white/40 mb-1.5 block uppercase tracking-wider font-bold">输出格式 (Format)</label>
+              <label className="text-[10px] text-[var(--text-muted)] mb-1.5 block uppercase tracking-wider font-bold">输出格式 (Format)</label>
               <GlassDropdown 
                 value={format}
                 onChange={setFormat}
@@ -113,7 +115,7 @@ export function Tagger() {
             <button 
               onClick={handleAnalyze}
               disabled={!image || isAnalyzing}
-              className={`mt-5 flex items-center gap-2 px-6 py-2.5 rounded-xl text-[14px] font-bold shadow-[0_4px_15px_rgba(255,152,0,0.3)] transition-all ${!image ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] cursor-pointer text-white'}`}
+              className={`mt-5 flex items-center gap-2 px-6 py-2.5 rounded-xl text-[14px] font-bold shadow-[0_4px_15px_rgba(255,152,0,0.3)] transition-all ${!image ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] cursor-pointer text-[var(--text-primary)]'}`}
               style={{ background: image ? "linear-gradient(135deg, #FF9800, #F44336)" : "rgba(255,255,255,0.1)", border: image ? "1px solid rgba(255,255,255,0.2)" : "none" }}
             >
               {isAnalyzing ? <RefreshCw size={18} className="animate-spin" /> : <Sparkles size={18} />}
@@ -125,14 +127,14 @@ export function Tagger() {
         {/* Right Column - Results */}
         <div className="w-1/2 flex flex-col">
           <div className="glass-panel rounded-2xl flex flex-col flex-1 overflow-hidden relative">
-            <div className="p-4 border-b border-white/5 flex items-center justify-between bg-black/20">
-              <h3 className="text-[14px] font-bold text-white/90 flex items-center gap-2">
+            <div className="p-4 border-b border-[var(--glass-border)] flex items-center justify-between bg-[var(--bg-layer-1)]">
+              <h3 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
                 <FileText size={16} className="text-orange-400" /> 反推结果
               </h3>
               <div className="flex gap-2">
                 <button 
                   disabled={results.length === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 text-[11px] font-bold transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-primary)] text-[11px] font-bold transition-colors disabled:opacity-50"
                 >
                   <Copy size={12} /> 复制文本
                 </button>
@@ -149,14 +151,14 @@ export function Tagger() {
               {results.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {results.map((r, i) => (
-                    <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-black/40 border border-white/5 hover:border-orange-500/30 transition-colors cursor-pointer group">
-                      <span className="text-[13px] font-mono text-white/90">{r.tag}</span>
+                    <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:border-orange-500/30 transition-colors cursor-pointer group">
+                      <span className="text-[13px] font-mono text-[var(--text-primary)]">{r.tag}</span>
                       <span className="text-[10px] text-orange-400/60 group-hover:text-orange-400">{(r.confidence * 100).toFixed(0)}%</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-white/30">
+                <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-muted)]">
                   <ImageIcon size={48} className="mb-4 opacity-20" />
                   <p className="text-[13px] font-bold uppercase tracking-widest">等待上传与反推</p>
                 </div>
@@ -164,11 +166,11 @@ export function Tagger() {
             </div>
             
             {results.length > 0 && (
-              <div className="p-4 bg-black/40 border-t border-white/5">
+              <div className="p-4 bg-[var(--glass-bg)] border-t border-[var(--glass-border)]">
                 <textarea 
                   readOnly 
                   value={results.map(r => r.tag).join(", ")}
-                  className="w-full h-24 bg-transparent border-none outline-none text-white/60 text-[12px] font-mono resize-none leading-relaxed"
+                  className="w-full h-24 bg-transparent border-none outline-none text-[var(--text-muted)] text-[12px] font-mono resize-none leading-relaxed"
                 />
               </div>
             )}

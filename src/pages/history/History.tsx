@@ -2,6 +2,7 @@ import { Download, Info, Trash2, CalendarDays, Maximize2, BookmarkPlus, Check, X
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePromptStore } from "../../stores/promptStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 
 interface HistoryImage {
   id: string;
@@ -26,6 +27,7 @@ export function History() {
   const [addingToPrompt, setAddingToPrompt] = useState<HistoryImage | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const prompts = usePromptStore(state => state.prompts);
+  const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
   useEffect(() => {
     fetchHistory();
@@ -147,10 +149,10 @@ export function History() {
       {/* PageHeader */}
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h2 className="text-2xl font-bold text-white drop-shadow-md flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
             <span className="text-green-400">📜</span> 生成历史 (History)
           </h2>
-          <p className="text-sm mt-1 text-white/60 font-medium">回顾所有的创造轨迹，支持查看详细参数与 Seed</p>
+          <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">回顾所有的创造轨迹，支持查看详细参数与 Seed</p>
         </div>
         <button 
           onClick={handleClearHistory}
@@ -165,24 +167,24 @@ export function History() {
         {history.map((group) => (
           <div key={group.id} className="space-y-4">
             {/* Date Header */}
-            <h3 className="text-[13px] font-bold text-white/70 flex items-center gap-2 border-b border-white/10 pb-2">
+            <h3 className="text-[13px] font-bold text-[var(--text-secondary)] flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
               <CalendarDays size={16} className="text-green-400" /> {group.date}
             </h3>
 
             {/* Images Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {group.images.map((img, i) => (
-                <div key={i} className="glass-panel rounded-xl flex flex-col group border border-white/5 hover:border-green-400/50 transition-all hover:shadow-[0_8px_30px_rgba(76,175,80,0.15)] overflow-hidden bg-black/40">
+                <div key={i} className="glass-panel rounded-xl flex flex-col group border border-[var(--glass-border)] hover:border-green-400/50 transition-all hover:shadow-[0_8px_30px_rgba(76,175,80,0.15)] overflow-hidden bg-[var(--glass-bg)]">
                   
                   {/* Image Container */}
                   <div className="aspect-square w-full relative overflow-hidden flex items-center justify-center">
-                    <img src={img.url} alt="Result" className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500" />
+                    <img src={img.url} alt="Result" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                     
                   {/* Hover Actions */}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
+                    <div className="absolute inset-0 bg-[var(--glass-bg)] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
                       <button 
                         onClick={() => setPreviewImage(img.url)}
-                        className="w-10 h-10 rounded-full bg-green-500/80 text-white flex items-center justify-center hover:scale-110 transition-transform shadow-lg cursor-pointer"
+                        className="w-10 h-10 rounded-full bg-green-500/80 text-[var(--text-primary)] flex items-center justify-center hover:scale-110 transition-transform shadow-lg cursor-pointer"
                         title="全屏查看"
                       >
                         <Maximize2 size={18} />
@@ -190,21 +192,21 @@ export function History() {
                       <div className="flex gap-2">
                         <button 
                           onClick={() => handleDownload(img.url)}
-                          className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-white/40 transition-colors cursor-pointer"
+                          className="w-8 h-8 rounded-full bg-white/20 text-[var(--text-primary)] flex items-center justify-center hover:bg-white/40 transition-colors cursor-pointer"
                           title="下载"
                         >
                           <Download size={14} />
                         </button>
                         <button 
                           onClick={() => setAddingToPrompt(img)}
-                          className="w-8 h-8 rounded-full bg-fuchsia-500/80 text-white flex items-center justify-center hover:bg-fuchsia-500 transition-colors cursor-pointer"
+                          className="w-8 h-8 rounded-full bg-[var(--accent-1)]/80 text-[var(--text-primary)] flex items-center justify-center hover:bg-[var(--accent-1)] transition-colors cursor-pointer"
                           title="添加为示范图"
                         >
                           <BookmarkPlus size={14} />
                         </button>
                         <button 
                           onClick={() => handleDelete(img.id)}
-                          className="w-8 h-8 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:bg-red-500 transition-colors cursor-pointer"
+                          className="w-8 h-8 rounded-full bg-red-500/80 text-[var(--text-primary)] flex items-center justify-center hover:bg-red-500 transition-colors cursor-pointer"
                           title="删除"
                         >
                           <Trash2 size={14} />
@@ -214,14 +216,14 @@ export function History() {
                   </div>
 
                   {/* Meta Bar */}
-                  <div className="p-2.5 bg-black/40 flex flex-col gap-1 border-t border-white/5">
+                  <div className="p-2.5 bg-[var(--glass-bg)] flex flex-col gap-1 border-t border-[var(--glass-border)]">
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="text-[10px] font-bold text-fuchsia-400/80 bg-fuchsia-500/10 border border-fuchsia-500/20 px-1.5 py-0.5 rounded-md truncate max-w-full">
+                      <span className="text-[10px] font-bold text-[var(--accent-1)]/80 bg-[var(--accent-1)]/10 border border-[var(--accent-1)]/20 px-1.5 py-0.5 rounded-md truncate max-w-full">
                         {img.promptTitle}
                       </span>
                     </div>
-                    <p className="text-[11px] text-white/60 line-clamp-1 font-mono">{img.prompt}</p>
-                    <div className="flex items-center justify-between text-[10px] text-white/40 font-bold">
+                    <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 font-mono">{img.prompt}</p>
+                    <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-bold">
                       <span className="px-1.5 py-0.5 rounded bg-white/5 truncate max-w-[100px]">{img.model}</span>
                       <div className="flex gap-2">
                         <span>{img.resolution}</span>
@@ -239,38 +241,38 @@ export function History() {
       {/* Fullscreen Preview Modal */}
       {previewImage && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-8 backdrop-blur-sm cursor-zoom-out"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--glass-bg)] p-8 backdrop-blur-sm cursor-zoom-out"
           onClick={() => setPreviewImage(null)}
         >
           <img 
             src={previewImage} 
             alt="Preview" 
-            className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" 
+            className={`max-w-full max-h-full object-contain rounded-xl shadow-2xl transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} 
           />
         </div>
       )}
 
       {/* Add to Instance Images Modal */}
       {addingToPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-8">
-          <div className="bg-[#1A1020]/95 border border-fuchsia-500/30 rounded-2xl shadow-2xl shadow-fuchsia-500/20 w-full max-w-md flex flex-col max-h-[70vh]">
-            <div className="p-5 border-b border-white/5 flex items-center justify-between flex-shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--glass-bg)] backdrop-blur-sm p-8">
+          <div className="bg-[#1A1020]/95 border border-[var(--accent-1)]/30 rounded-2xl shadow-2xl shadow-[var(--accent-1)]/20 w-full max-w-md flex flex-col max-h-[70vh]">
+            <div className="p-5 border-b border-[var(--glass-border)] flex items-center justify-between flex-shrink-0">
               <div>
-                <h3 className="text-[14px] font-bold text-white flex items-center gap-2">
-                  <BookmarkPlus size={16} className="text-fuchsia-400" /> 添加为示范图
+                <h3 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <BookmarkPlus size={16} className="text-[var(--accent-1)]" /> 添加为示范图
                 </h3>
-                <p className="text-[11px] text-white/50 mt-1">选择要添加到哪个提示词项目</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">选择要添加到哪个提示词项目</p>
               </div>
-              <button onClick={() => setAddingToPrompt(null)} className="text-white/40 hover:text-white transition-colors cursor-pointer">
+              <button onClick={() => setAddingToPrompt(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
                 <X size={18} />
               </button>
             </div>
 
-            <div className="flex gap-3 p-4 border-b border-white/5 flex-shrink-0">
-              <img src={addingToPrompt.url} className="w-20 h-20 object-cover rounded-lg border border-white/10" />
+            <div className="flex gap-3 p-4 border-b border-[var(--glass-border)] flex-shrink-0">
+              <img src={addingToPrompt.url} className="w-20 h-20 object-cover rounded-lg border border-[var(--glass-border)]" />
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] text-fuchsia-300 font-bold mb-1">{addingToPrompt.promptTitle}</p>
-                <p className="text-[10px] text-white/40 font-mono line-clamp-3 leading-relaxed">{addingToPrompt.prompt}</p>
+                <p className="text-[11px] text-[var(--accent-1)] font-bold mb-1">{addingToPrompt.promptTitle}</p>
+                <p className="text-[10px] text-[var(--text-muted)] font-mono line-clamp-3 leading-relaxed">{addingToPrompt.prompt}</p>
               </div>
             </div>
 
@@ -282,14 +284,14 @@ export function History() {
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer text-left ${
                     addSuccess === p.id
                       ? 'bg-green-500/20 border-green-500/50'
-                      : 'bg-white/5 border-white/10 hover:bg-fuchsia-500/10 hover:border-fuchsia-500/30'
+                      : 'bg-white/5 border-[var(--glass-border)] hover:bg-[var(--accent-1)]/10 hover:border-[var(--accent-1)]/30'
                   }`}
                 >
                   {p.coverImage && <img src={p.coverImage} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
-                  {!p.coverImage && <div className="w-10 h-10 rounded-lg bg-fuchsia-500/20 flex items-center justify-center flex-shrink-0 text-fuchsia-400 text-[16px]">📝</div>}
+                  {!p.coverImage && <div className="w-10 h-10 rounded-lg bg-[var(--accent-1)]/20 flex items-center justify-center flex-shrink-0 text-[var(--accent-1)] text-[16px]">📝</div>}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-bold text-white/90 truncate">{p.title}</p>
-                    <p className="text-[10px] text-white/40 truncate">{p.positivePrompt?.slice(0, 60)}...</p>
+                    <p className="text-[12px] font-bold text-[var(--text-primary)] truncate">{p.title}</p>
+                    <p className="text-[10px] text-[var(--text-muted)] truncate">{p.positivePrompt?.slice(0, 60)}...</p>
                   </div>
                   {addSuccess === p.id && <Check size={16} className="text-green-400 flex-shrink-0" />}
                 </button>
