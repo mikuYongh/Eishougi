@@ -19,6 +19,7 @@ export interface PromptProject {
   // Generation Params
   width: number;
   height: number;
+  resolution?: string;
   steps: number;
   cfgScale: number;
   seed: string;
@@ -29,6 +30,7 @@ export interface PromptProject {
   baseModel: string;
   vaeModel: string;
   loraConfigs: LoraConfig[];
+  workflowId?: string;
   
   // Metadata
   tags: string[];
@@ -56,15 +58,17 @@ function toRustPrompt(p: PromptProject): any {
     positivePrompt: p.positivePrompt || '',
     negativePrompt: p.negativePrompt || '',
     artistPrompt: p.artistPrompt || '',
-    width: p.width || 1024,
-    height: p.height || 1024,
-    steps: p.steps || 25,
-    cfgScale: p.cfgScale || 7.0,
+    width: p.width || 896,
+    height: p.height || 1088,
+    steps: p.steps || 20,
+    cfgScale: p.cfgScale || 5.0,
     seed: p.seed || '-1',
     samplerName: p.sampler || 'euler',
     scheduler: p.scheduler || 'normal',
     baseModel: p.baseModel || '',
     vaeModel: p.vaeModel || '',
+    resolution: p.resolution || null,
+    workflowId: p.workflowId || null,
     loraConfigs: JSON.stringify(p.loraConfigs || []),
     tags: (p.tags || []).map((t, i) => ({ id: `tag_${Date.now()}_${i}`, name: t, color: '#ff6b9d', createdAt: Date.now() })),
     isFavorite: p.isFavorite || false,
@@ -101,6 +105,8 @@ function fromRustPrompt(r: any): PromptProject {
     scheduler: r.scheduler,
     baseModel: r.baseModel || '',
     vaeModel: r.vaeModel || '',
+    resolution: r.resolution || undefined,
+    workflowId: r.workflowId || undefined,
     loraConfigs: loras,
     tags: (r.tags || []).map((t: any) => t.name),
     isFavorite: r.isFavorite,

@@ -68,15 +68,16 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         });
 
         if (completedJob) {
+          const job = completedJob as QueueJob;
           try {
-            const project = await invoke('get_prompt', { id: completedJob.projectId }) as any;
+            const project = await invoke('get_prompt', { id: job.projectId }) as any;
             if (project) {
               for (let i = 0; i < images.length; i++) {
                 const url = images[i];
                 const imageObj = {
                   id: "img_" + Date.now().toString() + "_" + i,
                   promptId: project.id,
-                  workflowId: completedJob.workflowId || null,
+                  workflowId: job.workflowId || null,
                   seed: project.seed,
                   outputPath: url,
                   outputType: "image",
@@ -86,7 +87,7 @@ export const useQueueStore = create<QueueStore>((set, get) => {
                 };
                 await invoke('save_generated_image', { image: imageObj });
               }
-              console.log("[Queue] saved history for", completedJob.projectId);
+              console.log("[Queue] saved history for", job.projectId);
             }
           } catch (e) {
             console.error("[Queue] Failed to save history from queue:", e);

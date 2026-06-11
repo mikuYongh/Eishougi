@@ -8,6 +8,8 @@ export interface AppSettings {
     apiKey: string;
     apiUrl: string;
     model: string;
+    temperature: number;
+    maxTokens: number;
   };
   slimToolsMode: boolean;
   wallpaperPath: string;
@@ -39,7 +41,9 @@ const defaultSettings: AppSettings = {
     provider: 'agnes',
     apiKey: import.meta.env.VITE_LLM_API_KEY || '',
     apiUrl: import.meta.env.VITE_LLM_API_URL || 'https://apihub.agnes-ai.com/v1',
-    model: import.meta.env.VITE_LLM_MODEL || 'agnes-2.0-flash'
+    model: import.meta.env.VITE_LLM_MODEL || 'agnes-2.0-flash',
+    temperature: 0.7,
+    maxTokens: 2048
   },
   slimToolsMode: false,
   wallpaperPath: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2560&auto=format&fit=crop',

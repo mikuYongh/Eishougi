@@ -11,6 +11,8 @@ export interface WorkflowProject {
   thumbnail?: string;
   jsonContent: string; // The ComfyUI JSON API format
   tags: string[];
+  isDefault?: boolean;
+  isBuiltin?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -21,6 +23,7 @@ interface WorkflowStore {
   addWorkflow: (workflow: WorkflowProject) => Promise<void>;
   removeWorkflow: (id: string) => Promise<void>;
   updateWorkflow: (id: string, data: Partial<WorkflowProject>) => Promise<void>;
+  setDefaultWorkflow: (id: string) => Promise<void>;
 }
 
 // Mapper to Rust
@@ -31,8 +34,8 @@ function toRustWorkflow(w: WorkflowProject): any {
     description: w.description || '',
     type: w.type || 'custom',
     jsonContent: w.jsonContent || '{}',
-    isDefault: false,
-    isBuiltin: false,
+    isDefault: w.isDefault || false,
+    isBuiltin: w.isBuiltin || false,
     createdAt: w.createdAt || Date.now(),
     updatedAt: w.updatedAt || Date.now()
   };
@@ -47,6 +50,8 @@ function fromRustWorkflow(r: any): WorkflowProject {
     type: r.type as WorkflowType,
     jsonContent: r.jsonContent,
     tags: [],
+    isDefault: r.isDefault,
+    isBuiltin: r.isBuiltin,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt
   };
@@ -89,6 +94,19 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
       }));
     } catch (error) {
       console.error('Failed to update workflow:', error);
+    }
+  },
+  setDefaultWorkflow: async (id) => {
+    try {
+      await invoke('set_default_workflow', { id });
+      set((state) => ({
+        workflows: state.workflows.map((w) => ({
+          ...w,
+          isDefault: w.id === id
+        })),
+      }));
+    } catch (error) {
+      console.error('Failed to set default workflow:', error);
     }
   },
 }));
