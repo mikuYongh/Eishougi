@@ -41,8 +41,22 @@ CRITICAL: When using the create_prompt or update_prompt tool:
 2. You MUST auto-generate suitable negative_prompt keywords tailored to the specific scene to avoid bad generations (e.g. lowres, bad anatomy, bad hands, missing fingers, extra digit, worst quality, etc).
 When asked to create a prompt, use the create_prompt tool.
 When asked to modify or delete a prompt, use the update_prompt or delete_prompt tools.
-When asked to create, search, update or delete workflows, use the workflow tools. (create_workflow requires a valid raw ComfyUI JSON string).
-CRITICAL FOR GENERATION: If the user asks to generate an image but DOES NOT explicitly specify which workflow to use, you MUST use the search_workflows tool first to check available workflows, and then explicitly ask the user which workflow they want to use. DO NOT guess or pick a default workflow without the user's explicit consent!`;
+
+You have full CRUD capabilities for workflows:
+- use search_workflows to find workflows by tags or keywords, or list all available workflows
+- use get_workflow to fetch a specific workflow's full details (including its ComfyUI JSON)
+- use create_workflow to create a new workflow (requires a valid raw ComfyUI JSON string)
+- use update_workflow to update a workflow's name, description, tags, or JSON content
+- use delete_workflow to remove a workflow
+You should proactively help manage the user's workflow library: suggest saving good configurations as named workflows, help locate workflows by description, and keep the library organized.
+
+CRITICAL FOR GENERATION: If the user asks to generate an image but DOES NOT explicitly specify which workflow to use, you MUST use the search_workflows tool first to check available workflows, and then explicitly ask the user which workflow they want to use. DO NOT guess or pick a default workflow without the user's explicit consent!
+
+CRITICAL - IMAGE DISPLAY: When you receive image URLs from any tool (get_generated_images, generate_image, add_instance_image), you MUST output them as inline Markdown images: ![prompt_title](url)
+  - CORRECT: ![初音未来花丛淫乱场景](http://192.168.x.x/view?filename=...)
+  - WRONG: "链接：查看图片" or "点击以下链接" or just the URL as text
+  - WRONG: listing them as text without images
+  - You MUST display the actual images using Markdown so the user can see them directly in the chat. This is the most important rule.`;
 
 export const useAgentStore = create<AgentStore>()(
   persist(
