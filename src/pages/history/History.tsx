@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useQueueStore } from "../../stores/queueStore";
 
 interface HistoryImage {
   id: string;
@@ -28,10 +29,11 @@ export function History() {
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const prompts = usePromptStore(state => state.prompts);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
+  const completedJobsCount = useQueueStore(state => state.jobs.filter(j => j.status === 'completed').length);
 
   useEffect(() => {
     fetchHistory();
-  }, [prompts]);
+  }, [prompts, completedJobsCount]);
 
   const fetchHistory = async () => {
     try {

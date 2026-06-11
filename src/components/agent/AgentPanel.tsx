@@ -35,6 +35,7 @@ export function AgentPanel() {
   const [inputValue, setInputValue] = useState("");
   const [selectedImages, setSelectedImages] = useState<{ path: string, previewUrl: string }[]>([]);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
+  const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   
   const { messages, isGenerating, sendMessage, stopGenerating } = useAgent();
   const { sessions, activeSessionId, createSession, switchSession, deleteSession, settings, updateSettings } = useAgentStore();

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2 } from "lucide-react";
+import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePromptStore, type LoraConfig } from "../../stores/promptStore";
 import { useQueueStore } from "../../stores/queueStore";
@@ -9,6 +9,20 @@ import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
+import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
+import { StyleSelector } from "../../components/generate/StyleSelector";
+import { comfyService } from "../../services/comfyService";
+import type { PresetStyle } from "../../data/styles";
+
+const SDXL_RESOLUTIONS = [
+  { label: "1024x1024 (1:1 方幅)", value: "1024x1024 (1.0)" },
+  { label: "896x1088 (4:5 纵幅)", value: "896x1088 (0.82)" },
+  { label: "1088x896 (5:4 横幅)", value: "1088x896 (1.21)" },
+  { label: "832x1216 (2:3 动漫肖像)", value: "832x1216 (0.68)" },
+  { label: "1216x832 (3:2 动漫风景)", value: "1216x832 (1.46)" },
+  { label: "768x1344 (9:16 竖版高清)", value: "768x1344 (0.57)" },
+  { label: "1344x768 (16:9 横版宽屏)", value: "1344x768 (1.75)" },
+];
 
 function parseLoraFromWorkflow(workflowJson: string): LoraConfig[] {
   try {
@@ -43,6 +57,7 @@ export function Generate() {
   const { promptId } = useParams();
   const navigate = useNavigate();
   const prompts = usePromptStore(state => state.prompts);
+  const updatePrompt = usePromptStore(state => state.updatePrompt);
   const project = prompts.find(p => p.id === promptId) || prompts[0];
 
   const { jobs, isConnected, connect, addJob } = useQueueStore();
@@ -57,40 +72,108 @@ export function Generate() {
   // Local overrides for Generate page
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>("");
   const [overrideBaseModel, setOverrideBaseModel] = useState<string>("");
+  const [overrideVaeModel, setOverrideVaeModel] = useState<string>("auto");
   const [overrideLoras, setOverrideLoras] = useState<LoraConfig[]>([]);
-  const [overrideWidth, setOverrideWidth] = useState<number>(512);
-  const [overrideHeight, setOverrideHeight] = useState<number>(512);
+  const [overrideWidth, setOverrideWidth] = useState<number>(896);
+  const [overrideHeight, setOverrideHeight] = useState<number>(1088);
+  const [overrideResolution, setOverrideResolution] = useState<string>("896x1088 (0.82)");
   const [overrideSteps, setOverrideSteps] = useState<number>(20);
-  const [overrideCfgScale, setOverrideCfgScale] = useState<number>(7.0);
-  const [overrideSeed, setOverrideSeed] = useState<number>(-1);
+  const [overrideCfgScale, setOverrideCfgScale] = useState<number>(5.0);
+  const [overrideSeed, setOverrideSeed] = useState<string>("-1");
+  const [overrideSampler, setOverrideSampler] = useState<string>("euler");
+  const [overrideScheduler, setOverrideScheduler] = useState<string>("normal");
+
+  // Prompts and style selectors states
+  const [positivePrompt, setPositivePrompt] = useState<string>("");
+  const [negativePrompt, setNegativePrompt] = useState<string>("");
+  const [selectedStyles, setSelectedStyles] = useState<PresetStyle[]>([]);
+
+  // Workflow structure flag
+  const [hasSizePicker, setHasSizePicker] = useState<boolean>(false);
 
   useEffect(() => {
     if (project) {
-      setOverrideBaseModel(project.baseModel || "sd_xl_base_1.0.safetensors");
-      setOverrideWidth(project.width || 512);
-      setOverrideHeight(project.height || 512);
-      setOverrideSteps(project.steps || 20);
-      setOverrideCfgScale(project.cfgScale || 7.0);
-      setOverrideSeed(project.seed || -1);
-    }
-  }, [project]);
+      const defaultWf = workflows.find(w => w.isDefault);
+      const initialWorkflowId = project.workflowId || (defaultWf ? defaultWf.id : "");
+      setSelectedWorkflowId(initialWorkflowId);
 
-  // When workflow changes, parse LoRAs from the workflow JSON. If no workflow selected, fallback to project config.
+      setOverrideVaeModel(project.vaeModel || "auto");
+      setOverrideWidth(project.width || 896);
+      setOverrideHeight(project.height || 1088);
+      
+      let initialResolution = project.resolution || "896x1088 (0.82)";
+      if (initialResolution && !initialResolution.includes("(")) {
+        const matched = SDXL_RESOLUTIONS.find(r => r.value.startsWith(initialResolution));
+        initialResolution = matched ? matched.value : "896x1088 (0.82)";
+      }
+      setOverrideResolution(initialResolution);
+      setOverrideSteps(project.steps || 20);
+      setOverrideCfgScale(project.cfgScale || 5.0);
+      setOverrideSeed(String(project.seed ?? "-1"));
+      setOverrideSampler(project.sampler || "euler");
+      setOverrideScheduler(project.scheduler || "normal");
+      setPositivePrompt(project.positivePrompt || "");
+      setNegativePrompt(project.negativePrompt || "");
+    }
+  }, [project?.id, workflows]);
+
+  // When workflow changes, parse configurations using analyzeWorkflow
   useEffect(() => {
     if (selectedWorkflowId) {
       const workflow = workflows.find(w => w.id === selectedWorkflowId);
       if (workflow && workflow.jsonContent) {
-        const parsedLoras = parseLoraFromWorkflow(workflow.jsonContent);
+        const analysis = comfyService.analyzeWorkflow(workflow.jsonContent);
+        setHasSizePicker(analysis.hasSizePicker);
+        
+        // Prioritize project's saved parameters if this is the project's selected workflow,
+        // otherwise default to workflow defaults.
+        const isProjectWf = project && project.workflowId === selectedWorkflowId;
+
+        if (isProjectWf && project.baseModel) {
+          setOverrideBaseModel(project.baseModel);
+        } else if (analysis.baseModel) {
+          setOverrideBaseModel(analysis.baseModel);
+        } else if (project?.baseModel) {
+          setOverrideBaseModel(project.baseModel);
+        } else {
+          setOverrideBaseModel("");
+        }
+
+        if (isProjectWf && project.vaeModel) {
+          setOverrideVaeModel(project.vaeModel);
+        } else if (analysis.vaeModel) {
+          setOverrideVaeModel(analysis.vaeModel);
+        }
+
+        if (isProjectWf && project.sampler) {
+          setOverrideSampler(project.sampler);
+        } else if (analysis.samplerName) {
+          setOverrideSampler(analysis.samplerName);
+        }
+
+        if (isProjectWf && project.scheduler) {
+          setOverrideScheduler(project.scheduler);
+        } else if (analysis.scheduler) {
+          setOverrideScheduler(analysis.scheduler);
+        }
+
+        // Align overrideLoras with current project preference if the parsed names exist
+        const parsedLoras = analysis.loras.map(al => {
+          // Check if project has a preference for this LoRA
+          const pref = project?.loraConfigs?.find(pc => pc.name === al.name);
+          return pref ? { name: al.name, strength: pref.strength, enabled: pref.enabled } : al;
+        });
         setOverrideLoras(parsedLoras);
-      } else {
-        setOverrideLoras([]);
       }
     } else {
+      setHasSizePicker(false);
       if (project) {
         setOverrideLoras(JSON.parse(JSON.stringify(project.loraConfigs || [])));
+        setOverrideBaseModel(project.baseModel || "");
+        setOverrideVaeModel(project.vaeModel || "auto");
       }
     }
-  }, [selectedWorkflowId, workflows, project]);
+  }, [selectedWorkflowId, workflows, project?.id]);
   
   // Find the active job for this project
   const activeJob = useMemo(() => {
@@ -117,16 +200,36 @@ export function Generate() {
 
   const handleGenerate = async () => {
     if (!project) return;
+    
+    // Construct style triggers combined for artistPrompt
+    const artistPrompt = selectedStyles.map(s => s.trigger).join(', ');
+
     const mergedProject = {
       ...project,
+      positivePrompt,
+      negativePrompt,
+      artistPrompt,
       baseModel: overrideBaseModel,
+      vaeModel: overrideVaeModel,
       loraConfigs: overrideLoras,
       width: overrideWidth,
       height: overrideHeight,
+      resolution: hasSizePicker ? overrideResolution : undefined,
       steps: overrideSteps,
       cfgScale: overrideCfgScale,
       seed: overrideSeed,
+      sampler: overrideSampler,
+      scheduler: overrideScheduler,
+      workflowId: selectedWorkflowId || undefined,
     };
+    
+    // Auto-save generation choices back to the project database
+    try {
+      await updatePrompt(project.id, mergedProject);
+    } catch(e) {
+      console.warn("Failed to auto-save prompt configurations:", e);
+    }
+
     await addJob(mergedProject, selectedWorkflowId || undefined);
   };
 
@@ -178,15 +281,38 @@ export function Generate() {
 
       <div className="flex gap-6 flex-1 min-h-0">
         
-        {/* Left Column - Main Preview & Progress */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0 glass-panel rounded-2xl overflow-hidden relative border border-[var(--glass-border)]">
-          {error && (
-            <div className="absolute top-4 left-4 right-4 z-50 bg-red-500/80 backdrop-blur-md text-[var(--text-primary)] px-4 py-3 rounded-lg text-sm font-bold flex items-center justify-between shadow-2xl">
-              <span>⚠️ {error}</span>
-            </div>
-          )}
+        {/* Left Column - Main Preview & Editor */}
+        <div className="flex-1 flex flex-col gap-4 min-w-0 overflow-y-auto custom-scrollbar pr-1">
+          
+          {/* Prompts Tag Editors */}
+          <div className="flex flex-col gap-4">
+            <PromptTagEditor
+              label="正向提示词"
+              value={positivePrompt}
+              onChange={setPositivePrompt}
+              type="positive"
+            />
+            <PromptTagEditor
+              label="负向提示词"
+              value={negativePrompt}
+              onChange={setNegativePrompt}
+              type="negative"
+            />
+            
+            <StyleSelector
+              selectedStyles={selectedStyles}
+              onChange={setSelectedStyles}
+            />
+          </div>
 
-          <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[var(--glass-bg)] relative">
+          <div className="flex-1 flex flex-col gap-4 min-h-[400px] glass-panel rounded-2xl overflow-hidden relative border border-[var(--glass-border)]">
+            {error && (
+              <div className="absolute top-4 left-4 right-4 z-50 bg-red-500/80 backdrop-blur-md text-[var(--text-primary)] px-4 py-3 rounded-lg text-sm font-bold flex items-center justify-between shadow-2xl">
+                <span>⚠️ {error}</span>
+              </div>
+            )}
+
+            <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[var(--glass-bg)] relative">
             
             {results.length > 0 && !isGenerating ? (
               <div className="relative w-full h-full flex items-center justify-center group">
@@ -228,6 +354,7 @@ export function Generate() {
             )}
           </div>
         </div>
+        </div>
 
         {/* Right Column - Project Params Summary */}
         <div className="w-[320px] flex-shrink-0 flex flex-col gap-4">
@@ -261,7 +388,12 @@ export function Generate() {
                 <div className="relative z-40">
                   <GlassDropdown 
                     value={selectedWorkflowId}
-                    onChange={v => setSelectedWorkflowId(v)}
+                    onChange={v => {
+                      setSelectedWorkflowId(v);
+                      if (project) {
+                        usePromptStore.getState().updatePrompt(project.id, { workflowId: v || undefined });
+                      }
+                    }}
                     options={[
                       { label: "默认工作流 (Default)", value: "" },
                       ...workflows.map(w => ({ label: w.name, value: w.id }))
@@ -272,21 +404,48 @@ export function Generate() {
               </div>
 
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block">正向提示词</label>
-                <div className="text-[11px] text-[var(--text-secondary)] font-mono bg-[var(--glass-bg-hover)] p-2 rounded-lg border border-[var(--glass-border)] max-h-32 overflow-y-auto leading-relaxed">
-                  {project.positivePrompt}
+                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
+                  <Cpu size={12} className="text-purple-400" /> VAE 模型
+                </label>
+                <div className="relative z-30">
+                  <GlassDropdown 
+                    value={overrideVaeModel}
+                    onChange={v => setOverrideVaeModel(v)}
+                    options={[
+                      { label: "Automatic (自动)", value: "auto" },
+                      { label: "sdxl_vae.safetensors", value: "sdxl_vae.safetensors" },
+                      { label: "sd_xl_base_1.0_vae.safetensors", value: "sd_xl_base_1.0_vae.safetensors" }
+                    ]}
+                    accentColor="purple"
+                  />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)]">
-                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">分辨率</label>
-                  <div className="flex items-center gap-1">
-                    <input type="number" value={overrideWidth} onChange={e => setOverrideWidth(Number(e.target.value))} className="w-12 bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                    <span className="text-[12px] text-[var(--text-muted)] font-mono">x</span>
-                    <input type="number" value={overrideHeight} onChange={e => setOverrideHeight(Number(e.target.value))} className="w-12 bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+              {/* Dynamic Resolution Block */}
+              {hasSizePicker ? (
+                <div>
+                  <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block">SDXL 尺寸规格</label>
+                  <div className="relative z-20">
+                    <GlassDropdown
+                      value={overrideResolution}
+                      onChange={setOverrideResolution}
+                      options={SDXL_RESOLUTIONS}
+                      accentColor="blue"
+                    />
                   </div>
                 </div>
+              ) : (
+                <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)]">
+                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">自定义分辨率</label>
+                  <div className="flex items-center gap-1 justify-center">
+                    <input type="number" value={overrideWidth} onChange={e => setOverrideWidth(Number(e.target.value))} className="w-16 bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                    <span className="text-[12px] text-[var(--text-muted)] font-mono">x</span>
+                    <input type="number" value={overrideHeight} onChange={e => setOverrideHeight(Number(e.target.value))} className="w-16 bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)]">
                   <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">Steps</label>
                   <input type="number" value={overrideSteps} onChange={e => setOverrideSteps(Number(e.target.value))} className="w-full bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
@@ -295,14 +454,51 @@ export function Generate() {
                   <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">CFG</label>
                   <input type="number" step="0.1" value={overrideCfgScale} onChange={e => setOverrideCfgScale(Number(e.target.value))} className="w-full bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                 </div>
-                <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)] relative group">
+                <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)] relative group col-span-2">
                   <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">Seed (-1 随机)</label>
                   <div className="flex items-center">
-                    <input type="number" value={overrideSeed} onChange={e => setOverrideSeed(Number(e.target.value))} className="w-full bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                    <button onClick={() => setOverrideSeed(-1)} className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-[var(--accent-1)] hover:text-white cursor-pointer px-1 rounded bg-[var(--glass-bg)] border border-[var(--accent-1)]/30">
+                    <input type="text" value={overrideSeed} onChange={e => setOverrideSeed(e.target.value)} className="w-full bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors" />
+                    <button onClick={() => setOverrideSeed("-1")} className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-[var(--accent-1)] hover:text-white cursor-pointer px-1 rounded bg-[var(--glass-bg)] border border-[var(--accent-1)]/30">
                       随机
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Sampler & Scheduler Overrides */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">采样器 (Sampler)</label>
+                  <GlassDropdown 
+                    value={overrideSampler}
+                    onChange={setOverrideSampler}
+                    options={[
+                      { label: "euler", value: "euler" },
+                      { label: "euler_ancestral", value: "euler_ancestral" },
+                      { label: "heun", value: "heun" },
+                      { label: "dpmpp_2m", value: "dpmpp_2m" },
+                      { label: "dpmpp_sde", value: "dpmpp_sde" },
+                      { label: "uni_pc", value: "uni_pc" }
+                    ]}
+                    accentColor="blue"
+                    small
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">调度器 (Scheduler)</label>
+                  <GlassDropdown 
+                    value={overrideScheduler}
+                    onChange={setOverrideScheduler}
+                    options={[
+                      { label: "normal", value: "normal" },
+                      { label: "karras", value: "karras" },
+                      { label: "exponential", value: "exponential" },
+                      { label: "sgm_uniform", value: "sgm_uniform" },
+                      { label: "simple", value: "simple" }
+                    ]}
+                    accentColor="blue"
+                    small
+                  />
                 </div>
               </div>
 

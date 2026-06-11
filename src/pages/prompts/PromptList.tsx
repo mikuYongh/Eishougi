@@ -9,6 +9,7 @@ type ViewMode = 'grid' | 'list';
 export function PromptList() {
   const prompts = usePromptStore((state) => state.prompts);
   const toggleFavorite = usePromptStore((state) => state.toggleFavorite);
+  const removePrompt = usePromptStore((state) => state.removePrompt);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   const navigate = useNavigate();
 
@@ -107,12 +108,24 @@ export function PromptList() {
                 {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) && (
                   <div className="h-24 w-full relative overflow-hidden flex-shrink-0 bg-[var(--glass-bg)]">
                     <img src={p.coverImage || p.instanceImages?.[0]} alt={p.title} className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
-                    <div className="absolute top-2 right-2 z-20">
+                    <div className="absolute top-2 right-2 z-20 flex gap-1.5">
                       <button 
                         onClick={() => toggleFavorite(p.id)}
                         className="p-1.5 rounded-full bg-[var(--glass-bg)] backdrop-blur hover:bg-[var(--glass-bg)] transition-colors cursor-pointer"
                       >
                         <Star size={14} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-[var(--text-primary)]"} />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm("确定要删除该提示词项目吗？")) {
+                            removePrompt(p.id);
+                          }
+                        }}
+                        className="p-1.5 rounded-full bg-[var(--glass-bg)] backdrop-blur hover:bg-red-500/20 hover:text-red-400 transition-colors cursor-pointer text-[var(--text-muted)]"
+                        title="删除项目"
+                      >
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -125,9 +138,23 @@ export function PromptList() {
                       <p className="text-[11px] text-[var(--text-muted)] line-clamp-1">{p.description || "暂无描述"}</p>
                     </div>
                     {(!p.coverImage && (!p.instanceImages || p.instanceImages.length === 0)) && (
-                      <button onClick={() => toggleFavorite(p.id)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer flex-shrink-0">
-                        <Star size={14} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-[var(--text-muted)]"} />
-                      </button>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={() => toggleFavorite(p.id)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer">
+                          <Star size={14} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-[var(--text-muted)]"} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm("确定要删除该提示词项目吗？")) {
+                              removePrompt(p.id);
+                            }
+                          }}
+                          className="p-1.5 rounded-full hover:bg-red-500/10 hover:text-red-400 transition-colors cursor-pointer text-[var(--text-muted)]"
+                          title="删除项目"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -214,6 +241,17 @@ export function PromptList() {
                   </button>
                   <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
                     <Copy size={14} />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (confirm("确定要删除该提示词项目吗？")) {
+                        removePrompt(p.id);
+                      }
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400 transition-colors cursor-pointer"
+                    title="删除项目"
+                  >
+                    <Trash2 size={14} />
                   </button>
                   <button 
                     onClick={() => navigate(`/prompts/${p.id}/edit`)}

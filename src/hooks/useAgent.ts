@@ -345,6 +345,8 @@ export function useAgent() {
           ],
           tools: ALL_TOOLS,
           stream: true,
+          temperature: llm.temperature !== undefined ? llm.temperature : 0.7,
+          max_tokens: llm.maxTokens !== undefined ? llm.maxTokens : 2048,
         }),
         signal: abortController.signal
       });
@@ -421,7 +423,14 @@ export function useAgent() {
         for (const call of assistantMessage.tool_calls) {
           let resultStr = "";
           try {
-            const parsedArgs = JSON.parse(call.function.arguments || '{}');
+            // Clean up backslashes or trailing content in argument string if LLM outputted slightly malformed json
+            let rawArgs = (call.function.arguments || '{}').trim();
+            // Simple auto-completion for truncated json
+            if (rawArgs.startsWith('{') && !rawArgs.endsWith('}')) {
+              // Try to patch missing curly braces
+              rawArgs += '}';
+            }
+            const parsedArgs = JSON.parse(rawArgs);
             try {
               let res: any;
               const fnName = call.function.name;
@@ -628,7 +637,9 @@ export function useAgent() {
               resultStr = JSON.stringify({ error: invokeErr.toString() });
             }
           } catch (e: any) {
-            resultStr = JSON.stringify({ error: e.toString() });
+            resultStr = JSON.stringify({ 
+              error: `Invalid JSON arguments provided to tool: ${e.toString()}. Please revise the arguments and call the tool again.` 
+            });
           }
 
           const toolMsg: ChatMessage = {

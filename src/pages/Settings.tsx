@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
-import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor } from "lucide-react";
+import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown } from "lucide-react";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { GlassDropdown } from "../components/ui/GlassDropdown";
 
 const SETTINGS_TABS = [
   { id: "appearance", label: "外观设置", icon: <Palette size={18} /> },
@@ -18,7 +20,7 @@ export function Settings() {
     blurLevel, setBlurLevel,
     appTheme, setAppTheme,
     colorTheme, setColorTheme,
-    settings, setPrivacyMode
+    settings, setPrivacyMode, updateSettings
   } = useSettingsStore();
   const [localWallpaper, setLocalWallpaper] = useState(wallpaperPath);
 
@@ -32,9 +34,18 @@ export function Settings() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const objectUrl = URL.createObjectURL(file);
-      setLocalWallpaper(objectUrl);
-      setWallpaperPath(objectUrl);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Data = event.target?.result as string;
+        try {
+          const savedPath = await invoke<string>('save_base64_image', { base64Data });
+          setLocalWallpaper(savedPath);
+          setWallpaperPath(savedPath);
+        } catch (err) {
+          console.error("Failed to save wallpaper persistently:", err);
+        }
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -114,7 +125,7 @@ export function Settings() {
                   <div className="w-64 h-40 rounded-xl overflow-hidden relative border border-[var(--glass-border)] shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex-shrink-0 bg-[var(--glass-bg)]">
                     <div 
                       className="absolute inset-0 bg-cover bg-center transition-all duration-700 hover:scale-110"
-                      style={{ backgroundImage: `url("${localWallpaper}")` }}
+                      style={{ backgroundImage: `url("${(localWallpaper.startsWith('http') || localWallpaper.startsWith('data:') || localWallpaper.startsWith('blob:')) ? localWallpaper : convertFileSrc(localWallpaper)}")` }}
                     />
                     <div className="absolute top-2 left-2 px-2 py-1 rounded bg-[var(--glass-bg)] backdrop-blur-md border border-[var(--glass-border)]">
                       <span className="text-[var(--text-muted)] text-[9px] font-bold tracking-widest uppercase">Preview</span>
@@ -285,11 +296,160 @@ export function Settings() {
             </div>
           )}
 
-          {activeTab !== "appearance" && activeTab !== "general" && (
-            <div className="glass-panel w-full h-64 flex flex-col items-center justify-center text-center opacity-60">
-               <SettingsIcon size={48} className="text-[var(--text-muted)] mb-4 animate-[spin_10s_linear_infinite]" />
-               <h3 className="text-xl font-bold text-[var(--text-primary)]">开发中</h3>
-               <p className="text-xs text-[var(--text-muted)] mt-1 uppercase tracking-widest">Module under construction</p>
+          {activeTab === "models" && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+              {/* ComfyUI Settings */}
+              <div className="glass-panel p-6">
+                <div className="flex items-center gap-3 mb-6 border-b border-[var(--glass-border)] pb-4">
+                  <div className="p-2 rounded-lg bg-[var(--accent-1)]/20 text-[var(--accent-1)] border border-[var(--accent-1)]/20 shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.2)]">
+                    <Cpu size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text-primary)]">ComfyUI 引擎配置</h3>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">配置本地或远程 ComfyUI 实例的连接端点。</p>
+                  </div>
+                </div>
+
+                <div className="max-w-2xl space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">ComfyUI 服务器地址</label>
+                    <input
+                      type="text"
+                      value={settings.comfyUrl}
+                      onChange={(e) => updateSettings({ comfyUrl: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                      placeholder="http://127.0.0.1:8188"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* LLM Agent Settings */}
+              <div className="glass-panel p-6">
+                <div className="flex items-center gap-3 mb-6 border-b border-[var(--glass-border)] pb-4">
+                  <div className="p-2 rounded-lg bg-[var(--accent-2)]/20 text-[var(--accent-2)] border border-[var(--accent-2)]/20">
+                    <SettingsIcon size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text-primary)]">AI 助手 & 反推模型配置</h3>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">配置 LLM 服务的连接、模型、温度以及最大 Token。</p>
+                  </div>
+                </div>
+
+                <div className="max-w-2xl space-y-5">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">服务商 (Provider)</label>
+                      <GlassDropdown
+                        value={settings.llm.provider}
+                        onChange={(val) => updateSettings({
+                          llm: { ...settings.llm, provider: val as any }
+                        })}
+                        options={[
+                          { label: "Agnes AI", value: "agnes" },
+                          { label: "OpenAI Compatible", value: "openai" },
+                          { label: "Anthropic Claude", value: "anthropic" },
+                          { label: "Ollama (Local)", value: "ollama" }
+                        ]}
+                        accentColor="pink"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">模型名称 (Model)</label>
+                      <input
+                        type="text"
+                        value={settings.llm.model}
+                        onChange={(e) => updateSettings({
+                          llm: { ...settings.llm, model: e.target.value }
+                        })}
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                        placeholder="e.g. agnes-2.0-flash, gpt-4o, etc."
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">API 接口地址 (API Base URL)</label>
+                    <input
+                      type="text"
+                      value={settings.llm.apiUrl}
+                      onChange={(e) => updateSettings({
+                        llm: { ...settings.llm, apiUrl: e.target.value }
+                      })}
+                      className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                      placeholder="https://api.openai.com/v1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">API 密钥 (API Key)</label>
+                    <input
+                      type="password"
+                      value={settings.llm.apiKey}
+                      onChange={(e) => updateSettings({
+                        llm: { ...settings.llm, apiKey: e.target.value }
+                      })}
+                      className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                      placeholder="sk-..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Temperature Slider */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest block">温度 (Temperature)</label>
+                        <span className="text-xs font-mono font-bold text-[var(--accent-1)] bg-[var(--accent-1)]/10 px-2 py-0.5 rounded border border-[var(--accent-1)]/20">
+                          {settings.llm.temperature ?? 0.7}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.0"
+                        max="2.0"
+                        step="0.1"
+                        value={settings.llm.temperature ?? 0.7}
+                        onChange={(e) => updateSettings({
+                          llm: { ...settings.llm, temperature: Number(e.target.value) }
+                        })}
+                        className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer border border-[var(--glass-border)] outline-none"
+                        style={{ accentColor: "var(--accent-1)" }}
+                      />
+                      <div className="flex justify-between text-[9px] text-[var(--text-muted)] uppercase tracking-widest font-bold mt-2">
+                        <span>精准 (0.0)</span>
+                        <span>创造力 (2.0)</span>
+                      </div>
+                    </div>
+
+                    {/* Max Tokens */}
+                    <div>
+                      <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">最大生成 Token (Max Tokens)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="32768"
+                        value={settings.llm.maxTokens ?? 4096}
+                        onChange={(e) => updateSettings({
+                          llm: { ...settings.llm, maxTokens: Number(e.target.value) }
+                        })}
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "about" && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 glass-panel p-6 text-center max-w-2xl mx-auto py-12">
+              <SettingsIcon size={48} className="text-[var(--accent-1)] mx-auto mb-4 animate-[spin_10s_linear_infinite]" />
+              <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">詠唱机 EISHOUGI</h3>
+              <p className="text-xs text-[var(--text-muted)] uppercase tracking-widest mb-4">Version 0.1.0</p>
+              <p className="text-sm text-[var(--text-primary)] max-w-md mx-auto leading-relaxed">
+                用文字咒语召唤画面的 AI 创作工作台。集成了提示词工程管理、本地工作流调度以及高级 AI 辅助生图指令。
+              </p>
             </div>
           )}
         </div>

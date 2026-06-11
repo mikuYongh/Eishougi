@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { useSettingsStore } from "./stores/settingsStore";
 import { TitleBar } from "./components/layout/TitleBar";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -38,7 +39,7 @@ export default function App() {
         <div
           className="absolute inset-[-20px] bg-cover bg-center scale-105 transition-all duration-700"
           style={{ 
-            backgroundImage: `url("${wallpaperPath}")`,
+            backgroundImage: `url("${(wallpaperPath.startsWith('http') || wallpaperPath.startsWith('data:') || wallpaperPath.startsWith('blob:')) ? wallpaperPath : convertFileSrc(wallpaperPath)}")`,
             filter: `blur(${blurLevel}px)`
           }}
         />

@@ -1,4 +1,4 @@
-import { Plus, Search, Edit3, Trash2, Cpu, Video, Settings, Play } from "lucide-react";
+import { Plus, Search, Edit3, Trash2, Cpu, Video, Settings, Play, Star } from "lucide-react";
 import { useWorkflowStore, type WorkflowType } from "../../stores/workflowStore";
 import { useNavigate } from "react-router-dom";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -19,6 +19,8 @@ const TypeBadge = ({ type }: { type: WorkflowType }) => {
 export function WorkflowList() {
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   const workflows = useWorkflowStore(state => state.workflows);
+  const setDefaultWorkflow = useWorkflowStore(state => state.setDefaultWorkflow);
+  const removeWorkflow = useWorkflowStore(state => state.removeWorkflow);
   const navigate = useNavigate();
 
   return (
@@ -88,9 +90,18 @@ export function WorkflowList() {
                 </div>
               </div>
 
-              <div className="p-5 flex flex-col gap-4 flex-1">
+               <div className="p-5 flex flex-col gap-4 flex-1">
                 <div>
-                  <h3 className="text-[16px] font-bold text-[var(--text-primary)] mb-1 line-clamp-1">{wf.name}</h3>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <h3 className="text-[16px] font-bold text-[var(--text-primary)] line-clamp-1 flex-1">{wf.name}</h3>
+                    <button
+                      onClick={() => setDefaultWorkflow(wf.id)}
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${wf.isDefault ? 'text-yellow-400 bg-yellow-500/10 border border-yellow-500/20' : 'text-[var(--text-muted)] hover:text-yellow-400 hover:bg-white/5 border border-transparent'}`}
+                      title={wf.isDefault ? "当前默认工作流" : "设为默认工作流"}
+                    >
+                      <Star size={14} className={wf.isDefault ? "fill-yellow-400" : ""} />
+                    </button>
+                  </div>
                   <p className="text-[12px] text-[var(--text-muted)] line-clamp-2 min-h-[36px]">{wf.description}</p>
                 </div>
 
@@ -105,7 +116,14 @@ export function WorkflowList() {
 
                 {/* Actions */}
                 <div className="flex items-center justify-between mt-auto pt-4 border-t border-[var(--glass-border)]">
-                  <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/5 hover:bg-red-500/10 text-red-400/70 hover:text-red-400 transition-colors cursor-pointer">
+                  <button 
+                    onClick={() => {
+                      if (confirm(`确定要删除工作流 "${wf.name}" 吗？`)) {
+                        removeWorkflow(wf.id);
+                      }
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/5 hover:bg-red-500/10 text-red-400/70 hover:text-red-400 transition-colors cursor-pointer"
+                  >
                     <Trash2 size={14} />
                   </button>
                   <div className="flex gap-2">

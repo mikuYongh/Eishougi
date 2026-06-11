@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X, History } from "lucide-react";
-import { usePromptStore, type PromptProject, type LoraConfig, type ControlNetConfig } from "../../stores/promptStore";
+import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
 import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import { invoke } from "@tauri-apps/api/core";
 import { HistoryImagePicker } from "../../components/ui/HistoryImagePicker";
+import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
 
 export function PromptEdit() {
   const { id } = useParams();
@@ -23,7 +24,7 @@ export function PromptEdit() {
   
   const [project, setProject] = useState<Partial<PromptProject>>({
     title: "", description: "", coverImage: "", positivePrompt: "", negativePrompt: "", artistPrompt: "",
-    width: 1024, height: 1024, steps: 20, cfgScale: 7.0, seed: "-1",
+    width: 896, height: 1088, steps: 20, cfgScale: 5.0, seed: "-1",
     baseModel: "sd_xl_base_1.0.safetensors", vaeModel: "auto", loraConfigs: [], tags: [], instanceImages: []
   });
   const [tagInput, setTagInput] = useState("");
@@ -156,23 +157,19 @@ export function PromptEdit() {
             </div>
           </div>
 
-          <div className="glass-panel p-5 space-y-4 flex-1">
-            <div className="h-1/2 flex flex-col">
-              <label className="text-[11px] font-bold text-blue-400 uppercase tracking-widest mb-1.5 block">正向提示词 (Positive Prompt)</label>
-              <textarea 
-                value={project.positivePrompt} onChange={e => updateField('positivePrompt', e.target.value)}
-                className="w-full flex-1 bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-xl px-4 py-3 text-[var(--text-primary)] text-[13px] font-mono outline-none focus:border-[var(--accent-2)]/50 transition-colors resize-none leading-relaxed"
-                placeholder="masterpiece, best quality..."
-              />
-            </div>
-            <div className="h-[40%] flex flex-col">
-              <label className="text-[11px] font-bold text-red-400 uppercase tracking-widest mb-1.5 block">负向提示词 (Negative Prompt)</label>
-              <textarea 
-                value={project.negativePrompt} onChange={e => updateField('negativePrompt', e.target.value)}
-                className="w-full flex-1 bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-xl px-4 py-3 text-[var(--text-muted)] text-[13px] font-mono outline-none focus:border-red-500/50 transition-colors resize-none leading-relaxed"
-                placeholder="lowres, bad anatomy..."
-              />
-            </div>
+          <div className="flex flex-col gap-4 flex-1">
+            <PromptTagEditor
+              label="正向提示词"
+              value={project.positivePrompt || ""}
+              onChange={v => updateField('positivePrompt', v)}
+              type="positive"
+            />
+            <PromptTagEditor
+              label="负向提示词"
+              value={project.negativePrompt || ""}
+              onChange={v => updateField('negativePrompt', v)}
+              type="negative"
+            />
           </div>
 
           <div className="glass-panel p-5 grid grid-cols-3 gap-6">
@@ -337,7 +334,16 @@ export function PromptEdit() {
                 <div key={i} className="p-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[12px] font-bold text-[var(--text-primary)] truncate pr-2">{lora.name}</span>
-                    <button className="text-red-400/50 hover:text-red-400 cursor-pointer transition-colors"><Trash2 size={14} /></button>
+                    <button 
+                      onClick={() => {
+                        const newLoras = [...(project.loraConfigs || [])];
+                        newLoras.splice(i, 1);
+                        updateField('loraConfigs', newLoras);
+                      }}
+                      className="text-red-400/50 hover:text-red-400 cursor-pointer transition-colors"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                   <div className="flex items-center gap-3">
                     <input type="range" min="0" max="2" step="0.05" value={lora.strength} onChange={e => updateLora(i, { strength: parseFloat(e.target.value) })} className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-orange-400" />
