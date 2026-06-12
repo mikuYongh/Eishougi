@@ -3,12 +3,12 @@
 import { useSettingsStore } from '../stores/settingsStore';
 
 // Get dynamically from settings
-const getComfyUrl = () => {
+export const getComfyUrl = () => {
   let url = useSettingsStore.getState().settings.comfyUrl || 'http://127.0.0.1:8188';
   return url.endsWith('/') ? url.slice(0, -1) : url;
 };
 
-const getWsUrl = () => {
+export const getWsUrl = () => {
   const httpUrl = getComfyUrl();
   return httpUrl.replace('http://', 'ws://').replace('https://', 'wss://');
 };
@@ -128,6 +128,25 @@ export class ComfyService {
       return await response.json();
     } catch (e: any) {
       throw new Error(`Failed to communicate with ComfyUI: ${e.message}`);
+    }
+  }
+
+  async interrupt() {
+    try {
+      const comfyUrl = getComfyUrl();
+      const response = await fetch(`${comfyUrl}/interrupt`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to interrupt: ${response.status} ${response.statusText}`);
+      }
+      return true;
+    } catch (e: any) {
+      console.error(`Failed to interrupt ComfyUI execution: ${e.message}`);
+      return false;
     }
   }
 

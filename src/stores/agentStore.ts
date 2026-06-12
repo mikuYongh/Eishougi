@@ -66,6 +66,8 @@ When creating or updating prompts:
 - The returned tags can be directly used in positive_prompt as comma-separated keywords
 - IMPORTANT: If MCP tools are unavailable (connection failed), fall back to your own knowledge of Danbooru tags
 
+CRITICAL - GENERATION: When using generate_image, the tool WAITS for image generation to complete and returns image URLs directly. Do NOT call get_queue_status after generate_image — the results are already in the response. Only use get_queue_status to check the queue state independently.
+
 CRITICAL - IMAGE DISPLAY: When you receive image URLs from any tool (get_generated_images, generate_image, add_instance_image), you MUST output them as inline Markdown images: ![prompt_title](url)
   - CORRECT: ![初音未来花丛淫乱场景](http://192.168.x.x/view?filename=...)
   - WRONG: "链接：查看图片" or "点击以下链接" or just the URL as text

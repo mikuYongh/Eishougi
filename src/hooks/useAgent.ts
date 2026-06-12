@@ -226,7 +226,7 @@ export function useAgent() {
       type: "function",
       function: {
         name: "generate_image",
-        description: "Generate an image using a specific prompt and workflow.",
+        description: "Generate an image using a specific prompt and workflow. This function WAITS for generation to complete and returns the generated image URLs directly. You do NOT need to poll get_queue_status after calling this.",
         parameters: {
           type: "object",
           properties: {
@@ -242,7 +242,7 @@ export function useAgent() {
       type: "function",
       function: {
         name: "get_queue_status",
-        description: "Get the status of the generation queue.",
+        description: "Get the status of the generation queue, including recent completed jobs with their image URLs. Use this ONLY to check queue state — do NOT poll repeatedly. generate_image already returns results directly.",
         parameters: {
           type: "object",
           properties: {}
@@ -287,10 +287,10 @@ export function useAgent() {
           properties: {
             title: { type: "string" },
             description: { type: "string" },
-            workflow_json: { type: "string", description: "The raw ComfyUI JSON string." },
+            workflow_json: { type: "object", description: "The ComfyUI workflow JSON object. IMPORTANT: If the user pasted a large JSON block in their chat message, OMIT this parameter completely! The system will automatically extract it." },
             tags: { type: "array", items: { type: "string" } }
           },
-          required: ["title", "workflow_json"]
+          required: ["title"]
         }
       }
     },
@@ -305,7 +305,7 @@ export function useAgent() {
             workflow_id: { type: "string" },
             title: { type: "string" },
             description: { type: "string" },
-            workflow_json: { type: "string" },
+            workflow_json: { type: "object", description: "The updated ComfyUI workflow JSON object. IMPORTANT: If the user pasted a large JSON block in their chat message, OMIT this parameter completely!" },
             tags: { type: "array", items: { type: "string" } }
           },
           required: ["workflow_id"]
@@ -416,7 +416,10 @@ export function useAgent() {
         bodyJson = JSON.stringify({
           model: llm.model || 'agnes-2.0-flash',
           messages: [
-            { role: 'system', content: agentSettings.systemPrompt },
+            { 
+              role: 'system', 
+              content: agentSettings.systemPrompt + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually." 
+            },
             ...mappedMessages
           ],
           tools: allTools,
@@ -518,6 +521,7 @@ export function useAgent() {
               // Try to patch missing curly braces
               rawArgs += '}';
             }
+            call.function.arguments = rawArgs; // MUST write back so history has valid JSON for subsequent API calls
             const parsedArgs = JSON.parse(rawArgs);
             try {
               let res: any;
@@ -617,12 +621,30 @@ export function useAgent() {
                 }
                 
                 const batchCount = parsedArgs.batch_count || 1;
-                await useQueueStore.getState().addJob(project, wfId, batchCount);
-                res = { status: "queued", message: `Generation request added for prompt ${parsedArgs.prompt_id} using workflow ${wfId || 'default'}. Please check the queue or Generate page.` };
+                const results = await useQueueStore.getState().addJob(project, wfId, batchCount);
+                const allImages = results.flat();
+                res = {
+                  status: "completed",
+                  images: allImages,
+                  message: `Successfully generated ${allImages.length} image(s).`
+                };
               } else if (fnName === 'get_queue_status') {
                 const state = useQueueStore.getState();
-                const active_jobs = state.jobs.filter(j => j.status === 'pending' || j.status === 'generating').length;
-                res = { status: state.isConnected ? "connected" : "disconnected", active_jobs, total_jobs_in_history: state.jobs.length };
+                const activeJobs = state.jobs.filter(j => j.status === 'pending' || j.status === 'generating');
+                const recentCompleted = state.jobs
+                  .filter(j => j.status === 'completed' && j.images && j.images.length > 0)
+                  .slice(-3)
+                  .map(j => ({
+                    job_id: j.id,
+                    project_title: j.projectTitle,
+                    images: j.images
+                  }));
+                res = {
+                  status: state.isConnected ? "connected" : "disconnected",
+                  active_jobs: activeJobs.length,
+                  total_jobs_in_history: state.jobs.length,
+                  recent_completed: recentCompleted
+                };
               } else if (fnName === 'search_workflows') {
                 const workflows = useWorkflowStore.getState().workflows;
                 res = workflows.filter(w => {
@@ -644,7 +666,18 @@ export function useAgent() {
                   name: parsedArgs.title,
                   description: parsedArgs.description || "Generated by AI Agent",
                   type: "custom" as const,
-                  jsonContent: parsedArgs.workflow_json,
+                  jsonContent: (() => {
+                    let j = typeof parsedArgs.workflow_json === 'string' ? parsedArgs.workflow_json : (parsedArgs.workflow_json ? JSON.stringify(parsedArgs.workflow_json, null, 2) : undefined);
+                    if (!j || j === '{}') {
+                      const lastUserMsg = currentMessages.slice().reverse().find(m => m.role === 'user');
+                      if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+                        const s = lastUserMsg.content.indexOf('{');
+                        const e = lastUserMsg.content.lastIndexOf('}');
+                        if (s !== -1 && e !== -1 && e > s) j = lastUserMsg.content.substring(s, e + 1);
+                      }
+                    }
+                    return j || '{}';
+                  })(),
                   tags: (parsedArgs.tags || []),
                   createdAt: Date.now(),
                   updatedAt: Date.now()
@@ -674,7 +707,19 @@ export function useAgent() {
                 const updatedWf = {
                   name: parsedArgs.title !== undefined ? parsedArgs.title : currentWf.name,
                   description: parsedArgs.description !== undefined ? parsedArgs.description : currentWf.description,
-                  jsonContent: parsedArgs.workflow_json !== undefined ? parsedArgs.workflow_json : currentWf.jsonContent,
+                  jsonContent: (() => {
+                    if (parsedArgs.workflow_json === undefined) return currentWf.jsonContent;
+                    let j = typeof parsedArgs.workflow_json === 'string' ? parsedArgs.workflow_json : JSON.stringify(parsedArgs.workflow_json, null, 2);
+                    if (!j || j === '{}') {
+                      const lastUserMsg = currentMessages.slice().reverse().find(m => m.role === 'user');
+                      if (lastUserMsg && typeof lastUserMsg.content === 'string') {
+                        const s = lastUserMsg.content.indexOf('{');
+                        const e = lastUserMsg.content.lastIndexOf('}');
+                        if (s !== -1 && e !== -1 && e > s) j = lastUserMsg.content.substring(s, e + 1);
+                      }
+                    }
+                    return j && j !== '{}' ? j : currentWf.jsonContent;
+                  })(),
                   tags: parsedArgs.tags !== undefined ? parsedArgs.tags : currentWf.tags,
                   updatedAt: Date.now()
                 };

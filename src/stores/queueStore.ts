@@ -28,16 +28,18 @@ interface QueueStore {
   jobs: QueueJob[];
   isConnected: boolean;
   completedNotifications: CompletionNotification[];
-  addJob: (project: any, workflowId?: string, batchCount?: number) => Promise<void>;
+  addJob: (project: any, workflowId?: string, batchCount?: number) => Promise<string[][]>;
   removeJob: (id: string) => void;
   clearCompleted: () => void;
   connect: () => Promise<void>;
   disconnect: () => void;
   dismissNotification: (id: string) => void;
+  interruptJob: () => Promise<void>;
 }
 
 export const useQueueStore = create<QueueStore>((set, get) => {
   let _resolveConnect: (() => void) | null = null;
+  let _jobResolvers = new Map<string, (images: string[]) => void>();
 
   const setupCallbacks = () => {
     comfyService.connect(
@@ -78,9 +80,15 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           return { jobs: newJobs };
         });
 
-        if (completedJob) {
-          const job = completedJob as QueueJob;
-          set(state => ({
+          if (completedJob) {
+            const job = completedJob as QueueJob;
+            // Resolve the waiting addJob Promise
+            const resolver = _jobResolvers.get(job.id);
+            if (resolver) {
+              resolver(job.images || []);
+              _jobResolvers.delete(job.id);
+            }
+            set(state => ({
             completedNotifications: [
               {
                 id: "notif_" + Date.now(),
@@ -110,7 +118,13 @@ export const useQueueStore = create<QueueStore>((set, get) => {
                   errorMsg: null,
                   createdAt: Date.now()
                 };
-                await invoke('save_generated_image', { image: imageObj });
+                try {
+                  await invoke('save_generated_image', { image: imageObj });
+                } catch (dbErr) {
+                  console.warn("[Queue] Failed to save image, retrying without workflowId...", dbErr);
+                  imageObj.workflowId = null;
+                  await invoke('save_generated_image', { image: imageObj });
+                }
               }
               console.log("[Queue] saved history for", job.projectId);
             }
@@ -175,10 +189,18 @@ export const useQueueStore = create<QueueStore>((set, get) => {
   },
 
   addJob: async (project: any, workflowId?: string, batchCount: number = 1) => {
+    const jobIds: string[] = [];
+    const jobPromises: Promise<string[]>[] = [];
     const jobs: QueueJob[] = [];
     for (let i = 0; i < batchCount; i++) {
+      const jobId = "job_" + Date.now() + "_" + i;
+      jobIds.push(jobId);
+      const promise = new Promise<string[]>((resolve) => {
+        _jobResolvers.set(jobId, resolve);
+      });
+      jobPromises.push(promise);
       jobs.push({
-        id: "job_" + Date.now() + "_" + i,
+        id: jobId,
         projectId: project.id,
         projectTitle: project.title,
         status: 'pending',
@@ -221,11 +243,22 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         await comfyService.queuePrompt(injectedWf);
         console.log("[Queue] addJob: prompt", i + 1, "queued successfully");
       }
+
+      // Wait for all jobs to complete via WebSocket callbacks
+      console.log("[Queue] addJob: waiting for generation to complete...");
+      const results = await Promise.all(jobPromises);
+      console.log("[Queue] addJob: all jobs completed, images:", results.flat().length);
+      return results;
     } catch (e: any) {
       console.error("[Queue] addJob error:", e.message);
+      // Reject pending resolvers so they don't hang forever
+      for (const id of jobIds) {
+        _jobResolvers.delete(id);
+      }
       set(state => ({
         jobs: state.jobs.map(j => jobs.some(bj => bj.id === j.id) ? { ...j, status: 'failed', error: e.message } : j)
       }));
+      throw e;
     }
   },
 
@@ -239,6 +272,14 @@ export const useQueueStore = create<QueueStore>((set, get) => {
 
   dismissNotification: (id) => {
     set(state => ({ completedNotifications: state.completedNotifications.filter(n => n.id !== id) }));
+  },
+
+  interruptJob: async () => {
+    try {
+      await comfyService.interrupt();
+    } catch (e) {
+      console.error("[Queue] Failed to interrupt job", e);
+    }
   }
   };
 });
