@@ -41,7 +41,7 @@ export function TitleBar() {
 
   return (
     <div
-      className="titlebar-drag flex items-center h-[var(--spacing-titlebar-h)] flex-shrink-0 px-4 relative z-20"
+      className="titlebar-drag hidden md:flex items-center h-[var(--spacing-titlebar-h)] flex-shrink-0 px-4 relative z-20"
       style={{ 
         background: "var(--glass-bg)", 
         backdropFilter: "blur(16px)", 

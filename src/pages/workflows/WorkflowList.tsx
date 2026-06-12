@@ -1,4 +1,4 @@
-import { Plus, Search, Edit3, Trash2, Cpu, Video, Settings, Play, Star } from "lucide-react";
+import { Plus, Search, Edit3, Trash2, Cpu, Video, Settings, Play, Star, Zap } from "lucide-react";
 import { useWorkflowStore, type WorkflowType } from "../../stores/workflowStore";
 import { useNavigate } from "react-router-dom";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -27,10 +27,10 @@ export function WorkflowList() {
     <div className="flex flex-col h-full relative z-10 gap-6">
       
       {/* PageHeader */}
-      <div className="flex items-center justify-between flex-shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0">
         <div>
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-            <span className="text-yellow-400">⚡</span> 工作流管理
+            <span className="text-yellow-400 flex items-center justify-center"><Zap size={24} /></span> 工作流管理
           </h2>
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">配置并保存 ComfyUI JSON 渲染节点图，与提示词项目绑定</p>
         </div>
@@ -48,8 +48,8 @@ export function WorkflowList() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 border-b border-[var(--glass-border)] pb-2">
-        <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--glass-border)] pb-2">
+        <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
           {["全部", "文生图", "视频生成", "实用工具"].map((tab, i) => (
             <button 
               key={i}

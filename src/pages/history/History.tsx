@@ -1,4 +1,4 @@
-import { Download, Info, Trash2, CalendarDays, Maximize2, BookmarkPlus, Check, X } from "lucide-react";
+import { Download, Info, Trash2, CalendarDays, Maximize2, BookmarkPlus, Check, X, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePromptStore } from "../../stores/promptStore";
@@ -29,11 +29,11 @@ export function History() {
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const prompts = usePromptStore(state => state.prompts);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
-  const completedJobsCount = useQueueStore(state => state.jobs.filter(j => j.status === 'completed').length);
+  const historyUpdateTick = useQueueStore(state => state.historyUpdateTick);
 
   useEffect(() => {
     fetchHistory();
-  }, [prompts, completedJobsCount]);
+  }, [prompts, historyUpdateTick]);
 
   const fetchHistory = async () => {
     try {
@@ -290,7 +290,7 @@ export function History() {
                   }`}
                 >
                   {p.coverImage && <img src={p.coverImage} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
-                  {!p.coverImage && <div className="w-10 h-10 rounded-lg bg-[var(--accent-1)]/20 flex items-center justify-center flex-shrink-0 text-[var(--accent-1)] text-[16px]">📝</div>}
+                  {!p.coverImage && <div className="w-10 h-10 rounded-lg bg-[var(--accent-1)]/20 flex items-center justify-center flex-shrink-0 text-[var(--accent-1)]"><FileText size={18} /></div>}
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-bold text-[var(--text-primary)] truncate">{p.title}</p>
                     <p className="text-[10px] text-[var(--text-muted)] truncate">{p.positivePrompt?.slice(0, 60)}...</p>

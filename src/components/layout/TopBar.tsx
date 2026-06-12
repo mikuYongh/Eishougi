@@ -1,9 +1,11 @@
 import { NAV_ITEMS } from "../../lib/constants";
 import { useLocation } from "react-router-dom";
-import { Search, ClipboardList } from "lucide-react";
+import { Search, ClipboardList, Menu } from "lucide-react";
+import { useNavStore } from "../../stores/navStore";
 
 export function TopBar() {
   const location = useLocation();
+  const toggleSidebar = useNavStore((state) => state.toggleSidebar);
   const currentNav = NAV_ITEMS.find((n) => {
     if (n.path === "/") return location.pathname === "/";
     return location.pathname.startsWith(n.path);
@@ -20,6 +22,12 @@ export function TopBar() {
       }}
     >
       <div className="flex items-center gap-2 text-[var(--text-primary)]">
+        <button
+          onClick={toggleSidebar}
+          className="p-1.5 mr-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center text-[var(--text-secondary)] hover:text-white"
+        >
+          <Menu size={18} />
+        </button>
         <span className="opacity-80">
           {currentNav?.icon}
         </span>

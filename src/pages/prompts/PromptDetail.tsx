@@ -76,7 +76,7 @@ export function PromptDetail() {
           <button className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]" title="复制">
             <Copy size={16} />
           </button>
-          <button className="p-2.5 rounded-xl bg-white/5 hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400 transition-colors cursor-pointer border border-[var(--glass-border)]" title="删除">
+          <button className="p-2.5 rounded-xl bg-white/5 hover:bg-red-500/20 text-red-500 hover:text-red-400 transition-colors cursor-pointer border border-[var(--glass-border)]" title="删除">
             <Trash2 size={16} />
           </button>
         </div>

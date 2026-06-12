@@ -6,7 +6,7 @@ import { cn } from "../../lib/utils";
 import { useNavigate, useLocation } from "react-router-dom";
 
 export function Sidebar() {
-  const { setActiveNav } = useNavStore();
+  const { setActiveNav, isSidebarCollapsed } = useNavStore();
   const { appTheme, toggleTheme } = useSettingsStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -16,9 +16,13 @@ export function Sidebar() {
     navigate(path);
   };
 
+  if (isSidebarCollapsed) {
+    return null;
+  }
+
   return (
     <div
-      className="w-[var(--spacing-sidebar-w)] flex-shrink-0 flex flex-col pt-3 relative"
+      className="w-[var(--spacing-sidebar-w)] flex flex-shrink-0 flex-col pt-3 relative z-20"
       style={{
         background: "var(--glass-bg)",
         backdropFilter: "blur(24px)",

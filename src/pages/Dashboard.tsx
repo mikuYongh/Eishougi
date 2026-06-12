@@ -114,7 +114,7 @@ export function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { icon: <FileText size={24} />, num: prompts.length, lbl: "提示词总数", onClick: () => navigate('/prompts') },
           { icon: <Star size={24} />, num: favoriteCount, lbl: "收藏提示词", onClick: () => navigate('/prompts') },
@@ -140,7 +140,7 @@ export function Dashboard() {
       </div>
 
       {/* Row: Recent Prompts & Queue */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Prompts */}
         <div className="glass-panel p-5 flex flex-col min-h-[240px]">
           <div className="flex items-center justify-between mb-4 border-b border-[var(--glass-border)] pb-2">
@@ -222,16 +222,24 @@ export function Dashboard() {
                   </div>
                 ))}
                 {completedJobs.slice(0, 3).map(job => (
-                  <div key={job.id} className="p-3 rounded-lg bg-green-500/5 border border-green-500/20 flex items-center justify-between">
+                  <div key={job.id} className="p-3 rounded-lg bg-green-500/5 border border-green-500/20 flex items-center justify-between group relative cursor-pointer hover:bg-green-500/10 transition-colors">
                     <div className="flex items-center gap-2 min-w-0">
-                      {job.images?.[0] ? (
-                        <img src={job.images[0]} className={`w-8 h-8 rounded object-cover flex-shrink-0 border border-green-500/30 transition-all duration-300 ${privacyMode ? 'blur-md hover:blur-none' : ''}`} />
-                      ) : (
-                        <ImageIcon size={14} className="text-green-400 flex-shrink-0" />
-                      )}
-                      <span className="text-[12px] font-bold text-[var(--text-secondary)] truncate">{job.projectTitle}</span>
+                      <ImageIcon size={14} className="text-green-400 flex-shrink-0" />
+                      <span className="text-[12px] font-bold text-[var(--text-primary)] truncate">{job.projectTitle}</span>
                     </div>
                     <span className="text-[10px] font-bold text-green-400 flex-shrink-0 ml-2">✓ 完成</span>
+
+                    {/* Hover Bubble Image Preview */}
+                    {job.images?.[0] && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 pointer-events-none translate-y-2 group-hover:translate-y-0">
+                        <div className="bg-[var(--bg-layer-1)] backdrop-blur-2xl border border-green-500/40 p-2 rounded-2xl shadow-[0_8px_30px_rgba(34,197,94,0.3)]">
+                          <img src={job.images[0]} className={`w-full aspect-square rounded-xl object-cover ${privacyMode ? 'blur-md' : ''}`} alt="preview" />
+                          <div className="text-[10px] text-center mt-2 text-green-400 font-bold mb-1">点击查看大图</div>
+                        </div>
+                        {/* Tooltip Arrow */}
+                        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[var(--bg-layer-1)] border-b border-r border-green-500/40 rotate-45 backdrop-blur-2xl" />
+                      </div>
+                    )}
                   </div>
                 ))}
               </>
@@ -252,7 +260,7 @@ export function Dashboard() {
               查看全部历史 <ChevronRight size={12} />
             </button>
           </div>
-          <div className="grid grid-cols-6 gap-3">
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {recentImages.map((img, i) => (
               <div
                 key={i}
@@ -275,7 +283,7 @@ export function Dashboard() {
           <Rocket size={16} className="text-[var(--accent-2)]" />
           快捷操作
         </div>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             {
               icon: <Rocket size={28} />,

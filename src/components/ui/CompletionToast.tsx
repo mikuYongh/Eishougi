@@ -23,8 +23,8 @@ function ToastItem({ item }: { item: CompletionNotification }) {
 
   return (
     <div
-      className={`bg-[var(--glass-bg)] backdrop-blur-xl border border-green-500/30 rounded-2xl p-3 flex items-center gap-3 shadow-lg shadow-green-500/5 min-w-[320px] max-w-[420px] transition-all duration-400 ${
-        leaving ? "opacity-0 translate-x-8 scale-95" : "opacity-100 translate-x-0 scale-100 animate-slide-in"
+      className={`bg-[var(--glass-bg)] backdrop-blur-xl border border-green-500/30 rounded-2xl p-3 flex items-center gap-3 shadow-[0_8px_30px_rgba(34,197,94,0.15)] min-w-[320px] max-w-[420px] transition-all duration-400 transform origin-bottom-left ${
+        leaving ? "opacity-0 translate-y-4 scale-95" : "opacity-100 translate-y-0 scale-100"
       }`}
     >
       <div className="flex-shrink-0 relative">
@@ -66,7 +66,7 @@ export function CompletionToast() {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none max-h-[80vh] overflow-hidden">
+    <div className="fixed bottom-10 left-48 z-50 flex flex-col-reverse gap-2 pointer-events-none max-h-[80vh] overflow-hidden">
       {notifications.map((item) => (
         <div key={item.id} className="pointer-events-auto">
           <ToastItem item={item} />

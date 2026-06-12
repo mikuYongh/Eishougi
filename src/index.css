@@ -173,3 +173,4 @@ body {
 .animate-slide-in {
   animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+.hide-scrollbar-on-mobile::-webkit-scrollbar { display: none; } .hide-scrollbar-on-mobile { -ms-overflow-style: none; scrollbar-width: none; }

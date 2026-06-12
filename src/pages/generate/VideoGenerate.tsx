@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { UploadCloud, Image as ImageIcon, Video, Play, FastForward, Clock, Maximize } from "lucide-react";
+import { UploadCloud, Image as ImageIcon, Video, Play, FastForward, Clock, Maximize, Film } from "lucide-react";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { useSettingsStore } from "../../stores/settingsStore";
 
@@ -32,7 +32,7 @@ export function VideoGenerate() {
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-            <span className="text-[var(--accent-2)]">🎬</span> 图生视频 (Image to Video)
+            <span className="text-[var(--accent-2)] flex items-center justify-center"><Film size={24} /></span> 图生视频 (Image to Video)
           </h2>
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">使用 AnimateDiff 或 SVD 将静态图片转化为丝滑的动态视频</p>
         </div>

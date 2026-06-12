@@ -4,6 +4,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { useSettingsStore } from "./stores/settingsStore";
 import { TitleBar } from "./components/layout/TitleBar";
 import { Sidebar } from "./components/layout/Sidebar";
+import { BottomNav } from "./components/layout/BottomNav";
 import { TopBar } from "./components/layout/TopBar";
 import { StatusBar } from "./components/layout/StatusBar";
 import { AgentPanel } from "./components/agent/AgentPanel";
@@ -14,8 +15,10 @@ import {
   PromptList, PromptEdit, PromptDetail,
   WorkflowList, WorkflowEdit,
   Generate, VideoGenerate,
-  Tagger, Gallery, History, Settings,
+  Tagger, History, Settings,
 } from "./pages";
+import { CharacterLibrary } from "./pages/library/CharacterLibrary";
+import { ArtistLibrary } from "./pages/library/ArtistLibrary";
 import { usePromptStore } from "./stores/promptStore";
 import { useWorkflowStore } from "./stores/workflowStore";
 
@@ -89,11 +92,13 @@ export default function App() {
                 <Route path="/generate/:promptId?" element={<Generate />} />
                 <Route path="/video/:imagePath?" element={<VideoGenerate />} />
                 <Route path="/tagger" element={<Tagger />} />
-                <Route path="/gallery" element={<Gallery />} />
+                <Route path="/characters" element={<CharacterLibrary />} />
+                <Route path="/artists" element={<ArtistLibrary />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </div>
+            <BottomNav />
             <StatusBar />
           </div>
 

@@ -35,6 +35,7 @@ interface QueueStore {
   disconnect: () => void;
   dismissNotification: (id: string) => void;
   interruptJob: () => Promise<void>;
+  historyUpdateTick: number;
 }
 
 export const useQueueStore = create<QueueStore>((set, get) => {
@@ -127,6 +128,7 @@ export const useQueueStore = create<QueueStore>((set, get) => {
                 }
               }
               console.log("[Queue] saved history for", job.projectId);
+              set(state => ({ historyUpdateTick: state.historyUpdateTick + 1 }));
             }
           } catch (e) {
             console.error("[Queue] Failed to save history from queue:", e);
@@ -159,16 +161,15 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     );
   };
 
-  return {
-  jobs: [],
-  isConnected: false,
-  completedNotifications: [],
+  let _connectPromise: Promise<void> | null = null;
 
-  connect: async () => {
+  const connectImpl = async () => {
+    if (get().isConnected) return;
+    if (_connectPromise) return _connectPromise;
+
     console.log("[Queue] connect: starting WebSocket connection...");
-    set({ isConnected: false });
     
-    return new Promise<void>((resolve, reject) => {
+    _connectPromise = new Promise<void>((resolve, reject) => {
       _resolveConnect = resolve;
       setupCallbacks();
       
@@ -176,11 +177,26 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         if (!get().isConnected) {
           console.error("[Queue] connect: timeout after 15s");
           _resolveConnect = null;
+          _connectPromise = null;
           reject(new Error('WebSocket connection timeout'));
         }
       }, 15000);
     });
-  },
+
+    try {
+      await _connectPromise;
+    } finally {
+      _connectPromise = null;
+    }
+  };
+
+  return {
+  jobs: [],
+  isConnected: false,
+  completedNotifications: [],
+  historyUpdateTick: 0,
+
+  connect: connectImpl,
 
   disconnect: () => {
     console.log("[Queue] disconnect");
@@ -214,9 +230,11 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     set(state => ({ jobs: [...state.jobs, ...jobs] }));
 
     try {
-      console.log("[Queue] addJob: reconnecting WebSocket...");
-      await get().connect();
-      console.log("[Queue] addJob: connected, proceeding");
+      if (!get().isConnected) {
+        console.log("[Queue] addJob: WebSocket disconnected, connecting...");
+        await get().connect();
+      }
+      console.log("[Queue] addJob: WebSocket connected, proceeding");
 
       let wfString = "";
       if (workflowId) {
@@ -236,7 +254,7 @@ export const useQueueStore = create<QueueStore>((set, get) => {
       }
 
       for (let i = 0; i < batchCount; i++) {
-        const injectedWf = comfyService.injectParameters(wfString, project);
+        const injectedWf = await comfyService.injectParameters(wfString, project);
         if (!injectedWf) throw new Error("Failed to construct workflow JSON");
 
         console.log("[Queue] addJob: queueing prompt", i + 1, "of", batchCount);
