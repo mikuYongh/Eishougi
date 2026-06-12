@@ -24,21 +24,13 @@ impl AppState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Tauri app data dir will be set by Tauri automatically
-    let app_data_dir = {
-        let mut dir = dirs_next().unwrap_or_else(|| PathBuf::from("."));
-        dir.push("prompt-muse");
-        dir
-    };
-    // Ensure dir exists
+    let app_data_dir = get_app_data_dir();
     std::fs::create_dir_all(&app_data_dir).ok();
-
     let state = AppState::new(app_data_dir).expect("Failed to initialize app state");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::greet,
@@ -77,21 +69,27 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn dirs_next() -> Option<PathBuf> {
-    // Simple cross-platform data directory resolution
+fn get_app_data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
-        std::env::var("APPDATA").ok().map(PathBuf::from)
+        let mut dir = std::env::var("APPDATA").ok().map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+        dir.push("prompt-muse");
+        dir
     }
     #[cfg(target_os = "macos")]
     {
-        std::env::var("HOME").ok().map(|h| PathBuf::from(h).join("Library/Application Support"))
+        let mut dir = std::env::var("HOME").ok().map(|h| PathBuf::from(h).join("Library/Application Support")).unwrap_or_else(|| PathBuf::from("."));
+        dir.push("prompt-muse");
+        dir
     }
     #[cfg(target_os = "linux")]
     {
-        std::env::var("XDG_DATA_HOME")
-            .ok()
-            .map(PathBuf::from)
-            .or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".local/share")))
+        let mut dir = std::env::var("XDG_DATA_HOME").ok().map(PathBuf::from).or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".local/share"))).unwrap_or_else(|| PathBuf::from("."));
+        dir.push("prompt-muse");
+        dir
+    }
+    #[cfg(target_os = "android")]
+    {
+        PathBuf::from("/data/data/com.promptmuse.app/files")
     }
 }
