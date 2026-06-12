@@ -9,6 +9,8 @@ import type { ChatMessage } from "../../hooks/useAgent";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { HistoryImagePicker } from "../ui/HistoryImagePicker";
+import { Virtuoso } from "react-virtuoso";
+import type { VirtuosoHandle } from "react-virtuoso";
 
 type ViewMode = 'chat' | 'history' | 'settings';
 
@@ -52,14 +54,16 @@ export function AgentPanel() {
     setTempMcpServers(JSON.parse(JSON.stringify(servers)));
   }, [viewMode]);
   
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
 
-  // Auto scroll to bottom
+  // Auto scroll to bottom when messages or isGenerating changes
   useEffect(() => {
-    if (viewMode === 'chat') {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (viewMode === 'chat' && virtuosoRef.current && messages.length > 0) {
+      setTimeout(() => {
+        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'smooth' });
+      }, 50);
     }
-  }, [messages, isGenerating, viewMode]);
+  }, [messages.length, isGenerating, viewMode]);
 
   // Auto-upgrade system prompt for older sessions
   useEffect(() => {
@@ -231,18 +235,18 @@ When asked to set model/LoRA on a project → use update_prompt.`;
 
   return (
     <div
-      className="flex-shrink-0 flex flex-col relative z-50 transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] bg-[var(--glass-bg)] border-l border-[var(--glass-border)] shadow-[-10px_0_40px_rgba(0,0,0,0.5)] backdrop-blur-3xl h-full"
+      className="flex-shrink-0 flex flex-col relative z-50 transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] bg-[var(--glass-bg)] border-l border-[var(--glass-border)] shadow-[-10px_0_40px_rgba(0,0,0,0.5)] backdrop-blur-3xl h-full md:max-w-[420px] max-w-full"
       style={{
-        width: isExpanded ? "420px" : "70px",
+        width: isExpanded ? "100%" : "70px",
       }}
     >
       {/* Decorative vertical gradient line */}
       <div className="absolute inset-y-0 left-0 w-[2px] bg-gradient-to-b from-transparent via-[var(--accent-1)]/30 to-transparent pointer-events-none" />
 
-      {/* Collapse/Expand Handle */}
+      {/* Collapse/Expand Handle - hide on very small screens if we prefer a different trigger, or keep it */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`absolute top-1/2 -translate-y-1/2 -left-[24px] w-[24px] h-[80px] flex items-center justify-center border-y border-l text-[var(--text-primary)] cursor-pointer transition-all duration-300 backdrop-blur-xl z-20 rounded-l-xl ${
+        className={`absolute top-1/2 -translate-y-1/2 -left-[24px] w-[24px] h-[80px] hidden md:flex items-center justify-center border-y border-l text-[var(--text-primary)] cursor-pointer transition-all duration-300 backdrop-blur-xl z-20 rounded-l-xl ${
           isExpanded 
             ? "bg-[var(--glass-bg)] border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] hover:border-[var(--glass-border-active)] hover:text-[var(--accent-1)] shadow-[-4px_0_15px_rgba(0,0,0,0.3)]" 
             : "bg-[var(--accent-1)]/20 border-[var(--accent-1)]/40 text-[var(--accent-1)] hover:bg-[var(--accent-1)]/30 hover:border-[var(--accent-1)] hover:text-[var(--text-primary)] shadow-[0_0_20px_rgba(var(--accent-1-rgb), 30)] animate-pulse"
@@ -298,7 +302,7 @@ When asked to set model/LoRA on a project → use update_prompt.`;
             </div>
           </>
         ) : (
-          <div className="flex flex-col gap-6 items-center pt-2 w-full">
+          <div className="hidden md:flex flex-col gap-6 items-center pt-2 w-full">
             <div 
               className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--accent-1)]/20 to-[var(--accent-2)]/20 border border-[var(--accent-1)]/30 text-[var(--accent-1)] group relative cursor-pointer hover:shadow-[0_0_20px_rgba(var(--accent-1-rgb), 40)] hover:scale-105 transition-all duration-300" 
               onClick={() => setIsExpanded(true)}
@@ -322,13 +326,22 @@ When asked to set model/LoRA on a project → use update_prompt.`;
         )}
       </div>
 
+      {/* Mobile-only toggle button when collapsed */}
+      {!isExpanded && (
+        <button 
+          onClick={() => setIsExpanded(true)}
+          className="md:hidden fixed bottom-20 right-4 w-12 h-12 rounded-full bg-[var(--accent-1)]/20 border border-[var(--accent-1)]/40 text-[var(--accent-1)] flex items-center justify-center shadow-[0_0_20px_rgba(var(--accent-1-rgb),30)] backdrop-blur-md z-[100]"
+        >
+          <Bot size={24} />
+        </button>
+      )}
+
       {/* Content Area */}
       <div 
-        className="flex-1 flex flex-col overflow-hidden transition-all duration-500 relative"
+        className="flex-1 flex flex-col overflow-hidden transition-all duration-500 relative w-full"
         style={{ 
           opacity: isExpanded ? 1 : 0, 
-          pointerEvents: isExpanded ? "auto" : "none",
-          width: isExpanded ? "420px" : "0px"
+          pointerEvents: isExpanded ? "auto" : "none"
         }}
       >
         {/* Background watermark */}
@@ -470,9 +483,9 @@ When asked to set model/LoRA on a project → use update_prompt.`;
 
         {/* View Mode: CHAT (Default) */}
         {/* Messages area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar z-10">
+        <div className="flex-1 overflow-hidden relative z-10">
           {messages.length === 0 ? (
-            <div className="flex flex-col gap-4 mt-4">
+            <div className="p-6">
               <div className="p-5 rounded-2xl text-sm leading-relaxed relative overflow-hidden bg-[var(--glass-bg)] text-[var(--text-primary)] border border-[var(--accent-1)]/20 shadow-[0_10px_30px_rgba(0,0,0,0.1)] backdrop-blur-md">
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--accent-1)] to-transparent opacity-50" />
                 <div className="flex items-center gap-3 mb-3">
@@ -490,42 +503,51 @@ When asked to set model/LoRA on a project → use update_prompt.`;
               </div>
             </div>
           ) : (
-            messages.map((msg) => (
-              <div 
-                key={msg.id} 
-                className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 fade-in duration-300`}
-              >
-                <div 
-                  className={`max-w-[92%] text-[14px] relative group ${
-                    msg.role === 'user' 
-                      ? 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tr-sm border border-[var(--accent-1)]/30 backdrop-blur-md shadow-[0_4px_15px_rgba(var(--accent-1-rgb), 10)]' 
-                      : msg.role === 'tool' || (!msg.content && msg.tool_calls && msg.tool_calls.length > 0)
-                      ? 'p-0 bg-transparent w-full shadow-none mt-2'
-                      : 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl shadow-[0_4px_15px_rgba(0,0,0,0.15)]'
-                  }`}
-                >
-                  {msg.role === 'assistant' && (
-                    <div className="absolute -left-10 top-0 w-8 h-8 rounded-full border border-[var(--accent-1)]/30 bg-[var(--bg-layer-0)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Bot size={14} className="text-[var(--accent-1)]" />
+            <Virtuoso
+              ref={virtuosoRef}
+              className="h-full custom-scrollbar"
+              data={messages}
+              initialTopMostItemIndex={messages.length > 0 ? messages.length - 1 : 0}
+              followOutput="smooth"
+              itemContent={(index, msg) => (
+                <div className="px-6 py-3">
+                  <div 
+                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 fade-in duration-300`}
+                  >
+                    <div 
+                      className={`max-w-[92%] text-[14px] relative group ${
+                        msg.role === 'user' 
+                          ? 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tr-sm border border-[var(--accent-1)]/30 backdrop-blur-md shadow-[0_4px_15px_rgba(var(--accent-1-rgb), 10)]' 
+                          : msg.role === 'tool' || (!msg.content && msg.tool_calls && msg.tool_calls.length > 0)
+                          ? 'p-0 bg-transparent w-full shadow-none mt-2'
+                          : 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl shadow-[0_4px_15px_rgba(0,0,0,0.15)]'
+                      }`}
+                    >
+                      {msg.role === 'assistant' && (
+                        <div className="absolute -left-10 top-0 w-8 h-8 rounded-full border border-[var(--accent-1)]/30 bg-[var(--bg-layer-0)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Bot size={14} className="text-[var(--accent-1)]" />
+                        </div>
+                      )}
+                      {renderMessageContent(msg)}
                     </div>
-                  )}
-                  {renderMessageContent(msg)}
+                    <span className="text-[10px] text-[var(--text-muted)] mt-1.5 font-mono px-1">
+                      {msg.role.toUpperCase()}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[10px] text-[var(--text-muted)] mt-1.5 font-mono px-1">
-                  {msg.role.toUpperCase()}
-                </span>
-              </div>
-            ))
+              )}
+              components={{
+                Footer: () => isGenerating ? (
+                  <div className="px-6 py-3 flex items-start animate-in fade-in duration-300">
+                    <div className="bg-[var(--glass-bg)] border border-[var(--accent-1)]/20 p-4 rounded-2xl rounded-tl-sm flex gap-3 items-center backdrop-blur-md shadow-[0_0_15px_rgba(var(--accent-1-rgb), 10)]">
+                      <Loader2 size={16} className="text-[var(--accent-1)] animate-spin" />
+                      <span className="text-xs font-mono text-[var(--accent-1)] tracking-widest uppercase animate-pulse">Processing...</span>
+                    </div>
+                  </div>
+                ) : <div className="h-4" />
+              }}
+            />
           )}
-          {isGenerating && (
-            <div className="flex items-start animate-in fade-in duration-300">
-              <div className="bg-[var(--glass-bg)] border border-[var(--accent-1)]/20 p-4 rounded-2xl rounded-tl-sm flex gap-3 items-center backdrop-blur-md shadow-[0_0_15px_rgba(var(--accent-1-rgb), 10)]">
-                <Loader2 size={16} className="text-[var(--accent-1)] animate-spin" />
-                <span className="text-xs font-mono text-[var(--accent-1)] tracking-widest uppercase animate-pulse">Processing...</span>
-              </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Input */}

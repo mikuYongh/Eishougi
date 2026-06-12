@@ -5,6 +5,7 @@ import { useAgentStore } from '../stores/agentStore';
 import { invoke } from '@tauri-apps/api/core';
 import { useQueueStore } from '../stores/queueStore';
 import { useWorkflowStore } from '../stores/workflowStore';
+import { useModelStore } from '../stores/modelStore';
 
 export interface ChatMessage {
   id: string;
@@ -354,6 +355,28 @@ export function useAgent() {
           required: ["prompt_id", "image_url"]
         }
       }
+    },
+    {
+      type: "function",
+      function: {
+        name: "auto_tag_all_prompts",
+        description: "Batch auto-generate Chinese tags for all prompts based on their positive prompts using the configured LLM API. Does this silently in the background.",
+        parameters: {
+          type: "object",
+          properties: {}
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "list_local_models",
+        description: "List all local models (checkpoints, loras, vaes) available in the system so you can assign valid model names when creating or updating prompts.",
+        parameters: {
+          type: "object",
+          properties: {}
+        }
+      }
     }
   ];
 
@@ -628,7 +651,18 @@ export function useAgent() {
                   images: allImages,
                   message: `Successfully generated ${allImages.length} image(s).`
                 };
-              } else if (fnName === 'get_queue_status') {
+              } else if (fnName === 'auto_tag_all_prompts') {
+            const { aiService } = await import('../services/aiService');
+            // Run in background, return immediate response
+            aiService.batchAutoTagPrompts(
+              (curr, total) => console.log(`[AutoTag] ${curr}/${total}`),
+              (msg) => console.log(`[AutoTag] ${msg}`)
+            );
+            resultStr = JSON.stringify({ status: "success", message: "后台批量打标已启动，将自动为所有提示词生成标签" });
+          } else if (fnName === 'list_local_models') {
+            const { checkpoints, loras } = useModelStore.getState();
+            res = { checkpoints, loras };
+          } else if (fnName === 'get_queue_status') {
                 const state = useQueueStore.getState();
                 const activeJobs = state.jobs.filter(j => j.status === 'pending' || j.status === 'generating');
                 const recentCompleted = state.jobs
