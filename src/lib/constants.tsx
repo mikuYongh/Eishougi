@@ -7,7 +7,8 @@ import {
   Paintbrush, 
   Video, 
   Search, 
-  Image as ImageIcon, 
+  Image as ImageIcon,
+  Users,
   History, 
   Settings 
 } from "lucide-react";
@@ -20,7 +21,8 @@ export const NAV_ITEMS: { id: NavId; label: string; icon: React.ReactNode; path:
   { id: "generate",   label: "生成",       icon: <Paintbrush size={18} />, path: "/generate" },
   { id: "video",      label: "图生视频",   icon: <Video size={18} />, path: "/video" },
   { id: "tagger",     label: "图片反推",   icon: <Search size={18} />, path: "/tagger" },
-  { id: "gallery",    label: "风格库",     icon: <ImageIcon size={18} />, path: "/gallery" },
+  { id: "characters", label: "角色图鉴",   icon: <Users size={18} />, path: "/characters" },
+  { id: "artists",    label: "风格画师",   icon: <ImageIcon size={18} />, path: "/artists" },
   { id: "history",    label: "生成历史",   icon: <History size={18} />, path: "/history" },
   { id: "settings",   label: "设置",       icon: <Settings size={18} />, path: "/settings" },
 ];

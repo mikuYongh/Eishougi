@@ -6,7 +6,6 @@ export { WorkflowEdit } from './workflows/WorkflowEdit';
 export { Generate } from './generate/Generate';
 export { VideoGenerate } from './generate/VideoGenerate';
 export { Tagger } from './tools/Tagger';
-export { Gallery } from './gallery/Gallery';
 export { History } from './history/History';
 export { Settings } from './Settings';
 

@@ -85,7 +85,8 @@ export type NavId =
   | "generate"
   | "video"
   | "tagger"
-  | "gallery"
+  | "characters"
+  | "artists"
   | "history"
   | "settings";
 
