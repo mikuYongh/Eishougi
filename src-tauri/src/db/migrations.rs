@@ -7,6 +7,7 @@ pub fn run(conn: &Connection) -> Result<()> {
         (MIGRATION_V1, 1),
         (MIGRATION_V2, 2),
         (MIGRATION_V3, 3),
+        (MIGRATION_V4, 4),
     ];
 
     for (sql, ver) in migrations {
@@ -141,3 +142,35 @@ CREATE TABLE IF NOT EXISTS custom_styles (
 );
 "#;
 
+const MIGRATION_V4: &str = r#"
+CREATE TABLE IF NOT EXISTS characters (
+    id             TEXT PRIMARY KEY NOT NULL,
+    character_tag  TEXT NOT NULL,
+    name_en        TEXT NOT NULL,
+    name_zh        TEXT,
+    copyright      TEXT,
+    "trigger"      TEXT NOT NULL,
+    core_tags      TEXT,
+    "count"        INTEGER NOT NULL DEFAULT 0,
+    img_url        TEXT,
+    is_favorite    INTEGER NOT NULL DEFAULT 0,
+    created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_characters_count ON characters("count" DESC);
+CREATE INDEX IF NOT EXISTS idx_characters_fav ON characters(is_favorite);
+
+CREATE TABLE IF NOT EXISTS artists (
+    id             TEXT PRIMARY KEY NOT NULL,
+    artist_tag     TEXT NOT NULL,
+    name_en        TEXT NOT NULL,
+    name_zh        TEXT,
+    "trigger"      TEXT NOT NULL,
+    "count"        INTEGER NOT NULL DEFAULT 0,
+    img_url        TEXT,
+    is_favorite    INTEGER NOT NULL DEFAULT 0,
+    created_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_artists_count ON artists("count" DESC);
+CREATE INDEX IF NOT EXISTS idx_artists_fav ON artists(is_favorite);
+
+"#;

@@ -37,6 +37,26 @@ pub async fn create_prompt(state: State<'_, AppState>, mut prompt: Prompt) -> Re
         }
     }
 
+    if let Some(tags) = &prompt.tags {
+        for tag in tags {
+            db.conn.execute(
+                "INSERT OR IGNORE INTO tags (id, name, color, created_at) VALUES (?1, ?2, ?3, ?4)",
+                params![tag.id, tag.name, tag.color, tag.created_at]
+            ).map_err(|e| e.to_string())?;
+            
+            let actual_tag_id: String = db.conn.query_row(
+                "SELECT id FROM tags WHERE name = ?1",
+                params![tag.name],
+                |row| row.get(0)
+            ).unwrap_or(tag.id.clone());
+
+            db.conn.execute(
+                "INSERT INTO prompt_tag_cross (prompt_id, tag_id) VALUES (?1, ?2)",
+                params![prompt.id, actual_tag_id]
+            ).map_err(|e| e.to_string())?;
+        }
+    }
+
     Ok(prompt)
 }
 
@@ -92,6 +112,22 @@ pub async fn get_prompt(state: State<'_, AppState>, id: String) -> Result<Option
             images.push(img.map_err(|e| e.to_string())?);
         }
         p.images = Some(images);
+
+        let mut tags = Vec::new();
+        let mut tag_stmt = db.conn.prepare("SELECT t.* FROM tags t INNER JOIN prompt_tag_cross pt ON t.id = pt.tag_id WHERE pt.prompt_id = ?1").map_err(|e| e.to_string())?;
+        let tag_rows = tag_stmt.query_map(params![p.id], |row| {
+            Ok(crate::db::models::Tag {
+                id: row.get("id")?,
+                name: row.get("name")?,
+                color: row.get("color")?,
+                created_at: row.get("created_at")?,
+            })
+        }).map_err(|e| e.to_string())?;
+        
+        for tag in tag_rows {
+            tags.push(tag.map_err(|e| e.to_string())?);
+        }
+        p.tags = Some(tags);
         
         Ok(Some(p))
     } else {
@@ -134,6 +170,28 @@ pub async fn update_prompt(state: State<'_, AppState>, mut prompt: Prompt) -> Re
                 "INSERT INTO prompt_images (id, prompt_id, file_path, file_name, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![img.id, img.prompt_id, img.file_path, img.file_name, img.created_at]
+            ).map_err(|e| e.to_string())?;
+        }
+    }
+
+    db.conn.execute("DELETE FROM prompt_tag_cross WHERE prompt_id = ?1", params![prompt.id.clone()]).map_err(|e| e.to_string())?;
+    
+    if let Some(tags) = &prompt.tags {
+        for tag in tags {
+            db.conn.execute(
+                "INSERT OR IGNORE INTO tags (id, name, color, created_at) VALUES (?1, ?2, ?3, ?4)",
+                params![tag.id, tag.name, tag.color, tag.created_at]
+            ).map_err(|e| e.to_string())?;
+            
+            let actual_tag_id: String = db.conn.query_row(
+                "SELECT id FROM tags WHERE name = ?1",
+                params![tag.name],
+                |row| row.get(0)
+            ).unwrap_or(tag.id.clone());
+
+            db.conn.execute(
+                "INSERT INTO prompt_tag_cross (prompt_id, tag_id) VALUES (?1, ?2)",
+                params![prompt.id, actual_tag_id]
             ).map_err(|e| e.to_string())?;
         }
     }
@@ -225,6 +283,22 @@ pub async fn list_prompts(state: State<'_, AppState>, filter: Option<PromptFilte
             images.push(img.map_err(|e| e.to_string())?);
         }
         p.images = Some(images);
+
+        let mut tags = Vec::new();
+        let mut tag_stmt = db.conn.prepare("SELECT t.* FROM tags t INNER JOIN prompt_tag_cross pt ON t.id = pt.tag_id WHERE pt.prompt_id = ?1").map_err(|e| e.to_string())?;
+        let tag_rows = tag_stmt.query_map(params![p.id], |row| {
+            Ok(crate::db::models::Tag {
+                id: row.get("id")?,
+                name: row.get("name")?,
+                color: row.get("color")?,
+                created_at: row.get("created_at")?,
+            })
+        }).map_err(|e| e.to_string())?;
+        
+        for tag in tag_rows {
+            tags.push(tag.map_err(|e| e.to_string())?);
+        }
+        p.tags = Some(tags);
         
         prompts.push(p);
     }

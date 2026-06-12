@@ -11,6 +11,9 @@ impl Database {
         let conn = Connection::open(&db_path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
         super::migrations::run(&conn)?;
+        if let Err(e) = super::init::init_library_data(&conn) {
+            log::warn!("Failed to initialize library data: {}", e);
+        }
         Ok(Self { conn })
     }
 }

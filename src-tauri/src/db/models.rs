@@ -124,3 +124,33 @@ pub struct PromptFilter {
     pub limit: Option<i32>,
     pub offset: Option<i32>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Character {
+    pub id: String,
+    pub character_tag: String,
+    pub name_en: String,
+    pub name_zh: Option<String>,
+    pub copyright: Option<String>,
+    pub trigger: String,
+    pub core_tags: Option<String>,
+    pub count: i32,
+    pub img_url: Option<String>,
+    pub is_favorite: bool,
+    pub created_at: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Artist {
+    pub id: String,
+    pub artist_tag: String,
+    pub name_en: String,
+    pub name_zh: Option<String>,
+    pub trigger: String,
+    pub count: i32,
+    pub img_url: Option<String>,
+    pub is_favorite: bool,
+    pub created_at: i64,
+}

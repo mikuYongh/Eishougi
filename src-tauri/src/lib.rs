@@ -50,6 +50,7 @@ pub fn run() {
             commands::history::list_generated_images,
             commands::history::delete_generated_image,
             commands::files::save_base64_image,
+
             commands::files::read_image_base64,
             commands::files::read_text_file,
             commands::files::write_bytes_to_file,
@@ -64,6 +65,10 @@ pub fn run() {
             commands::mcp::call_mcp_tool,
             commands::data::export_all_data,
             commands::data::import_all_data,
+            commands::library::search_characters,
+            commands::library::search_artists,
+            commands::library::toggle_favorite_character,
+            commands::library::toggle_favorite_artist,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
