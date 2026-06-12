@@ -2,7 +2,14 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" id="viewport-meta" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // 简单检测是否运行在 Android 或移动端
+      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        // 如果是移动端，将视口宽度固定为1600，让WebView自动整体缩放页面以适配物理屏幕 (越大元素越小)
+        document.getElementById('viewport-meta').setAttribute('content', 'width=1600');
+      }
+    </script>
     <title>詠唱机 EISHOUGI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
