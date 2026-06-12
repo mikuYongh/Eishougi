@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders } from "lucide-react";
+import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders, Zap } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePromptStore, type LoraConfig } from "../../stores/promptStore";
 import { useQueueStore } from "../../stores/queueStore";
@@ -243,8 +243,8 @@ export function Generate() {
     <div className="flex flex-col h-full relative z-10 gap-6 max-w-7xl mx-auto w-full">
       
       {/* Header */}
-      <div className="flex items-center justify-between flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md">
+        <div className="flex items-center gap-4 w-full md:w-auto">
           <button 
             onClick={() => navigate('/prompts')}
             className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
@@ -253,13 +253,13 @@ export function Generate() {
           </button>
           <div>
             <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-              <span className="text-blue-400">⚡</span> 渲染控制台
+              <span className="text-blue-400 flex items-center justify-center"><Zap size={24} /></span> 渲染控制台
             </h2>
             <p className="text-[12px] text-[var(--text-muted)]">当前项目: {project.title}</p>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full md:w-auto justify-end">
           {!isConnected && (
             <button 
               onClick={connect}
@@ -281,7 +281,7 @@ export function Generate() {
         </div>
       </div>
 
-      <div className="flex gap-6 flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
         
         {/* Left Column - Main Preview & Editor */}
         <div className="flex-1 flex flex-col gap-4 min-w-0 overflow-y-auto custom-scrollbar pr-1">
@@ -359,7 +359,7 @@ export function Generate() {
         </div>
 
         {/* Right Column - Project Params Summary */}
-        <div className="w-[320px] flex-shrink-0 flex flex-col gap-4">
+        <div className="w-full md:w-[320px] flex-shrink-0 flex flex-col gap-4">
           <div className="glass-panel p-5 rounded-2xl flex-1 flex flex-col gap-5 overflow-y-auto">
             <h3 className="text-[13px] font-bold text-[var(--text-primary)] border-b border-[var(--glass-border)] pb-3">项目参数概览</h3>
             

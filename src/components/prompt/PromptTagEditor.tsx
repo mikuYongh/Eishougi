@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Star, Copy, Trash2, LayoutGrid, FileText, Check, Plus, X, FolderHeart } from 'lucide-react';
+import { Star, Copy, Trash2, LayoutGrid, FileText, Check, Plus, X, FolderHeart, Sparkles } from 'lucide-react';
 import { useFavoriteStore } from '../../stores/favoriteStore';
+import { LibraryModal } from '../library/LibraryModal';
 
 interface PromptTagEditorProps {
   label: string;
@@ -15,6 +16,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
   const [copied, setCopied] = useState(false);
   const [showFavorites, setShowFavorites] = useState(false);
   const [favoriteLabel, setFavoriteLabel] = useState('');
+  const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
   
   const { positiveFavorites, negativeFavorites, fetchFavorites, addFavorite, deleteFavorite } = useFavoriteStore();
 
@@ -127,6 +129,17 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
               <span>文本模式</span>
             </button>
           </div>
+
+          {/* Summon Library Button */}
+          {type === 'positive' && (
+            <button
+              onClick={() => setIsLibraryModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1 bg-[var(--accent-1)]/20 hover:bg-[var(--accent-1)] text-[var(--accent-1)] hover:text-white border border-[var(--accent-1)]/30 hover:border-transparent rounded-lg text-xs font-bold transition-all shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.2)] ml-2"
+              title="召唤图库，快速插入画师或角色"
+            >
+              <Sparkles size={14} /> <span>召唤图库</span>
+            </button>
+          )}
 
           {/* Copy Button */}
           <button
@@ -287,6 +300,12 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
           </div>
         )}
       </div>
+
+      <LibraryModal 
+        isOpen={isLibraryModalOpen} 
+        onClose={() => setIsLibraryModalOpen(false)} 
+        onSelect={handleInsertFavorite} 
+      />
     </div>
   );
 }

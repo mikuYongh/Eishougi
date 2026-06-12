@@ -28,6 +28,8 @@ export function PromptEdit() {
     baseModel: "sd_xl_base_1.0.safetensors", vaeModel: "auto", loraConfigs: [], tags: [], instanceImages: []
   });
   const [tagInput, setTagInput] = useState("");
+  const [showTagDropdown, setShowTagDropdown] = useState(false);
+  const tagContainerRef = useRef<HTMLDivElement>(null);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -37,6 +39,20 @@ export function PromptEdit() {
       if (p) setProject(p);
     }
   }, [id, prompts]);
+
+  // Extract all unique tags
+  const allTags = Array.from(new Set(prompts.flatMap(p => p.tags)));
+  const filteredTags = allTags.filter(t => t.toLowerCase().includes(tagInput.toLowerCase()) && !project.tags?.includes(t));
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (tagContainerRef.current && !tagContainerRef.current.contains(e.target as Node)) {
+        setShowTagDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSave = async () => {
     if (id && id !== 'new') {
@@ -60,16 +76,7 @@ export function PromptEdit() {
     });
   };
 
-  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      const newTag = tagInput.trim();
-      if (!project.tags?.includes(newTag)) {
-        updateField('tags', [...(project.tags || []), newTag]);
-      }
-      setTagInput("");
-    }
-  };
+
 
   const removeTag = (tagToRemove: string) => {
     updateField('tags', project.tags?.filter(t => t !== tagToRemove));
@@ -87,8 +94,8 @@ export function PromptEdit() {
     <div className="flex flex-col h-full relative z-10 gap-6 max-w-6xl mx-auto w-full">
       
       {/* Header Actions */}
-      <div className="flex items-center justify-between flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md">
+        <div className="flex items-center gap-4 w-full md:w-auto">
           <button 
             onClick={() => navigate('/prompts')}
             className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
@@ -103,7 +110,7 @@ export function PromptEdit() {
           </div>
         </div>
         
-        <div className="flex gap-3">
+        <div className="flex gap-2 w-full md:w-auto justify-end">
           <button 
             onClick={handleSave}
             className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-white/10 hover:bg-white/20 text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
@@ -119,7 +126,7 @@ export function PromptEdit() {
         </div>
       </div>
 
-      <div className="flex gap-6 flex-1 min-h-0 overflow-y-auto pb-10">
+      <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 overflow-y-auto pb-10">
         
         {/* Left Column - Content & Params */}
         <div className="flex-1 flex flex-col gap-5 min-w-0">
@@ -143,18 +150,75 @@ export function PromptEdit() {
             </div>
             <div>
               <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">标签 (Tags)</label>
-              <div className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-2 min-h-[46px] flex flex-wrap gap-2 focus-within:border-[var(--accent-2)]/50 transition-colors">
+              <div 
+                ref={tagContainerRef}
+                className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-2 min-h-[46px] flex flex-wrap gap-2 focus-within:border-[var(--accent-2)]/50 transition-colors relative"
+              >
                 {project.tags?.map(tag => (
                   <span key={tag} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--accent-2)]/20 text-blue-400 border border-[var(--accent-2)]/30 text-[11px] font-bold">
                     {tag}
                     <button onClick={() => removeTag(tag)} className="hover:text-red-400 transition-colors cursor-pointer"><X size={12}/></button>
                   </span>
                 ))}
-                <input 
-                  type="text" value={tagInput} onChange={e => setTagInput(e.target.value)} onKeyDown={handleAddTag}
-                  className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-[var(--text-primary)] text-[12px] px-2 h-7"
-                  placeholder="输入标签后按回车添加..."
-                />
+                <div className="flex-1 min-w-[120px] relative">
+                  <input 
+                    type="text" 
+                    value={tagInput} 
+                    onChange={e => {
+                      setTagInput(e.target.value);
+                      setShowTagDropdown(true);
+                    }} 
+                    onFocus={() => setShowTagDropdown(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && tagInput.trim()) {
+                        e.preventDefault();
+                        const newTag = tagInput.trim();
+                        if (!project.tags?.includes(newTag)) {
+                          updateField('tags', [...(project.tags || []), newTag]);
+                        }
+                        setTagInput("");
+                        setShowTagDropdown(false);
+                      }
+                    }}
+                    className="w-full bg-transparent border-none outline-none text-[var(--text-primary)] text-[12px] px-2 h-7"
+                    placeholder="输入或搜索标签后按回车添加..."
+                  />
+                  
+                  {/* Glassmorphism Autocomplete Dropdown */}
+                  {showTagDropdown && (tagInput.trim() !== "" || filteredTags.length > 0) && (
+                    <div className="absolute top-full left-0 mt-2 w-48 bg-[#1A1625]/95 backdrop-blur-xl border border-[var(--glass-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[200px] z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                      <div className="flex-1 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                        {tagInput.trim() && !allTags.includes(tagInput.trim()) && !project.tags?.includes(tagInput.trim()) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateField('tags', [...(project.tags || []), tagInput.trim()]);
+                              setTagInput("");
+                              setShowTagDropdown(false);
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-lg text-[12px] transition-colors cursor-pointer text-blue-400 hover:bg-blue-500/20 font-bold flex items-center gap-2"
+                          >
+                            <Plus size={14} /> 添加新标签: "{tagInput}"
+                          </button>
+                        )}
+                        {filteredTags.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              updateField('tags', [...(project.tags || []), tag]);
+                              setTagInput("");
+                              setShowTagDropdown(false);
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-lg text-[12px] transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-white/10 hover:text-[var(--text-primary)]"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -174,7 +238,7 @@ export function PromptEdit() {
             />
           </div>
 
-          <div className="glass-panel p-5 grid grid-cols-3 gap-6">
+          <div className="glass-panel p-5 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">迭代步数 (Steps)</label>
               <div className="flex items-center gap-3">
@@ -198,7 +262,7 @@ export function PromptEdit() {
         </div>
 
         {/* Right Column - Model & Config */}
-        <div className="w-[380px] flex-shrink-0 flex flex-col gap-5">
+        <div className="w-full md:w-[380px] flex-shrink-0 flex flex-col gap-5">
           
           {/* Cover Image Uploader */}
           <div className="glass-panel p-5">

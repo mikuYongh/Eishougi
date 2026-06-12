@@ -244,10 +244,22 @@ export class ComfyService {
     return result;
   }
 
+  private cachedObjectInfo: any = null;
+
+  async getObjectInfo() {
+    if (this.cachedObjectInfo) return this.cachedObjectInfo;
+    this.cachedObjectInfo = await this.fetchObjectInfo();
+    return this.cachedObjectInfo;
+  }
+
   // Inject user PromptProject parameters into a raw ComfyUI JSON workflow
-  injectParameters(workflowStr: string, project: any): any {
+  async injectParameters(workflowStr: string, project: any): Promise<any> {
     console.log("[ComfyService] injectParameters started.");
     console.log("[ComfyService] Input project settings:", JSON.stringify(project, null, 2));
+    
+    // Fetch object_info to get dynamic widget valid options
+    const objectInfo = await this.getObjectInfo();
+    
     try {
       const workflow = JSON.parse(workflowStr);
 
@@ -281,14 +293,6 @@ export class ComfyService {
           if (project.scheduler && node.inputs.scheduler !== undefined) node.inputs.scheduler = project.scheduler;
           if (node.inputs.noise_seed !== undefined) node.inputs.noise_seed = finalSeed;
           if (node.inputs.seed !== undefined) node.inputs.seed = finalSeed;
-          console.log("[ComfyService] KSampler node", key, "injected:", {
-            steps: node.inputs.steps,
-            cfg: node.inputs.cfg,
-            sampler_name: node.inputs.sampler_name,
-            scheduler: node.inputs.scheduler,
-            noise_seed: node.inputs.noise_seed,
-            seed: node.inputs.seed
-          });
         }
 
         // 2. Positive Prompt (CLIPTextEncode / Simple String / StringConcatenate)
@@ -329,14 +333,21 @@ export class ComfyService {
 
         // 5. Resolution / Empty Latent
         if (node.class_type === "SDXLEmptyLatentSizePicker+") {
-          if (project.resolution) {
-            node.inputs.resolution = project.resolution;
-          }
-          if (project.width && project.width > 0) {
+          if (project.width && project.height && project.width > 0 && project.height > 0) {
+            let customStr = "custom ⚠️";
+            if (objectInfo && objectInfo["SDXLEmptyLatentSizePicker+"]?.input?.required?.resolution?.[0]) {
+              const resList = objectInfo["SDXLEmptyLatentSizePicker+"].input.required.resolution[0];
+              const found = resList.find((r: string) => r.toLowerCase().includes("custom"));
+              if (found) customStr = found;
+              else if (resList.length > 0) customStr = resList[resList.length - 1];
+            }
+            node.inputs.resolution = customStr;
+            node.inputs.empty_latent_width = project.width;
             node.inputs.width_override = project.width;
-          }
-          if (project.height && project.height > 0) {
+            node.inputs.empty_latent_height = project.height;
             node.inputs.height_override = project.height;
+          } else if (project.resolution) {
+            node.inputs.resolution = project.resolution;
           }
         } else if (node.class_type.includes("EmptyLatent") || node.class_type.includes("SizePicker") || node.class_type.includes("Latent")) {
           if (node.inputs.width !== undefined) node.inputs.width = project.width;
