@@ -38,6 +38,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::greet,
@@ -59,6 +60,8 @@ pub fn run() {
             commands::files::save_base64_image,
             commands::files::read_image_base64,
             commands::files::read_text_file,
+            commands::files::write_bytes_to_file,
+            commands::files::read_file_as_bytes,
             commands::favorites::get_favorite_prompts,
             commands::favorites::add_favorite_prompt,
             commands::favorites::delete_favorite_prompt,
@@ -67,6 +70,8 @@ pub fn run() {
             commands::styles::delete_custom_style,
             commands::mcp::list_mcp_tools,
             commands::mcp::call_mcp_tool,
+            commands::data::export_all_data,
+            commands::data::import_all_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

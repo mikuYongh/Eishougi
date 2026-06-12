@@ -5,6 +5,7 @@ pub mod files;
 pub mod favorites;
 pub mod styles;
 pub mod mcp;
+pub mod data;
 
 #[tauri::command]
 pub fn greet(name: &str) -> String {

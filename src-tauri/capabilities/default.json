@@ -12,6 +12,8 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "shell:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-open",
     "core:path:allow-basename",
     "core:path:allow-dirname",
     "core:path:allow-extname",

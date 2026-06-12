@@ -54,3 +54,13 @@ pub async fn read_image_base64(path: String) -> Result<String, String> {
 pub async fn read_text_file(path: String) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn write_bytes_to_file(path: String, data: Vec<u8>) -> Result<(), String> {
+    fs::write(&path, data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn read_file_as_bytes(path: String) -> Result<Vec<u8>, String> {
+    fs::read(&path).map_err(|e| e.to_string())
+}

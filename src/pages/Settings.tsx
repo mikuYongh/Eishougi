@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
-import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown } from "lucide-react";
+import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database } from "lucide-react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { GlassDropdown } from "../components/ui/GlassDropdown";
 
 const SETTINGS_TABS = [
   { id: "appearance", label: "外观设置", icon: <Palette size={18} /> },
   { id: "general", label: "通用设置", icon: <SettingsIcon size={18} /> },
   { id: "models", label: "模型与服务", icon: <Cpu size={18} /> },
+  { id: "data", label: "数据管理", icon: <Database size={18} /> },
   { id: "about", label: "关于", icon: <Info size={18} /> },
 ];
 
@@ -23,6 +25,8 @@ export function Settings() {
     settings, setPrivacyMode, updateSettings
   } = useSettingsStore();
   const [localWallpaper, setLocalWallpaper] = useState(wallpaperPath);
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalWallpaper(wallpaperPath);
@@ -46,6 +50,90 @@ export function Settings() {
         }
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleExport = async () => {
+    setExportStatus("正在打包数据...");
+    try {
+      // 1. Get zip bytes from Rust (contains DB data + bundled images)
+      const zipBytes: number[] = await invoke('export_all_data');
+
+      // 2. Show save dialog
+      const filePath = await save({
+        defaultPath: `eishougi-backup-${new Date().toISOString().slice(0, 10)}.eishougi`,
+        filters: [{ name: "Eishougi Backup", extensions: ["eishougi"] }],
+      });
+
+      if (!filePath) {
+        setExportStatus(null);
+        return;
+      }
+
+      // 3. Write zip file
+      await invoke('write_bytes_to_file', { path: filePath, data: zipBytes });
+
+      // 4. Also save frontend localStorage into a sidecar JSON
+      const frontendData: Record<string, any> = {};
+      const lsKeys = ['eishougi-settings', 'agent-storage'];
+      for (const key of lsKeys) {
+        const val = localStorage.getItem(key);
+        if (val) frontendData[key] = JSON.parse(val);
+      }
+      const encoder = new TextEncoder();
+      const frontendBytes = encoder.encode(JSON.stringify(frontendData));
+      const frontendPath = filePath + ".frontend.json";
+      await invoke('write_bytes_to_file', { path: frontendPath, data: Array.from(frontendBytes) });
+
+      setExportStatus("导出成功！");
+      setTimeout(() => setExportStatus(null), 3000);
+    } catch (err: any) {
+      console.error("Export failed:", err);
+      setExportStatus(`导出失败: ${err}`);
+    }
+  };
+
+  const handleImport = async () => {
+    setImportStatus("请选择备份文件...");
+    try {
+      // 1. Show open dialog
+      const filePath = await open({
+        filters: [
+          { name: "Eishougi Backup", extensions: ["eishougi"] },
+          { name: "JSON", extensions: ["json"] },
+        ],
+        multiple: false,
+      });
+
+      if (!filePath) {
+        setImportStatus(null);
+        return;
+      }
+
+      setImportStatus("正在读取备份...");
+
+      // 2. Read zip bytes and send to Rust for import
+      const zipBytes: number[] = await invoke('read_file_as_bytes', { path: filePath });
+      const result = await invoke('import_all_data', { zipBytes });
+
+      // 3. Restore frontend localStorage from sidecar if present
+      const frontendPath = filePath + ".frontend.json";
+      try {
+        const frontendBytes: number[] = await invoke('read_file_as_bytes', { path: frontendPath });
+        const decoder = new TextDecoder();
+        const jsonStr = decoder.decode(new Uint8Array(frontendBytes));
+        const frontendData = JSON.parse(jsonStr);
+        for (const [key, value] of Object.entries(frontendData)) {
+          localStorage.setItem(key, JSON.stringify(value));
+        }
+      } catch {
+        // Sidecar not found is fine — older backups may not have it
+      }
+
+      setImportStatus(`${result} 请重启应用以加载所有数据。`);
+    } catch (err: any) {
+      console.error("Import failed:", err);
+      setImportStatus(`导入失败: ${err}`);
     }
   };
 
@@ -436,6 +524,78 @@ export function Settings() {
                         className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
                       />
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "data" && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+              <div className="glass-panel p-6">
+                <div className="flex items-center gap-3 mb-6 border-b border-[var(--glass-border)] pb-4">
+                  <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/20">
+                    <Database size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[var(--text-primary)]">数据导出与导入</h3>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5">导出全部数据（提示词、工作流、生成记录、设置等）为 JSON 文件，方便设备间迁移。</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-6 max-w-2xl">
+                  <div className="flex gap-4">
+                    <button
+                      onClick={handleExport}
+                      disabled={exportStatus !== null && !exportStatus.includes("失败")}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold cursor-pointer transition-all duration-300 hover:scale-105 shadow-[0_4px_15px_rgba(16,185,129,0.3)]"
+                      style={{ background: "linear-gradient(135deg, #10B981, #059669)", color: "#fff" }}
+                    >
+                      <Download size={16} /> 导出全部数据
+                    </button>
+                    <button
+                      onClick={handleImport}
+                      disabled={importStatus !== null && !importStatus.includes("失败") && !importStatus.includes("请选择")}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-white/10 transition-all cursor-pointer text-[13px] font-bold"
+                    >
+                      <Upload size={16} /> 导入备份数据
+                    </button>
+                  </div>
+
+                  {exportStatus && (
+                    <div className={`px-4 py-3 rounded-xl text-sm font-medium ${
+                      exportStatus.includes("失败") 
+                        ? "bg-red-500/10 text-red-400 border border-red-500/20" 
+                        : exportStatus.includes("成功")
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        : "bg-white/5 text-[var(--text-muted)] border border-[var(--glass-border)]"
+                    }`}>
+                      {exportStatus}
+                    </div>
+                  )}
+                  {importStatus && (
+                    <div className={`px-4 py-3 rounded-xl text-sm font-medium ${
+                      importStatus.includes("失败") || importStatus.includes("无效")
+                        ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                        : importStatus.includes("成功")
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        : "bg-white/5 text-[var(--text-muted)] border border-[var(--glass-border)]"
+                    }`}>
+                      {importStatus}
+                    </div>
+                  )}
+
+                  <div className="text-xs text-[var(--text-muted)] space-y-1 border-t border-[var(--glass-border)] pt-4">
+                    <p className="font-bold text-[var(--text-primary)]">备份内容包括：</p>
+                    <ul className="list-disc list-inside space-y-0.5 ml-2">
+                      <li>提示词项目（正面/负面提示词、模型配置、LoRA等）</li>
+                      <li>工作流定义（ComfyUI JSON）</li>
+                      <li>生成历史记录与示范图片（本地图片打包进备份）</li>
+                      <li>收藏提示词 / 自定义风格</li>
+                      <li>Agent 会话记录</li>
+                      <li>应用设置（主题、LLM配置、壁纸等）</li>
+                    </ul>
+                    <p className="mt-2 text-[var(--text-muted)]">备份格式为 .eishougi 压缩包，包含所有数据和本地图片文件。</p>
                   </div>
                 </div>
               </div>
