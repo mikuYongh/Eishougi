@@ -574,17 +574,32 @@ When asked to set model/LoRA on a project → use update_prompt.`;
                   Nexus Terminal v2.0
                 </span>
               </div>
-              <button
-                onClick={handleSend}
-                disabled={isGenerating || (!inputValue.trim() && selectedImages.length === 0)}
-                className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer flex-shrink-0 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none hover:scale-105 hover:shadow-[0_0_15px_rgba(var(--accent-1-rgb), 0.5)]"
-                style={{
-                  background: isGenerating || (!inputValue.trim() && selectedImages.length === 0) ? "rgba(255,255,255,0.1)" : "linear-gradient(135deg, #d946ef, #9333ea)",
-                  color: isGenerating || (!inputValue.trim() && selectedImages.length === 0) ? "rgba(255,255,255,0.3)" : "#fff",
-                }}
-              >
-                <Send size={16} className={(inputValue.trim() || selectedImages.length > 0) ? "ml-0.5" : ""} />
-              </button>
+              {isGenerating ? (
+                <button
+                  onClick={stopGenerating}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer flex-shrink-0 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]"
+                  style={{
+                    background: "linear-gradient(135deg, #ef4444, #b91c1c)",
+                    color: "#fff",
+                  }}
+                  title="停止生成"
+                >
+                  <div className="w-3.5 h-3.5 bg-current rounded-sm" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={!inputValue.trim() && selectedImages.length === 0}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer flex-shrink-0 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none hover:scale-105 hover:shadow-[0_0_15px_rgba(var(--accent-1-rgb), 0.5)]"
+                  style={{
+                    background: (!inputValue.trim() && selectedImages.length === 0) ? "rgba(255,255,255,0.1)" : "linear-gradient(135deg, #d946ef, #9333ea)",
+                    color: (!inputValue.trim() && selectedImages.length === 0) ? "rgba(255,255,255,0.3)" : "#fff",
+                  }}
+                  title="发送"
+                >
+                  <Send size={16} className={(inputValue.trim() || selectedImages.length > 0) ? "ml-0.5" : ""} />
+                </button>
+              )}
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { useQueueStore } from "../../stores/queueStore";
 
 export function StatusBar() {
   const { jobs, isConnected } = useQueueStore();
+  
   const pendingJobs = jobs.filter(j => j.status === 'pending');
   const generatingJobs = jobs.filter(j => j.status === 'generating');
   const activeCount = pendingJobs.length + generatingJobs.length;
@@ -111,7 +112,14 @@ export function StatusBar() {
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-[var(--text-primary)] truncate pr-2 font-medium">{job.projectTitle}</span>
                         {job.status === 'pending' && <span className="text-[9px] text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded">排队中</span>}
-                        {job.status === 'generating' && <span className="text-[9px] text-[var(--accent-2)] bg-[var(--accent-2)]/10 px-1.5 py-0.5 rounded flex items-center gap-1"><Loader2 size={8} className="animate-spin" /> {job.progress}%</span>}
+                        {job.status === 'generating' && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[9px] text-[var(--accent-2)] bg-[var(--accent-2)]/10 px-1.5 py-0.5 rounded flex items-center gap-1"><Loader2 size={8} className="animate-spin" /> {job.progress}%</span>
+                            <button onClick={(e) => { e.stopPropagation(); useQueueStore.getState().interruptJob(); }} className="text-red-500 hover:text-red-400 p-1 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors" title="强制停止">
+                              <div className="w-2 h-2 bg-current rounded-sm" />
+                            </button>
+                          </div>
+                        )}
                         {job.status === 'completed' && <span className="text-[9px] text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded flex items-center gap-1"><CheckCircle2 size={8} /> 完成</span>}
                         {job.status === 'failed' && <span className="text-[9px] text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded flex items-center gap-1"><XCircle size={8} /> 失败</span>}
                       </div>
