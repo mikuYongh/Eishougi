@@ -9,8 +9,9 @@ import {
   Search, 
   Image as ImageIcon,
   Users,
-  History, 
-  Settings 
+  History,
+  Settings,
+  Sparkles
 } from "lucide-react";
 
 /* ====== Navigation ====== */
@@ -24,6 +25,7 @@ export const NAV_ITEMS: { id: NavId; label: string; icon: React.ReactNode; path:
   { id: "characters", label: "角色图鉴",   icon: <Users size={18} />, path: "/characters" },
   { id: "artists",    label: "风格画师",   icon: <ImageIcon size={18} />, path: "/artists" },
   { id: "history",    label: "生成历史",   icon: <History size={18} />, path: "/history" },
+  { id: "vault",      label: "典藏库",     icon: <Sparkles size={18} />, path: "/vault" },
   { id: "settings",   label: "设置",       icon: <Settings size={18} />, path: "/settings" },
 ];
 

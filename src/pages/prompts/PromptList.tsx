@@ -4,6 +4,10 @@ import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useNavigate } from "react-router-dom";
 import { aiService } from "../../services/aiService";
+import { convertFileSrc } from "@tauri-apps/api/core";
+
+const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 type ViewMode = 'grid' | 'list';
 
@@ -207,7 +211,7 @@ export function PromptList() {
                 
                 {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) && (
                   <div className="h-24 w-full relative overflow-hidden flex-shrink-0 bg-[var(--glass-bg)]">
-                    <img src={p.coverImage || p.instanceImages?.[0]} alt={p.title} className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                    <img src={getImgSrc(p.coverImage || p.instanceImages?.[0])} alt={p.title} className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                     <div className="absolute top-2 right-2 z-20 flex gap-1.5">
                       <button 
                         onClick={() => toggleFavorite(p.id)}
@@ -243,10 +247,18 @@ export function PromptList() {
                           <Star size={14} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-[var(--text-muted)]"} />
                         </button>
                         <button 
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            if (confirm("确定要删除该提示词项目吗？")) {
-                              removePrompt(p.id);
+                            try {
+                              const yes = await confirm("确定要删除该提示词项目吗？");
+                              if (yes) {
+                                removePrompt(p.id);
+                              }
+                            } catch (err) {
+                              // Fallback to native confirm if tauri dialog plugin is not ready
+                              if (window.confirm("确定要删除该提示词项目吗？")) {
+                                removePrompt(p.id);
+                              }
                             }
                           }}
                           className="p-1.5 rounded-full hover:bg-red-500/10 text-red-400/80 hover:text-red-400 transition-colors cursor-pointer"
@@ -307,7 +319,7 @@ export function PromptList() {
                 {/* Square Thumbnail */}
                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-[var(--glass-bg)] flex-shrink-0 relative">
                   {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) ? (
-                    <img src={p.coverImage || p.instanceImages?.[0]} className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} alt="cover"/>
+                    <img src={getImgSrc(p.coverImage || p.instanceImages?.[0])} className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} alt="cover"/>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/10">
                       <ImageIcon size={20} />

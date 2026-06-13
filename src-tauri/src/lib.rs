@@ -31,6 +31,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .invoke_handler(tauri::generate_handler![
             commands::greet,
@@ -49,6 +50,7 @@ pub fn run() {
             commands::history::get_generated_image,
             commands::history::list_generated_images,
             commands::history::delete_generated_image,
+            commands::history::toggle_save_image,
             commands::files::save_base64_image,
 
             commands::files::read_image_base64,
@@ -57,6 +59,7 @@ pub fn run() {
             commands::files::read_file_as_bytes,
             commands::favorites::get_favorite_prompts,
             commands::favorites::add_favorite_prompt,
+            commands::images::download_comfyui_image,
             commands::favorites::delete_favorite_prompt,
             commands::styles::get_custom_styles,
             commands::styles::add_custom_style,

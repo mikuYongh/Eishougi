@@ -164,7 +164,9 @@ export function useAgent() {
             height: { type: "number", description: "Image height in pixels (default 1024)" },
             steps: { type: "number", description: "Sampling steps (default 25)" },
             cfg_scale: { type: "number", description: "CFG scale / guidance scale (default 7.0)" },
-            seed: { type: "string", description: "Seed value, use '-1' for random" }
+            seed: { type: "string", description: "Seed value, use '-1' for random" },
+            sampler_name: { type: "string", description: "Sampler name (e.g. euler, euler_ancestral, dpmpp_2m)" },
+            scheduler: { type: "string", description: "Scheduler name (e.g. normal, karras, beta57)" }
           },
           required: ["content"]
         }
@@ -173,17 +175,31 @@ export function useAgent() {
     {
       type: "function",
       function: {
-        name: "update_prompt",
-        description: "Update an existing prompt project.",
+        name: "update_prompt_content",
+        description: "Update the textual content (prompts, title, tags) of an existing project.",
         parameters: {
           type: "object",
           properties: {
             prompt_id: { type: "string", description: "The ID of the prompt to update" },
             title: { type: "string", description: "Updated title" },
-            content: { type: "string", description: "Updated positive prompt text" },
+            positive_prompt: { type: "string", description: "Updated positive prompt text" },
             negative_prompt: { type: "string", description: "Updated negative prompt text" },
+            artist_prompt: { type: "string", description: "Updated artist or style trigger words" },
             tags: { type: "array", items: { type: "string" }, description: "Updated tags" },
-            instance_images: { type: "array", items: { type: "string" }, description: "URLs or file paths to instance reference images" },
+          },
+          required: ["prompt_id"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "update_prompt_settings",
+        description: "Update the configuration settings (model, LoRAs, resolution, etc) of an existing project.",
+        parameters: {
+          type: "object",
+          properties: {
+            prompt_id: { type: "string", description: "The ID of the prompt to update" },
             base_model: { type: "string", description: "Base checkpoint model filename" },
             vae_model: { type: "string", description: "VAE model" },
             lora_configs: {
@@ -203,7 +219,10 @@ export function useAgent() {
             height: { type: "number" },
             steps: { type: "number" },
             cfg_scale: { type: "number" },
-            seed: { type: "string" }
+            seed: { type: "string" },
+            sampler_name: { type: "string" },
+            scheduler: { type: "string" },
+            workflow_id: { type: "string", description: "The ID of the default workflow to bind to this prompt" }
           },
           required: ["prompt_id"]
         }
@@ -227,12 +246,11 @@ export function useAgent() {
       type: "function",
       function: {
         name: "generate_image",
-        description: "Generate an image using a specific prompt and workflow. This function WAITS for generation to complete and returns the generated image URLs directly. You do NOT need to poll get_queue_status after calling this.",
+        description: "Generate an image using a specific prompt project. It will automatically rely on the bound workflow. This function WAITS for generation to complete and returns the generated image URLs directly. You do NOT need to poll get_queue_status after calling this.",
         parameters: {
           type: "object",
           properties: {
             prompt_id: { type: "string", description: "The ID of the prompt to use" },
-            workflow_id: { type: "string", description: "The ID of the workflow to use (optional)" },
             batch_count: { type: "number", description: "Number of images to generate (default 1)" }
           },
           required: ["prompt_id"]
@@ -432,24 +450,46 @@ export function useAgent() {
       }));
 
       const allTools = [...ALL_TOOLS, ...mcpTools];
-      console.log("[Agent] Sending", allTools.length, "tools to LLM (local:", ALL_TOOLS.length, "MCP:", mcpTools.length, ")");
+      const mcpToolsPrompt = Object.entries(mcpTools).length > 0 
+        ? `\n\n## AVAILABLE MCP TOOLS\nYou can use the following MCP tools:\n${Object.values(mcpTools).map(t => 
+            `- ${t.name}(${Object.keys(t.inputSchema?.properties || {}).join(', ')}): ${t.description}`
+          ).join('\n')}`
+        : '';
+
+      // Determine active context from URL
+      let systemContext = `\n\n[System Context]`;
+      const match = window.location.pathname.match(/\/prompts\/(p_[a-zA-Z0-9_-]+)/);
+      if (match) {
+        systemContext += `\nThe user is currently viewing/editing Prompt Project ID: ${match[1]}.\nCRITICAL: You MUST USE update_prompt_content or update_prompt_settings on this ID if the user asks to modify the scene or settings. DO NOT create a new prompt.`;
+      } else {
+        systemContext += `\nThe user is NOT viewing a specific prompt. If they ask to generate a scene, you can use create_prompt.`;
+      }
 
       let bodyJson: string;
       try {
-        bodyJson = JSON.stringify({
+        const systemMessage = {
+          role: "system",
+          content: agentSettings.systemPrompt + mcpToolsPrompt + systemContext + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually." 
+        };
+        
+        const payload: any = {
           model: llm.model || 'agnes-2.0-flash',
           messages: [
-            { 
-              role: 'system', 
-              content: agentSettings.systemPrompt + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually." 
-            },
+            systemMessage,
             ...mappedMessages
           ],
-          tools: allTools,
+          tools: allTools.map((t: any) => {
+            const { _mcp, ...rest } = t;
+            return rest;
+          }),
           stream: true,
           temperature: llm.temperature !== undefined ? llm.temperature : 0.7,
           max_tokens: llm.maxTokens !== undefined ? llm.maxTokens : 2048,
-        });
+        };
+        if (llm.provider === 'ollama') {
+          payload.options = { num_ctx: 32768 };
+        }
+        bodyJson = JSON.stringify(payload);
       } catch (e) {
         console.error("[Agent] JSON.stringify failed:", e);
         throw e;
@@ -466,7 +506,22 @@ export function useAgent() {
       });
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        let errorMsg = response.statusText;
+        try {
+          const errorBody = await response.json();
+          if (errorBody.error && errorBody.error.message) {
+            errorMsg = errorBody.error.message;
+          } else if (typeof errorBody.error === 'string') {
+            errorMsg = errorBody.error;
+          } else {
+            errorMsg = JSON.stringify(errorBody);
+          }
+        } catch (e) {
+          try {
+            errorMsg = await response.text();
+          } catch (e2) {}
+        }
+        throw new Error(`API Error: ${response.status} ${errorMsg}`);
       }
 
       const reader = response.body?.getReader();
@@ -536,14 +591,10 @@ export function useAgent() {
         
         for (const call of assistantMessage.tool_calls) {
           let resultStr = "";
+          let rawArgs = "";
           try {
             // Clean up backslashes or trailing content in argument string if LLM outputted slightly malformed json
-            let rawArgs = (call.function.arguments || '{}').trim();
-            // Simple auto-completion for truncated json
-            if (rawArgs.startsWith('{') && !rawArgs.endsWith('}')) {
-              // Try to patch missing curly braces
-              rawArgs += '}';
-            }
+            rawArgs = (call.function.arguments || '{}').trim();
             call.function.arguments = rawArgs; // MUST write back so history has valid JSON for subsequent API calls
             const parsedArgs = JSON.parse(rawArgs);
             try {
@@ -562,11 +613,11 @@ export function useAgent() {
                   steps: parsedArgs.steps || 25,
                   cfgScale: parsedArgs.cfg_scale || 7.0,
                   seed: parsedArgs.seed || "-1",
-                  samplerName: "euler",
-                  scheduler: "beta57",
+                  samplerName: parsedArgs.sampler_name || "euler",
+                  scheduler: parsedArgs.scheduler || "beta57",
                   baseModel: parsedArgs.base_model || "sd_xl_base_1.0.safetensors",
                   vaeModel: parsedArgs.vae_model || "auto",
-                  loraConfigs: parsedArgs.lora_configs || null,
+                  loraConfigs: parsedArgs.lora_configs ? JSON.stringify(parsedArgs.lora_configs) : null,
                   tags: (parsedArgs.tags || []).map((t: string, i: number) => ({
                     id: "tag_" + Date.now() + i,
                     name: t,
@@ -582,35 +633,49 @@ export function useAgent() {
                 await invoke('create_prompt', { prompt: newPrompt });
                 usePromptStore.getState().fetchPrompts();
                 res = { status: "success", prompt_id: newPrompt.id };
-              } else if (fnName === 'update_prompt') {
+              } else if (fnName === 'update_prompt_content') {
                 const currentPrompt = await invoke('get_prompt', { id: parsedArgs.prompt_id }) as any;
                 if (!currentPrompt) throw new Error(`Prompt with ID ${parsedArgs.prompt_id} not found.`);
                 
                 const updatedPrompt = {
                   ...currentPrompt,
                   title: parsedArgs.title !== undefined ? parsedArgs.title : currentPrompt.title,
-                  positivePrompt: parsedArgs.content !== undefined ? parsedArgs.content : currentPrompt.positivePrompt,
+                  positivePrompt: parsedArgs.positive_prompt !== undefined ? parsedArgs.positive_prompt : currentPrompt.positivePrompt,
                   negativePrompt: parsedArgs.negative_prompt !== undefined ? parsedArgs.negative_prompt : currentPrompt.negativePrompt,
-                  baseModel: parsedArgs.base_model !== undefined ? parsedArgs.base_model : currentPrompt.baseModel,
-                  vaeModel: parsedArgs.vae_model !== undefined ? parsedArgs.vae_model : currentPrompt.vaeModel,
-                  loraConfigs: parsedArgs.lora_configs !== undefined ? parsedArgs.lora_configs : currentPrompt.loraConfigs,
-                  width: parsedArgs.width !== undefined ? parsedArgs.width : currentPrompt.width,
-                  height: parsedArgs.height !== undefined ? parsedArgs.height : currentPrompt.height,
-                  steps: parsedArgs.steps !== undefined ? parsedArgs.steps : currentPrompt.steps,
-                  cfgScale: parsedArgs.cfg_scale !== undefined ? parsedArgs.cfg_scale : currentPrompt.cfgScale,
-                  seed: parsedArgs.seed !== undefined ? parsedArgs.seed : currentPrompt.seed,
+                  artistPrompt: parsedArgs.artist_prompt !== undefined ? parsedArgs.artist_prompt : currentPrompt.artistPrompt,
                   tags: parsedArgs.tags !== undefined ? parsedArgs.tags.map((t: string, i: number) => ({
                     id: "tag_" + Date.now() + i,
                     name: t,
                     color: "#ff6b9d",
                     createdAt: Date.now()
                   })) : currentPrompt.tags,
-                  instanceImages: parsedArgs.instance_images !== undefined ? parsedArgs.instance_images : currentPrompt.instanceImages,
                   updatedAt: Date.now()
                 };
                 await invoke('update_prompt', { prompt: updatedPrompt });
                 usePromptStore.getState().fetchPrompts();
-                res = { status: "success", message: `Prompt ${parsedArgs.prompt_id} updated.` };
+                res = { status: "success", message: `Prompt content ${parsedArgs.prompt_id} updated.` };
+              } else if (fnName === 'update_prompt_settings') {
+                const currentPrompt = await invoke('get_prompt', { id: parsedArgs.prompt_id }) as any;
+                if (!currentPrompt) throw new Error(`Prompt with ID ${parsedArgs.prompt_id} not found.`);
+                
+                const updatedPrompt = {
+                  ...currentPrompt,
+                  baseModel: parsedArgs.base_model !== undefined ? parsedArgs.base_model : currentPrompt.baseModel,
+                  vaeModel: parsedArgs.vae_model !== undefined ? parsedArgs.vae_model : currentPrompt.vaeModel,
+                  loraConfigs: parsedArgs.lora_configs !== undefined ? (parsedArgs.lora_configs ? JSON.stringify(parsedArgs.lora_configs) : null) : currentPrompt.loraConfigs,
+                  width: parsedArgs.width !== undefined ? parsedArgs.width : currentPrompt.width,
+                  height: parsedArgs.height !== undefined ? parsedArgs.height : currentPrompt.height,
+                  steps: parsedArgs.steps !== undefined ? parsedArgs.steps : currentPrompt.steps,
+                  cfgScale: parsedArgs.cfg_scale !== undefined ? parsedArgs.cfg_scale : currentPrompt.cfgScale,
+                  seed: parsedArgs.seed !== undefined ? parsedArgs.seed : currentPrompt.seed,
+                  samplerName: parsedArgs.sampler_name !== undefined ? parsedArgs.sampler_name : currentPrompt.samplerName,
+                  scheduler: parsedArgs.scheduler !== undefined ? parsedArgs.scheduler : currentPrompt.scheduler,
+                  workflowId: parsedArgs.workflow_id !== undefined ? parsedArgs.workflow_id : currentPrompt.workflowId,
+                  updatedAt: Date.now()
+                };
+                await invoke('update_prompt', { prompt: updatedPrompt });
+                usePromptStore.getState().fetchPrompts();
+                res = { status: "success", message: `Prompt settings ${parsedArgs.prompt_id} updated.` };
               } else if (fnName === 'delete_prompt') {
                 await invoke('delete_prompt', { id: parsedArgs.prompt_id });
                 usePromptStore.getState().fetchPrompts();
@@ -634,18 +699,20 @@ export function useAgent() {
                 const project = await invoke('get_prompt', { id: parsedArgs.prompt_id }) as any;
                 if (!project) throw new Error(`Prompt ID ${parsedArgs.prompt_id} not found`);
                 
-                let wfId = parsedArgs.workflow_id;
+                let wfId = project.workflowId;
                 if (!wfId) {
                   const workflows = useWorkflowStore.getState().workflows;
-                  if (workflows.length > 0) {
-                    const sortedWfs = [...workflows].sort((a, b) => b.updatedAt - a.updatedAt);
-                    wfId = sortedWfs[0].id;
+                  const defaultWf = workflows.find((w: any) => w.isDefault);
+                  if (defaultWf) {
+                    wfId = defaultWf.id;
+                  } else if (workflows.length > 0) {
+                    wfId = workflows[0].id;
                   }
                 }
                 
                 const batchCount = parsedArgs.batch_count || 1;
                 const results = await useQueueStore.getState().addJob(project, wfId, batchCount);
-                const allImages = results.flat();
+                const allImages = results ? results.flat() : [];
                 res = {
                   status: "completed",
                   images: allImages,
@@ -660,6 +727,10 @@ export function useAgent() {
             );
             resultStr = JSON.stringify({ status: "success", message: "后台批量打标已启动，将自动为所有提示词生成标签" });
           } else if (fnName === 'list_local_models') {
+            const store = useModelStore.getState();
+            if (store.checkpoints.length === 0 && store.loras.length === 0) {
+              await store.fetchModels();
+            }
             const { checkpoints, loras } = useModelStore.getState();
             res = { checkpoints, loras };
           } else if (fnName === 'get_queue_status') {
@@ -818,8 +889,11 @@ export function useAgent() {
               resultStr = JSON.stringify({ error: invokeErr.toString() });
             }
           } catch (e: any) {
+            console.error(`[Agent] Tool ${call.function.name} argument parsing error:`, e, rawArgs);
+            // Replace invalid JSON with valid JSON so OpenAI API doesn't reject the message history with 400 Bad Request
+            call.function.arguments = "{}";
             resultStr = JSON.stringify({ 
-              error: `Invalid JSON arguments provided to tool: ${e.toString()}. Please revise the arguments and call the tool again.` 
+              error: `Invalid JSON arguments provided to tool: ${e.toString()}. Your raw input was: ${rawArgs}. Please revise the arguments and call the tool again.` 
             });
           }
 

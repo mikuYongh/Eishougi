@@ -176,6 +176,10 @@ export class ComfyService {
     vaeModel: string | null;
     samplerName: string | null;
     scheduler: string | null;
+    width: number | null;
+    height: number | null;
+    steps: number | null;
+    cfgScale: number | null;
     loras: { name: string; strength: number; enabled: boolean }[];
   } {
     const result = {
@@ -184,6 +188,10 @@ export class ComfyService {
       vaeModel: null as string | null,
       samplerName: null as string | null,
       scheduler: null as string | null,
+      width: null as number | null,
+      height: null as number | null,
+      steps: null as number | null,
+      cfgScale: null as number | null,
       loras: [] as { name: string; strength: number; enabled: boolean }[]
     };
 
@@ -211,6 +219,17 @@ export class ComfyService {
         if (node.class_type.includes("KSampler")) {
           if (node.inputs.sampler_name) result.samplerName = node.inputs.sampler_name;
           if (node.inputs.scheduler) result.scheduler = node.inputs.scheduler;
+          if (typeof node.inputs.steps === 'number') result.steps = node.inputs.steps;
+          if (typeof node.inputs.cfg === 'number') result.cfgScale = node.inputs.cfg;
+        }
+
+        // Check for Resolution
+        if (node.class_type.includes("EmptyLatent") || node.class_type.includes("SizePicker") || node.class_type.includes("Latent")) {
+          if (typeof node.inputs.empty_latent_width === 'number') result.width = node.inputs.empty_latent_width;
+          else if (typeof node.inputs.width === 'number') result.width = node.inputs.width;
+          
+          if (typeof node.inputs.empty_latent_height === 'number') result.height = node.inputs.empty_latent_height;
+          else if (typeof node.inputs.height === 'number') result.height = node.inputs.height;
         }
 
         // Check for LoRAs in Power Lora Loader (rgthree)
@@ -287,33 +306,37 @@ export class ComfyService {
 
         // 1. KSampler / KSamplerAdvanced
         if (node.class_type.includes("KSampler")) {
-          if (node.inputs.steps !== undefined) node.inputs.steps = project.steps;
-          if (node.inputs.cfg !== undefined) node.inputs.cfg = project.cfgScale;
-          if (project.sampler && node.inputs.sampler_name !== undefined) node.inputs.sampler_name = project.sampler;
-          if (project.scheduler && node.inputs.scheduler !== undefined) node.inputs.scheduler = project.scheduler;
-          if (node.inputs.noise_seed !== undefined) node.inputs.noise_seed = finalSeed;
-          if (node.inputs.seed !== undefined) node.inputs.seed = finalSeed;
+          if (project.steps !== undefined && node.inputs.steps !== undefined) node.inputs.steps = project.steps;
+          if (project.cfgScale !== undefined && node.inputs.cfg !== undefined) node.inputs.cfg = project.cfgScale;
+          if (project.sampler !== undefined && project.sampler !== null && node.inputs.sampler_name !== undefined) node.inputs.sampler_name = project.sampler;
+          if (project.scheduler !== undefined && project.scheduler !== null && node.inputs.scheduler !== undefined) node.inputs.scheduler = project.scheduler;
+          if (project.seed !== undefined && node.inputs.noise_seed !== undefined) node.inputs.noise_seed = finalSeed;
+          if (project.seed !== undefined && node.inputs.seed !== undefined) node.inputs.seed = finalSeed;
         }
 
         // 2. Positive Prompt (CLIPTextEncode / Simple String / StringConcatenate)
-        if (node.class_type === "CLIPTextEncode" && node._meta?.title?.includes("Positive")) {
-          if (typeof node.inputs.text === 'string') {
-            node.inputs.text = finalPositive;
-          }
-        } else if (node.class_type === "Simple String" || node.class_type === "SimpleString") {
-          node.inputs.string = finalPositive;
-        } else if (node.class_type === "StringConcatenate") {
-          if (typeof node.inputs.string_b === 'string') {
-            node.inputs.string_b = finalPositive;
-          } else if (typeof node.inputs.string_a === 'string') {
-            node.inputs.string_a = finalPositive;
+        if (project.positivePrompt !== undefined) {
+          if (node.class_type === "CLIPTextEncode" && node._meta?.title?.includes("Positive")) {
+            if (typeof node.inputs.text === 'string') {
+              node.inputs.text = finalPositive;
+            }
+          } else if (node.class_type === "Simple String" || node.class_type === "SimpleString") {
+            node.inputs.string = finalPositive;
+          } else if (node.class_type === "StringConcatenate") {
+            if (typeof node.inputs.string_b === 'string') {
+              node.inputs.string_b = finalPositive;
+            } else if (typeof node.inputs.string_a === 'string') {
+              node.inputs.string_a = finalPositive;
+            }
           }
         }
 
         // 3. Negative Prompt (CLIPTextEncode)
-        if (node.class_type === "CLIPTextEncode" && node._meta?.title?.includes("Negative")) {
-          if (typeof node.inputs.text === 'string') {
-            node.inputs.text = project.negativePrompt;
+        if (project.negativePrompt !== undefined) {
+          if (node.class_type === "CLIPTextEncode" && node._meta?.title?.includes("Negative")) {
+            if (typeof node.inputs.text === 'string') {
+              node.inputs.text = project.negativePrompt;
+            }
           }
         }
 
@@ -333,7 +356,7 @@ export class ComfyService {
 
         // 5. Resolution / Empty Latent
         if (node.class_type === "SDXLEmptyLatentSizePicker+") {
-          if (project.width && project.height && project.width > 0 && project.height > 0) {
+          if (project.width !== undefined && project.height !== undefined && project.width > 0 && project.height > 0) {
             let customStr = "custom ⚠️";
             if (objectInfo && objectInfo["SDXLEmptyLatentSizePicker+"]?.input?.required?.resolution?.[0]) {
               const resList = objectInfo["SDXLEmptyLatentSizePicker+"].input.required.resolution[0];
@@ -346,14 +369,14 @@ export class ComfyService {
             node.inputs.width_override = project.width;
             node.inputs.empty_latent_height = project.height;
             node.inputs.height_override = project.height;
-          } else if (project.resolution) {
+          } else if (project.resolution !== undefined && project.resolution !== null) {
             node.inputs.resolution = project.resolution;
           }
         } else if (node.class_type.includes("EmptyLatent") || node.class_type.includes("SizePicker") || node.class_type.includes("Latent")) {
-          if (node.inputs.width !== undefined) node.inputs.width = project.width;
-          if (node.inputs.height !== undefined) node.inputs.height = project.height;
-          if (node.inputs.width_override !== undefined) node.inputs.width_override = project.width;
-          if (node.inputs.height_override !== undefined) node.inputs.height_override = project.height;
+          if (project.width !== undefined && node.inputs.width !== undefined) node.inputs.width = project.width;
+          if (project.height !== undefined && node.inputs.height !== undefined) node.inputs.height = project.height;
+          if (project.width !== undefined && node.inputs.width_override !== undefined) node.inputs.width_override = project.width;
+          if (project.height !== undefined && node.inputs.height_override !== undefined) node.inputs.height_override = project.height;
         }
 
         // 6. Power Lora Loader (rgthree)

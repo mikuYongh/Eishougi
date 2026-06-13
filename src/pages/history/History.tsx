@@ -1,6 +1,6 @@
-import { Download, Info, Trash2, CalendarDays, Maximize2, BookmarkPlus, Check, X, FileText } from "lucide-react";
+import { Download, Info, Trash2, CalendarDays, Maximize2, BookmarkPlus, Check, X, FileText, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useQueueStore } from "../../stores/queueStore";
@@ -14,6 +14,7 @@ interface HistoryImage {
   model: string;
   time: string;
   resolution: string;
+  isSaved: boolean;
 }
 
 interface HistoryGroup {
@@ -24,7 +25,7 @@ interface HistoryGroup {
 
 export function History() {
   const [history, setHistory] = useState<HistoryGroup[]>([]);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<HistoryImage | null>(null);
   const [addingToPrompt, setAddingToPrompt] = useState<HistoryImage | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const prompts = usePromptStore(state => state.prompts);
@@ -59,7 +60,8 @@ export function History() {
           prompt: promptObj ? promptObj.positivePrompt : 'Custom Generated Image',
           model: promptObj ? (promptObj.baseModel || 'Default Model') : 'Unknown Model',
           time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          resolution: promptObj ? `${promptObj.width}x${promptObj.height}` : 'Unknown'
+          resolution: promptObj ? `${promptObj.width}x${promptObj.height}` : 'Unknown',
+          isSaved: !!item.isSaved
         };
         
         if (!grouped.has(dateStr)) {
@@ -89,20 +91,25 @@ export function History() {
     }
   };
 
-  const handleDownload = async (url: string) => {
+  const handleToggleSave = async (img: HistoryImage) => {
     try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `generation_${Date.now()}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
+      const newSavedState = !img.isSaved;
+      await invoke('toggle_save_image', { id: img.id, is_saved: newSavedState });
+      
+      // Update local state
+      setHistory(prev => prev.map(group => ({
+        ...group,
+        images: group.images.map(image => 
+          image.id === img.id ? { ...image, isSaved: newSavedState } : image
+        )
+      })));
+      
+      // Also update preview modal state if it's the current image
+      if (previewImage?.id === img.id) {
+        setPreviewImage({ ...previewImage, isSaved: newSavedState });
+      }
     } catch (e) {
-      console.error("Failed to download image:", e);
+      console.error("Failed to toggle save image:", e);
     }
   };
 
@@ -180,12 +187,12 @@ export function History() {
                   
                   {/* Image Container */}
                   <div className="aspect-square w-full relative overflow-hidden flex items-center justify-center">
-                    <img src={img.url} alt="Result" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                    <img src={img.url.startsWith('http') ? img.url : convertFileSrc(img.url)} alt="Result" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                     
                   {/* Hover Actions */}
                     <div className="absolute inset-0 bg-[var(--glass-bg)] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
                       <button 
-                        onClick={() => setPreviewImage(img.url)}
+                        onClick={() => setPreviewImage(img)}
                         className="w-10 h-10 rounded-full bg-green-500/80 text-[var(--text-primary)] flex items-center justify-center hover:scale-110 transition-transform shadow-lg cursor-pointer"
                         title="全屏查看"
                       >
@@ -193,11 +200,11 @@ export function History() {
                       </button>
                       <div className="flex gap-2">
                         <button 
-                          onClick={() => handleDownload(img.url)}
-                          className="w-8 h-8 rounded-full bg-white/20 text-[var(--text-primary)] flex items-center justify-center hover:bg-white/40 transition-colors cursor-pointer"
-                          title="下载"
+                          onClick={() => handleToggleSave(img)}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${img.isSaved ? 'bg-[var(--accent-1)] text-white hover:bg-[var(--accent-1)]/80' : 'bg-white/20 text-[var(--text-primary)] hover:bg-white/40'}`}
+                          title={img.isSaved ? "取消收藏" : "收藏到典藏库"}
                         >
-                          <Download size={14} />
+                          <Sparkles size={14} className={img.isSaved ? 'fill-white' : ''} />
                         </button>
                         <button 
                           onClick={() => setAddingToPrompt(img)}
@@ -243,14 +250,79 @@ export function History() {
       {/* Fullscreen Preview Modal */}
       {previewImage && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--glass-bg)] p-8 backdrop-blur-sm cursor-zoom-out"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 md:p-8 backdrop-blur-sm"
           onClick={() => setPreviewImage(null)}
         >
-          <img 
-            src={previewImage} 
-            alt="Preview" 
-            className={`max-w-full max-h-full object-contain rounded-xl shadow-2xl transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} 
-          />
+          <div 
+            className="flex flex-col md:flex-row bg-[#1A1020]/95 border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden w-full max-w-6xl max-h-[90vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Left: Image */}
+            <div className="flex-1 flex items-center justify-center bg-black/50 p-4 relative min-h-[40vh] md:min-h-[auto]">
+              <img 
+                src={previewImage.url.startsWith('http') ? previewImage.url : convertFileSrc(previewImage.url)} 
+                alt="Preview full" 
+                className={`max-w-full max-h-[85vh] object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
+              />
+            </div>
+            
+            {/* Right: Info */}
+            <div className="w-full md:w-[350px] flex-shrink-0 bg-[var(--bg-layer-1)] p-6 flex flex-col gap-5 border-l border-[var(--glass-border)] overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">生成详情</h3>
+                <button onClick={() => setPreviewImage(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div>
+                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">所属项目</label>
+                <div className="text-[13px] font-bold text-[var(--accent-1)]">{previewImage.promptTitle}</div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">正向提示词</label>
+                <div className="text-[12px] text-[var(--text-primary)] font-mono leading-relaxed bg-[var(--glass-bg)] p-3 rounded-xl border border-[var(--glass-border)] max-h-40 overflow-y-auto custom-scrollbar">
+                  {previewImage.prompt}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">基础模型</label>
+                  <div className="text-[12px] font-bold text-[var(--text-primary)] truncate" title={previewImage.model}>{previewImage.model}</div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">分辨率</label>
+                  <div className="text-[12px] font-bold text-[var(--text-primary)]">{previewImage.resolution}</div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">生成时间</label>
+                  <div className="text-[12px] font-bold text-[var(--text-primary)]">{previewImage.time}</div>
+                </div>
+              </div>
+
+              <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-[var(--glass-border)]">
+                <button 
+                  onClick={() => handleToggleSave(previewImage)}
+                  className={`w-full py-3 rounded-xl border font-bold text-[13px] transition-colors flex items-center justify-center gap-2 ${
+                    previewImage.isSaved 
+                      ? 'bg-[var(--accent-1)] text-white border-[var(--accent-1)] hover:bg-[var(--accent-1)]/80' 
+                      : 'bg-[var(--accent-2)]/20 text-[var(--accent-2)] border-[var(--accent-2)]/30 hover:bg-[var(--accent-2)]/30'
+                  }`}
+                >
+                  <Sparkles size={16} className={previewImage.isSaved ? 'fill-white' : ''} /> 
+                  {previewImage.isSaved ? '已收藏到典藏库' : '收藏到典藏库'}
+                </button>
+                <button 
+                  onClick={() => { setAddingToPrompt(previewImage); setPreviewImage(null); }}
+                  className="w-full py-3 rounded-xl bg-[var(--glass-bg)] text-[var(--text-primary)] border border-[var(--glass-border)] font-bold text-[13px] hover:bg-[var(--glass-bg-hover)] transition-colors flex items-center justify-center gap-2"
+                >
+                  <BookmarkPlus size={16} /> 作为项目示范图
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

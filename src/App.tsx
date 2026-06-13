@@ -19,6 +19,7 @@ import {
 } from "./pages";
 import { CharacterLibrary } from "./pages/library/CharacterLibrary";
 import { ArtistLibrary } from "./pages/library/ArtistLibrary";
+import { Vault } from "./pages/vault/Vault";
 import { usePromptStore } from "./stores/promptStore";
 import { useWorkflowStore } from "./stores/workflowStore";
 
@@ -95,6 +96,7 @@ export default function App() {
                 <Route path="/characters" element={<CharacterLibrary />} />
                 <Route path="/artists" element={<ArtistLibrary />} />
                 <Route path="/history" element={<History />} />
+                <Route path="/vault" element={<Vault />} />
                 <Route path="/settings" element={<Settings />} />
               </Routes>
             </div>

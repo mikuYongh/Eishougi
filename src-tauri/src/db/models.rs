@@ -98,6 +98,7 @@ pub struct GeneratedImage {
     pub output_type: String,
     pub status: String,
     pub error_msg: Option<String>,
+    pub is_saved: bool,
     pub created_at: i64,
 }
 

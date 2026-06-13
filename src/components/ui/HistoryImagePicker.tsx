@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { History, X, CheckCircle2 } from "lucide-react";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { convertFileSrc } from "@tauri-apps/api/core";
+
+const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 interface HistoryImagePickerProps {
   onSelect: (url: string) => void;
@@ -80,7 +84,7 @@ export function HistoryImagePicker({ onSelect, onClose, title = "选择生成历
                   onClick={() => onSelect(h.outputPath)}
                 >
                   <img 
-                    src={h.outputPath} 
+                    src={getImgSrc(h.outputPath)} 
                     alt="Generation History"
                     className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`}
                   />
@@ -91,7 +95,7 @@ export function HistoryImagePicker({ onSelect, onClose, title = "选择生成历
                   {/* Hover Actions / Info */}
                   <div className="absolute inset-x-0 bottom-0 p-3 flex flex-col justify-end translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
                     <span className="text-[10px] text-[var(--text-secondary)] font-mono mb-1">
-                      {new Date(h.created_at).toLocaleDateString()}
+                      {new Date(h.createdAt).toLocaleDateString()}
                     </span>
                     <button className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-lg bg-[var(--accent-1)] text-[var(--text-primary)] text-xs font-bold shadow-[0_0_15px_rgba(var(--accent-1-rgb), 0.5)]">
                       <CheckCircle2 size={14} /> 选用

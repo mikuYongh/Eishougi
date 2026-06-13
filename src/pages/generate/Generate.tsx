@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders, Zap } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { usePromptStore, type LoraConfig } from "../../stores/promptStore";
 import { useQueueStore } from "../../stores/queueStore";
 import { useWorkflowStore } from "../../stores/workflowStore";
@@ -175,6 +175,24 @@ export function Generate() {
     }
   }, [selectedWorkflowId, workflows, project?.id]);
   
+  const handleResetToWorkflowDefaults = () => {
+    if (selectedWorkflowId) {
+      const workflow = workflows.find(w => w.id === selectedWorkflowId);
+      if (workflow && workflow.jsonContent) {
+        const analysis = comfyService.analyzeWorkflow(workflow.jsonContent);
+        if (analysis.baseModel) setOverrideBaseModel(analysis.baseModel);
+        if (analysis.vaeModel) setOverrideVaeModel(analysis.vaeModel);
+        if (analysis.samplerName) setOverrideSampler(analysis.samplerName);
+        if (analysis.scheduler) setOverrideScheduler(analysis.scheduler);
+        if (analysis.steps) setOverrideSteps(analysis.steps);
+        if (analysis.cfgScale) setOverrideCfgScale(analysis.cfgScale);
+        if (analysis.width) setOverrideWidth(analysis.width);
+        if (analysis.height) setOverrideHeight(analysis.height);
+        setOverrideLoras(analysis.loras);
+      }
+    }
+  };
+
   // Find the active job for this project
   const activeJob = useMemo(() => {
     if (!project) return null;
@@ -318,7 +336,7 @@ export function Generate() {
             
             {results.length > 0 && !isGenerating ? (
               <div className="relative w-full h-full flex items-center justify-center group">
-                <img src={results[0]} alt="Generated" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} />
+                <img src={results[0].startsWith('http') ? results[0] : convertFileSrc(results[0])} alt="Generated" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} />
                 
                 <div className="absolute bottom-6 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={() => window.open(results[0], '_blank')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--glass-bg)] backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--glass-bg)] transition-colors shadow-lg border border-[var(--glass-border)]">
@@ -361,7 +379,16 @@ export function Generate() {
         {/* Right Column - Project Params Summary */}
         <div className="w-full md:w-[320px] flex-shrink-0 flex flex-col gap-4">
           <div className="glass-panel p-5 rounded-2xl flex-1 flex flex-col gap-5 overflow-y-auto">
-            <h3 className="text-[13px] font-bold text-[var(--text-primary)] border-b border-[var(--glass-border)] pb-3">项目参数概览</h3>
+            <div className="flex items-center justify-between border-b border-[var(--glass-border)] pb-3">
+              <h3 className="text-[13px] font-bold text-[var(--text-primary)]">项目参数概览</h3>
+              <button 
+                onClick={handleResetToWorkflowDefaults}
+                className="flex items-center gap-1.5 px-2 py-1 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-md text-[10px] text-[var(--text-primary)] transition-colors"
+                title="重新从当前工作流加载默认参数"
+              >
+                <Layers size={10} className="text-yellow-400" /> 同步工作流参数
+              </button>
+            </div>
             
             <div className="space-y-4">
               <div>
@@ -592,7 +619,7 @@ export function Generate() {
         <div className="flex-shrink-0 glass-panel p-3 rounded-2xl border border-[var(--glass-border)] flex gap-3 overflow-x-auto no-scrollbar">
           {results.slice(1).map((res, i) => (
             <div key={i} className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[var(--glass-border)] hover:border-blue-400/50 cursor-pointer transition-colors relative group">
-              <img src={res} alt={`History ${i}`} className={`w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+              <img src={res.startsWith('http') ? res : convertFileSrc(res)} alt={`History ${i}`} className={`w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
             </div>
           ))}
         </div>

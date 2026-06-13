@@ -63,6 +63,7 @@ export interface GeneratedImage {
   output_type: "image" | "video";
   status: "completed" | "failed";
   error_msg: string | null;
+  isSaved: boolean;
   created_at: number;
 }
 
@@ -88,6 +89,7 @@ export type NavId =
   | "characters"
   | "artists"
   | "history"
+  | "vault"
   | "settings";
 
 export type ThemeId = "sakura" | "classic" | "green" | "night" | "cyber";

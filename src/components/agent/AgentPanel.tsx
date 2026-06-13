@@ -11,25 +11,17 @@ import remarkGfm from 'remark-gfm';
 import { HistoryImagePicker } from "../ui/HistoryImagePicker";
 import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
+import { convertFileSrc } from "@tauri-apps/api/core";
+
+const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 type ViewMode = 'chat' | 'history' | 'settings';
 
 function ChatImage({ src }: { src: string }) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
-  useEffect(() => {
-    if (src.startsWith('http') || src.startsWith('data:')) {
-      setDataUrl(src);
-    } else {
-      invoke<string>('read_image_base64', { path: src })
-        .then(setDataUrl)
-        .catch(console.error);
-    }
-  }, [src]);
-
-  if (!dataUrl) return <div className="w-48 h-48 bg-white/5 animate-pulse rounded-lg mt-2" />;
-  return <img src={dataUrl} className={`max-w-xs max-h-64 object-contain rounded-lg border border-[var(--glass-border)] mt-2 transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} alt="chat-attachment" />;
+  return <img src={getImgSrc(src)} className={`max-w-xs max-h-64 object-contain rounded-lg border border-[var(--glass-border)] mt-2 transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} alt="chat-attachment" />;
 }
 
 export function AgentPanel() {
@@ -105,11 +97,16 @@ Use these proactively when creating prompts to ensure tags are valid Danbooru ke
 - Use add_instance_image to add a generated image as reference to a prompt project.
 
 ## GENERATION RULES:
-- ALWAYS call search_workflows first before generating. If no workflows exist, tell user to import one from the Workflows page.
-- NEVER pick a workflow without user's explicit confirmation.
+- When asked to generate an image, simply call the generate_image tool with the prompt_id. DO NOT ask the user which workflow to use. The generate_image tool will automatically use the prompt's default bound workflow.
+- Only if generate_image returns an error stating "No workflows exist", you should tell the user to import a workflow from the Workflows page.
 
-When asked to create/modify/delete prompts → use create_prompt / update_prompt / delete_prompt.
-When asked to set model/LoRA on a project → use update_prompt.`;
+## CONTEXT AWARENESS:
+- You will be provided with [System Context] containing the active prompt ID if the user is viewing one.
+- CRITICAL: If the user describes a change, asks for a modification, or says "Generate X" while an Active Prompt ID is present, YOU MUST use update_prompt_content or update_prompt_settings on THAT active prompt. DO NOT use create_prompt unless the user explicitly says "create a new prompt".
+- Only use create_prompt if no prompt is currently active, or if the user explicitly requests a new one.
+
+When asked to create/modify/delete prompts → use create_prompt / update_prompt_content / update_prompt_settings / delete_prompt.
+When asked to set model/LoRA on a project → use update_prompt_settings.`;
 
       updateSettings({ systemPrompt: defaultSystemPrompt });
       setTempSystemPrompt(defaultSystemPrompt);
@@ -187,7 +184,7 @@ When asked to set model/LoRA on a project → use update_prompt.`;
             <ReactMarkdown 
               remarkPlugins={[remarkGfm]}
               components={{
-                p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                p: ({node, ...props}) => <div className="mb-2 last:mb-0" {...props} />,
                 strong: ({node, ...props}) => <strong className="text-[var(--accent-1)] font-bold" {...props} />,
                 a: ({node, ...props}) => <a className="text-[var(--accent-2)] underline hover:text-[var(--accent-1)] transition-colors" target="_blank" {...props} />,
                 code: ({node, inline, className, children, ...props}: any) => 
@@ -557,7 +554,7 @@ When asked to set model/LoRA on a project → use update_prompt.`;
               <div className="flex gap-2 px-2 pt-2 overflow-x-auto custom-scrollbar">
                 {selectedImages.map((img, i) => (
                   <div key={i} className="relative w-16 h-16 rounded-md overflow-hidden border border-[var(--accent-1)]/30 flex-shrink-0 group">
-                    <img src={img.previewUrl} alt="preview" className={`w-full h-full object-cover transition-all duration-300 ${privacyMode ? 'blur-md group-hover:blur-none' : ''}`} />
+                    <img src={getImgSrc(img.previewUrl)} alt="preview" className={`w-full h-full object-cover transition-all duration-300 ${privacyMode ? 'blur-md group-hover:blur-none' : ''}`} />
                     <button 
                       onClick={() => setSelectedImages(prev => prev.filter((_, idx) => idx !== i))}
                       className="absolute top-0 right-0 p-1 bg-[var(--bg-layer-0)] text-[var(--text-primary)] hover:text-red-400"

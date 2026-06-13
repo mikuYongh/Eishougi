@@ -81,42 +81,42 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           return { jobs: newJobs };
         });
 
-          if (completedJob) {
-            const job = completedJob as QueueJob;
-            // Resolve the waiting addJob Promise
-            const resolver = _jobResolvers.get(job.id);
-            if (resolver) {
-              resolver(job.images || []);
-              _jobResolvers.delete(job.id);
-            }
-            set(state => ({
-            completedNotifications: [
-              {
-                id: "notif_" + Date.now(),
-                jobId: job.id,
-                projectId: job.projectId,
-                projectTitle: job.projectTitle,
-                images: job.images || [],
-                createdAt: Date.now()
-              },
-              ...state.completedNotifications
-            ].slice(0, 5)
-          }));
+        if (completedJob) {
+          const job = completedJob as QueueJob;
+          // Resolve the waiting addJob Promise
+          const resolver = _jobResolvers.get(job.id);
+          if (resolver) {
+            resolver(job.images || []);
+            _jobResolvers.delete(job.id);
+          }
 
           try {
             const project = await invoke('get_prompt', { id: job.projectId }) as any;
+            const localPaths: string[] = [];
+            
             if (project) {
               for (let i = 0; i < images.length; i++) {
                 const url = images[i];
+                let localPath = url;
+                try {
+                  console.log("[Queue] Downloading image from ComfyUI:", url);
+                  localPath = await invoke('download_comfyui_image', { url }) as string;
+                  console.log("[Queue] Downloaded to:", localPath);
+                } catch (dlErr) {
+                  console.error("[Queue] Failed to download image, using remote URL fallback:", dlErr);
+                }
+                localPaths.push(localPath);
+
                 const imageObj = {
                   id: "img_" + Date.now().toString() + "_" + i,
                   promptId: project.id,
                   workflowId: job.workflowId || null,
                   seed: project.seed,
-                  outputPath: url,
+                  outputPath: localPath,
                   outputType: "image",
                   status: "completed",
                   errorMsg: null,
+                  isSaved: false,
                   createdAt: Date.now()
                 };
                 try {
@@ -129,7 +129,26 @@ export const useQueueStore = create<QueueStore>((set, get) => {
               }
               console.log("[Queue] saved history for", job.projectId);
               set(state => ({ historyUpdateTick: state.historyUpdateTick + 1 }));
+            } else {
+              // If project not found, still use raw images
+              localPaths.push(...images);
             }
+
+            // Update notifications with the persistent local paths
+            set(state => ({
+              completedNotifications: [
+                {
+                  id: "notif_" + Date.now(),
+                  jobId: job.id,
+                  projectId: job.projectId,
+                  projectTitle: job.projectTitle,
+                  images: localPaths,
+                  createdAt: Date.now()
+                },
+                ...state.completedNotifications
+              ].slice(0, 5)
+            }));
+
           } catch (e) {
             console.error("[Queue] Failed to save history from queue:", e);
           }

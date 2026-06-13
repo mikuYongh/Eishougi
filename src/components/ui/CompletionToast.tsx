@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { X, ImageIcon, Sparkles } from "lucide-react";
 import { useQueueStore, type CompletionNotification } from "../../stores/queueStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 function ToastItem({ item }: { item: CompletionNotification }) {
   const dismissNotification = useQueueStore((s) => s.dismissNotification);
@@ -30,7 +31,7 @@ function ToastItem({ item }: { item: CompletionNotification }) {
       <div className="flex-shrink-0 relative">
         {item.images?.[0] ? (
           <img
-            src={item.images[0]}
+            src={item.images[0].startsWith('http') ? item.images[0] : convertFileSrc(item.images[0])}
             className={`w-14 h-14 rounded-xl object-cover border-2 border-green-500/30 shadow-md transition-all duration-300 ${privacyMode ? "blur-md hover:blur-none" : ""}`}
           />
         ) : (

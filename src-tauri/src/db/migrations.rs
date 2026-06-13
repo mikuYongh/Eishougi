@@ -8,6 +8,7 @@ pub fn run(conn: &Connection) -> Result<()> {
         (MIGRATION_V2, 2),
         (MIGRATION_V3, 3),
         (MIGRATION_V4, 4),
+        (MIGRATION_V5, 5),
     ];
 
     for (sql, ver) in migrations {
@@ -174,3 +175,9 @@ CREATE INDEX IF NOT EXISTS idx_artists_count ON artists("count" DESC);
 CREATE INDEX IF NOT EXISTS idx_artists_fav ON artists(is_favorite);
 
 "#;
+
+const MIGRATION_V5: &str = r#"
+ALTER TABLE generated_images ADD COLUMN is_saved INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_gen_images_saved ON generated_images(is_saved);
+"#;
+

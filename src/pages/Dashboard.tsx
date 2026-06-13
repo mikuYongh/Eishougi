@@ -6,6 +6,9 @@ import { usePromptStore } from "../stores/promptStore";
 import { useWorkflowStore } from "../stores/workflowStore";
 import { useQueueStore } from "../stores/queueStore";
 import { useSettingsStore } from "../stores/settingsStore";
+import { convertFileSrc } from "@tauri-apps/api/core";
+
+const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -166,7 +169,7 @@ export function Dashboard() {
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   {p.coverImage ? (
-                    <img src={p.coverImage} className={`w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-[var(--glass-border)] transition-all duration-300 ${privacyMode ? 'blur-md hover:blur-none' : ''}`} />
+                    <img src={getImgSrc(p.coverImage)} className={`w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-[var(--glass-border)] transition-all duration-300 ${privacyMode ? 'blur-md hover:blur-none' : ''}`} />
                   ) : (
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center border bg-[var(--accent-2)]/10 text-blue-400 border-[var(--accent-2)]/20 flex-shrink-0">
                       <FileText size={14} />
@@ -233,7 +236,7 @@ export function Dashboard() {
                     {job.images?.[0] && (
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 pointer-events-none translate-y-2 group-hover:translate-y-0">
                         <div className="bg-[var(--bg-layer-1)] backdrop-blur-2xl border border-green-500/40 p-2 rounded-2xl shadow-[0_8px_30px_rgba(34,197,94,0.3)]">
-                          <img src={job.images[0]} className={`w-full aspect-square rounded-xl object-cover ${privacyMode ? 'blur-md' : ''}`} alt="preview" />
+                          <img src={getImgSrc(job.images[0])} className={`w-full aspect-square rounded-xl object-cover ${privacyMode ? 'blur-md' : ''}`} alt="preview" />
                           <div className="text-[10px] text-center mt-2 text-green-400 font-bold mb-1">点击查看大图</div>
                         </div>
                         {/* Tooltip Arrow */}
@@ -267,7 +270,7 @@ export function Dashboard() {
                 className="aspect-square rounded-xl overflow-hidden border border-[var(--glass-border)] hover:border-green-400/50 cursor-pointer group relative transition-all"
                 onClick={() => navigate('/history')}
               >
-                <img src={img.outputPath} className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                <img src={getImgSrc(img.outputPath)} className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                 <div className="absolute inset-0 bg-[var(--bg-layer-1)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <ImageIcon size={20} className="text-[var(--text-primary)]" />
                 </div>

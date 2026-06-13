@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
 import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database } from "lucide-react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { GlassDropdown } from "../components/ui/GlassDropdown";
 
@@ -27,6 +28,26 @@ export function Settings() {
   const [localWallpaper, setLocalWallpaper] = useState(wallpaperPath);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [ollamaModels, setOllamaModels] = useState<{label: string, value: string}[]>([]);
+
+  useEffect(() => {
+    if (settings.llm.provider === 'ollama') {
+      const fetchOllamaModels = async () => {
+        try {
+          const res = await fetch('http://127.0.0.1:11434/api/tags');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.models) {
+              setOllamaModels(data.models.map((m: any) => ({ label: m.name, value: m.name })));
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch Ollama models:", e);
+        }
+      };
+      fetchOllamaModels();
+    }
+  }, [settings.llm.provider]);
 
   useEffect(() => {
     setLocalWallpaper(wallpaperPath);
@@ -54,11 +75,17 @@ export function Settings() {
   };
 
   const handleExport = async () => {
-    setExportStatus("正在打包数据...");
+    setExportStatus("正在准备打包...");
+    let unlisten: any = null;
     try {
+      unlisten = await listen<any>('export-progress', (event) => {
+        setExportStatus(event.payload.message);
+      });
+
       // 1. Get zip bytes from Rust (contains DB data + bundled images)
       const zipBytes: number[] = await invoke('export_all_data');
 
+      setExportStatus("请选择保存位置...");
       // 2. Show save dialog
       const filePath = await save({
         defaultPath: `eishougi-backup-${new Date().toISOString().slice(0, 10)}.eishougi`,
@@ -67,9 +94,11 @@ export function Settings() {
 
       if (!filePath) {
         setExportStatus(null);
+        if (unlisten) unlisten();
         return;
       }
 
+      setExportStatus("正在写入文件...");
       // 3. Write zip file
       await invoke('write_bytes_to_file', { path: filePath, data: zipBytes });
 
@@ -90,6 +119,8 @@ export function Settings() {
     } catch (err: any) {
       console.error("Export failed:", err);
       setExportStatus(`导出失败: ${err}`);
+    } finally {
+      if (unlisten) unlisten();
     }
   };
 
@@ -430,9 +461,26 @@ export function Settings() {
                       <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">服务商 (Provider)</label>
                       <GlassDropdown
                         value={settings.llm.provider}
-                        onChange={(val) => updateSettings({
-                          llm: { ...settings.llm, provider: val as any }
-                        })}
+                        onChange={(val) => {
+                          const provider = val as any;
+                          const updates: any = { provider };
+                          if (provider === 'ollama') {
+                            updates.apiUrl = 'http://127.0.0.1:11434/v1';
+                            updates.model = 'qwen2.5:7b';
+                          } else if (provider === 'agnes') {
+                            updates.apiUrl = 'https://apihub.agnes-ai.com/v1';
+                            updates.model = 'agnes-2.0-flash';
+                          } else if (provider === 'openai') {
+                            updates.apiUrl = 'https://api.openai.com/v1';
+                            updates.model = 'gpt-4o';
+                          } else if (provider === 'anthropic') {
+                            updates.apiUrl = 'https://api.anthropic.com/v1';
+                            updates.model = 'claude-3-5-sonnet-20240620';
+                          }
+                          updateSettings({
+                            llm: { ...settings.llm, ...updates }
+                          });
+                        }}
                         options={[
                           { label: "Agnes AI", value: "agnes" },
                           { label: "OpenAI Compatible", value: "openai" },
@@ -445,15 +493,26 @@ export function Settings() {
 
                     <div>
                       <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">模型名称 (Model)</label>
-                      <input
-                        type="text"
-                        value={settings.llm.model}
-                        onChange={(e) => updateSettings({
-                          llm: { ...settings.llm, model: e.target.value }
-                        })}
-                        className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
-                        placeholder="e.g. agnes-2.0-flash, gpt-4o, etc."
-                      />
+                      {settings.llm.provider === 'ollama' && ollamaModels.length > 0 ? (
+                        <GlassDropdown
+                          value={settings.llm.model}
+                          onChange={(val) => updateSettings({
+                            llm: { ...settings.llm, model: val }
+                          })}
+                          options={ollamaModels}
+                          accentColor="pink"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={settings.llm.model}
+                          onChange={(e) => updateSettings({
+                            llm: { ...settings.llm, model: e.target.value }
+                          })}
+                          className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                          placeholder={settings.llm.provider === 'ollama' ? "e.g. qwen2.5:7b (Fetching local models...)" : "e.g. agnes-2.0-flash, gpt-4o, etc."}
+                        />
+                      )}
                     </div>
                   </div>
 

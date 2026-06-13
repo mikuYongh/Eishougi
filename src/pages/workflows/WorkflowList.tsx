@@ -2,6 +2,10 @@ import { Plus, Search, Edit3, Trash2, Cpu, Video, Settings, Play, Star, Zap } fr
 import { useWorkflowStore, type WorkflowType } from "../../stores/workflowStore";
 import { useNavigate } from "react-router-dom";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { convertFileSrc } from "@tauri-apps/api/core";
+
+const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 const TypeBadge = ({ type }: { type: WorkflowType }) => {
   switch (type) {
@@ -80,7 +84,7 @@ export function WorkflowList() {
                 {wf.thumbnail ? (
                   <>
                     <div className="absolute inset-0 bg-[var(--bg-layer-1)] group-hover:bg-transparent transition-colors z-10" />
-                    <img src={wf.thumbnail} alt={wf.name} className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                    <img src={getImgSrc(wf.thumbnail)} alt={wf.name} className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                   </>
                 ) : (
                   <Cpu size={32} className="text-white/10 group-hover:scale-110 group-hover:text-yellow-400/30 transition-all" />

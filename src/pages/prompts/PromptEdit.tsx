@@ -4,11 +4,17 @@ import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, C
 import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
 import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useWorkflowStore } from "../../stores/workflowStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import { invoke } from "@tauri-apps/api/core";
 import { HistoryImagePicker } from "../../components/ui/HistoryImagePicker";
+import { convertFileSrc } from "@tauri-apps/api/core";
+
+const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
+import { ArtistSelector } from "../../components/prompt/ArtistSelector";
 
 export function PromptEdit() {
   const { id } = useParams();
@@ -22,6 +28,8 @@ export function PromptEdit() {
     fetchModels();
   }, [fetchModels]);
   
+  const workflows = useWorkflowStore(state => state.workflows);
+
   const [project, setProject] = useState<Partial<PromptProject>>({
     title: "", description: "", coverImage: "", positivePrompt: "", negativePrompt: "", artistPrompt: "",
     width: 896, height: 1088, steps: 20, cfgScale: 5.0, seed: "-1",
@@ -37,8 +45,14 @@ export function PromptEdit() {
     if (id && id !== 'new') {
       const p = prompts.find(p => p.id === id);
       if (p) setProject(p);
+    } else if (id === 'new') {
+      // Set default workflow for new prompts
+      const defaultWorkflow = workflows.find(w => w.isDefault);
+      if (defaultWorkflow) {
+        setProject(prev => ({ ...prev, workflowId: defaultWorkflow.id }));
+      }
     }
-  }, [id, prompts]);
+  }, [id, prompts, workflows]);
 
   // Extract all unique tags
   const allTags = Array.from(new Set(prompts.flatMap(p => p.tags)));
@@ -225,38 +239,17 @@ export function PromptEdit() {
 
           <div className="flex flex-col gap-4 flex-1">
             <PromptTagEditor
-              label="正向提示词"
+              label="正向提示词 (Positive)"
               value={project.positivePrompt || ""}
               onChange={v => updateField('positivePrompt', v)}
               type="positive"
             />
             <PromptTagEditor
-              label="负向提示词"
+              label="负向提示词 (Negative)"
               value={project.negativePrompt || ""}
               onChange={v => updateField('negativePrompt', v)}
               type="negative"
             />
-          </div>
-
-          <div className="glass-panel p-5 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">迭代步数 (Steps)</label>
-              <div className="flex items-center gap-3">
-                <input type="range" min="1" max="150" value={project.steps} onChange={e => updateField('steps', parseInt(e.target.value))} className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-blue-400" />
-                <span className="text-[13px] font-mono font-bold text-[var(--text-primary)] w-8 text-right">{project.steps}</span>
-              </div>
-            </div>
-            <div>
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">提示词引导 (CFG)</label>
-              <div className="flex items-center gap-3">
-                <input type="range" min="1" max="30" step="0.5" value={project.cfgScale} onChange={e => updateField('cfgScale', parseFloat(e.target.value))} className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-blue-400" />
-                <span className="text-[13px] font-mono font-bold text-[var(--text-primary)] w-8 text-right">{project.cfgScale}</span>
-              </div>
-            </div>
-            <div>
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">随机种子 (Seed)</label>
-              <input type="text" value={project.seed} onChange={e => updateField('seed', e.target.value)} className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-lg px-3 py-1.5 text-[var(--text-primary)] text-xs font-mono outline-none focus:border-[var(--accent-2)]/50" />
-            </div>
           </div>
 
         </div>
@@ -264,6 +257,68 @@ export function PromptEdit() {
         {/* Right Column - Model & Config */}
         <div className="w-full md:w-[380px] flex-shrink-0 flex flex-col gap-5">
           
+          {/* Generation Settings */}
+          <div className="glass-panel p-5">
+            <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+              <Cpu size={16} className="text-[var(--accent-1)]" /> 生成参数配置
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">采样器 (Sampler)</label>
+                <GlassDropdown 
+                  value={project.samplerName || "euler"}
+                  onChange={v => updateField('samplerName', v)}
+                  options={[
+                    { label: "euler", value: "euler" },
+                    { label: "euler_ancestral", value: "euler_ancestral" },
+                    { label: "heun", value: "heun" },
+                    { label: "dpm_2", value: "dpm_2" },
+                    { label: "dpm_2_ancestral", value: "dpm_2_ancestral" },
+                    { label: "dpmpp_2s_ancestral", value: "dpmpp_2s_ancestral" },
+                    { label: "dpmpp_2m", value: "dpmpp_2m" },
+                    { label: "dpmpp_2m_sde", value: "dpmpp_2m_sde" },
+                    { label: "dpmpp_sde", value: "dpmpp_sde" },
+                    { label: "dpmpp_3m_sde", value: "dpmpp_3m_sde" },
+                  ]}
+                />
+              </div>
+              
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">调度器 (Scheduler)</label>
+                <GlassDropdown 
+                  value={project.scheduler || "beta57"}
+                  onChange={v => updateField('scheduler', v)}
+                  options={[
+                    { label: "normal", value: "normal" },
+                    { label: "karras", value: "karras" },
+                    { label: "exponential", value: "exponential" },
+                    { label: "sgm_uniform", value: "sgm_uniform" },
+                    { label: "simple", value: "simple" },
+                    { label: "ddim_uniform", value: "ddim_uniform" },
+                    { label: "beta", value: "beta" },
+                    { label: "beta57", value: "beta57" },
+                  ]}
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">采样步数 (Steps)</label>
+                <input 
+                  type="number" value={project.steps || 20} onChange={e => updateField('steps', Number(e.target.value))}
+                  className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">CFG Scale</label>
+                <input 
+                  type="number" step="0.1" value={project.cfgScale || 5.0} onChange={e => updateField('cfgScale', Number(e.target.value))}
+                  className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Cover Image Uploader */}
           <div className="glass-panel p-5">
             <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
@@ -275,7 +330,7 @@ export function PromptEdit() {
             >
               {project.coverImage ? (
                 <div className="absolute inset-0 z-0 group-hover/cover:bg-[var(--bg-layer-2)] transition-colors flex items-center justify-center cursor-pointer">
-                  <img src={project.coverImage} alt="Cover" className={`w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                  <img src={getImgSrc(project.coverImage)} alt="Cover" className={`w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                   <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover/cover:opacity-100 transition-opacity">
                     <span className="bg-[var(--glass-bg)] backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--text-primary)]">点击更换图片</span>
                   </div>
@@ -317,7 +372,7 @@ export function PromptEdit() {
             <div className="flex flex-wrap gap-3">
               {project.instanceImages?.map((img, i) => (
                 <div key={i} className="w-16 h-16 rounded-xl overflow-hidden border border-[var(--glass-border)] relative group">
-                  <img src={img} className={`w-full h-full object-cover transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} alt="instance" />
+                  <img src={getImgSrc(img)} className={`w-full h-full object-cover transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} alt="instance" />
                   <button 
                     onClick={() => updateField('instanceImages', project.instanceImages!.filter((_, idx) => idx !== i))} 
                     className="absolute top-0 right-0 bg-red-500/80 text-[var(--text-primary)] p-0.5 rounded-bl-lg hover:bg-red-500 transition-colors cursor-pointer"
@@ -334,106 +389,12 @@ export function PromptEdit() {
             </div>
           </div>
 
-          <div className="glass-panel p-5">
-            <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-              <ImageIcon size={16} className="text-blue-400" /> 分辨率与画幅
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { w: 1024, h: 1024, label: "1:1 方形" },
-                { w: 1024, h: 576, label: "16:9 横屏" },
-                { w: 576, h: 1024, label: "9:16 竖屏" },
-                { w: 832, h: 1216, label: "动漫竖版" }
-              ].map((res, i) => (
-                <button 
-                  key={i}
-                  onClick={() => { updateField('width', res.w); updateField('height', res.h); }}
-                  className={`py-2 px-3 rounded-xl flex flex-col items-center gap-1 border transition-colors cursor-pointer ${project.width === res.w && project.height === res.h ? 'bg-[var(--accent-2)]/20 border-[var(--accent-2)]/50 text-blue-400' : 'bg-[var(--bg-layer-1)] border-[var(--glass-border)] text-[var(--text-muted)] hover:bg-white/5'}`}
-                >
-                  <span className="text-[11px] font-bold">{res.label}</span>
-                  <span className="text-[10px] font-mono opacity-60">{res.w} x {res.h}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="glass-panel p-5 relative z-40">
-            <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-              <Cpu size={16} className="text-[var(--accent-2)]" /> 基础模型
-            </h3>
-            <div className="space-y-4">
-              <div className="relative z-40">
-                <label className="text-[10px] text-[var(--text-muted)] mb-1.5 block uppercase tracking-wider font-bold">Checkpoint</label>
-                <SearchableDropdown 
-                  value={project.baseModel || ""}
-                  onChange={v => updateField('baseModel', v)}
-                  options={checkpoints.map(c => ({ label: c, value: c }))}
-                  accentColor="purple"
-                  placeholder="选择基础模型..."
-                  searchPlaceholder="搜索模型文件..."
-                />
-              </div>
-              <div className="relative z-20">
-                <label className="text-[10px] text-[var(--text-muted)] mb-1.5 block uppercase tracking-wider font-bold">VAE</label>
-                <GlassDropdown 
-                  value={project.vaeModel || ""}
-                  onChange={v => updateField('vaeModel', v)}
-                  options={[
-                    { label: "Automatic (自动)", value: "auto" },
-                    { label: "sdxl_vae.safetensors", value: "sdxl_vae" }
-                  ]}
-                  accentColor="purple"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-panel p-5 flex-1 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2">
-                <Layers size={16} className="text-orange-400" /> LoRA 列表
-              </h3>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-              {project.loraConfigs?.map((lora, i) => (
-                <div key={i} className="p-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-bold text-[var(--text-primary)] truncate pr-2">{lora.name}</span>
-                    <button 
-                      onClick={() => {
-                        const newLoras = [...(project.loraConfigs || [])];
-                        newLoras.splice(i, 1);
-                        updateField('loraConfigs', newLoras);
-                      }}
-                      className="text-red-400/50 hover:text-red-400 cursor-pointer transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <input type="range" min="0" max="2" step="0.05" value={lora.strength} onChange={e => updateLora(i, { strength: parseFloat(e.target.value) })} className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-orange-400" />
-                    <span className="text-[11px] font-mono font-bold text-orange-400 w-8 text-right">{lora.strength.toFixed(2)}</span>
-                  </div>
-                </div>
-              ))}
-              {(!project.loraConfigs || project.loraConfigs.length === 0) && (
-                <div className="h-24 flex items-center justify-center text-[11px] text-[var(--text-muted)] font-bold uppercase tracking-widest border border-dashed border-[var(--glass-border)] rounded-xl">
-                  暂未添加 LoRA
-                </div>
-              )}
-              
-              <div className="mt-4 relative z-30">
-                <SearchableDropdown
-                  value=""
-                  placeholder="➕ 搜索并添加 LoRA..."
-                  searchPlaceholder="输入 LoRA 名称进行搜索..."
-                  options={loras.map(l => ({ label: l, value: l }))}
-                  onChange={addLora}
-                  accentColor="orange"
-                />
-              </div>
-            </div>
+          {/* Artist / Style Selector */}
+          <div className="flex-1 min-h-[300px]">
+            <ArtistSelector 
+              selectedTriggers={project.artistPrompt || ""}
+              onChange={v => updateField('artistPrompt', v)}
+            />
           </div>
 
         </div>

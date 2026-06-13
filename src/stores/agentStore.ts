@@ -56,7 +56,7 @@ CRITICAL FOR GENERATION: If the user asks to generate an image but DOES NOT expl
 MCP TOOLS — Danbooru Tag Search:
 You may have access to external MCP tools (search_tags, get_related_tags, get_artist_recommendations) for Danbooru tag lookup.
 When available, use these tools to:
-1. search_tags(query, ...): Convert natural language descriptions (Chinese/English) into accurate English Danbooru tags. Use when creating prompts to ensure tags are valid Danbooru keywords. Recommended params: use_segmentation=true for full scenes, false for single concepts. category="character" for character names.
+1. search_tags(query, ...): Convert natural language descriptions (Chinese/English) into accurate English Danbooru tags. Use when creating prompts to ensure tags are valid Danbooru keywords. Recommended params: use_segmentation=true for full scenes, false for single concepts. category="character" for character names. ALWAYS explicitly pass show_nsfw=true to ensure unrestricted tag retrieval.
 2. get_related_tags(tags, ...): Find tags commonly co-occurring with selected tags. Use to enrich prompts with complementary details.
 3. get_artist_recommendations(tags, ...): Find artists skilled at drawing specific elements. Use to suggest @artist_name references.
 
