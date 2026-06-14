@@ -11,6 +11,7 @@ export interface AgentSession {
 
 export interface AgentSettings {
   systemPrompt: string;
+  reasoningEffort: 'low' | 'medium' | 'high';
 }
 
 interface AgentStore {
@@ -47,6 +48,7 @@ CRITICAL RULES FOR PROMPT GENERATION (create_prompt / update_prompt):
 3. NO CHAOTIC/EXTREME CONTENT: Unless explicitly requested, keep the scene coherent and aesthetic. Avoid adding extreme explicit/hardcore tags if a simple "teasing" or "intimate" atmosphere is requested.
 4. USE MCP TOOLS: If search_tags is available, use it FIRST to convert the scene description into accurate Danbooru English tags. If unavailable, use your own Danbooru knowledge.
 5. NEGATIVE PROMPT: Auto-generate suitable negative_prompt keywords tailored to the specific scene.
+6. DO NOT INVENT CHARACTER TRAITS: If the user specifies a known character (e.g., Hatsune Miku, Hiiragi Kagami), DO NOT add tags for their hair color, eye color, or hairstyle unless the user EXPLICITLY asks to change them. The image model already knows what the character looks like. Guessing incorrect traits (e.g., "black hair" for a character with purple hair) will ruin the character generation. Just use the character's name tag and focus on their outfit, action, and scene.
 
 When asked to create a prompt, use the create_prompt tool.
 When asked to modify or delete a prompt, use the update_prompt or delete_prompt tools.
@@ -69,10 +71,12 @@ When available, use these tools to:
 3. get_artist_recommendations(tags, ...): Find artists skilled at drawing specific elements. Use to suggest @artist_name references.
 
 When creating or updating prompts:
-- ALWAYS use search_tags first to convert scene descriptions into accurate Danbooru tags
-- Use get_related_tags to supplement prompts with commonly associated tags
-- The returned tags can be directly used in positive_prompt as comma-separated keywords
-- IMPORTANT: If MCP tools are unavailable (connection failed), fall back to your own knowledge of Danbooru tags
+- FOR CREATION: ALWAYS use search_tags first to convert scene descriptions into accurate Danbooru tags.
+- FOR MODIFICATION (update_prompt): 
+    - If modifying basic elements (like 1girl, full_body, smile, simple_background), you can directly update the prompt WITHOUT searching.
+    - If adding complex concepts, obscure clothing, specific artistic styles (like lineart, ink, specific artists), or rare actions, you MUST use search_tags first to ensure you use standard Danbooru tags (e.g., do not invent tags like "simple_lines").
+- The returned tags can be directly used in positive_prompt as comma-separated keywords.
+- IMPORTANT: If MCP tools are unavailable (connection failed), fall back to your own knowledge of Danbooru tags.
 
 CRITICAL - GENERATION: When using generate_image, the tool WAITS for image generation to complete and returns image URLs directly. Do NOT call get_queue_status after generate_image — the results are already in the response. Only use get_queue_status to check the queue state independently.
 
@@ -89,6 +93,7 @@ export const useAgentStore = create<AgentStore>()(
       activeSessionId: null,
       settings: {
         systemPrompt: defaultSystemPrompt,
+        reasoningEffort: 'medium',
       },
       isMobileAgentOpen: false,
       isGenerating: false,
@@ -220,10 +225,10 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: 'prompt-muse-agent',
-      version: 1,
+      version: 3,
       migrate: (persistedState: any, version: number) => {
-        if (version === 0) {
-          // Reset systemPrompt to apply the new anti-spam rules
+        if (version === 0 || version === 1 || version === 2) {
+          // Reset systemPrompt to apply the new character trait rules
           if (persistedState.settings) {
             persistedState.settings.systemPrompt = defaultSystemPrompt;
           }

@@ -49,7 +49,7 @@ export function TitleBar() {
       }}
     >
       <div className="flex items-center gap-2.5 flex-1">
-        <Sparkles size={14} className="text-[var(--accent-1)]" />
+        <img src="/icon.png" alt="Logo" className="w-4 h-4 object-contain" />
         <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-[var(--text-secondary)]">
           詠唱机 EISHOUGI
         </span>

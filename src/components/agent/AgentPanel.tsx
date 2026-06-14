@@ -37,6 +37,7 @@ export function AgentPanel() {
   const { sessions, activeSessionId, createSession, switchSession, deleteSession, settings, updateSettings } = useAgentStore();
   
   const [tempSystemPrompt, setTempSystemPrompt] = useState(settings.systemPrompt);
+  const [tempReasoningEffort, setTempReasoningEffort] = useState(settings.reasoningEffort || 'medium');
   const mcp = useSettingsStore.getState().settings.mcpServers || [];
   const [tempMcpServers, setTempMcpServers] = useState<McpServerConfig[]>(() => 
     JSON.parse(JSON.stringify(mcp))
@@ -156,8 +157,9 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
   };
 
   const handleSaveSettings = () => {
-    updateSettings({ systemPrompt: tempSystemPrompt });
-    useSettingsStore.getState().updateSettings({ mcpServers: tempMcpServers });
+    updateSettings({ systemPrompt: tempSystemPrompt, reasoningEffort: tempReasoningEffort });
+    const curSettings = useSettingsStore.getState().settings;
+    useSettingsStore.getState().updateSettings({ ...curSettings, mcpServers: tempMcpServers });
     setViewMode('chat');
   };
 
@@ -396,7 +398,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                       <h4 className="font-bold text-[14px] text-[var(--text-primary)] line-clamp-1 flex-1 group-hover:text-[var(--accent-1)] transition-colors">{session.title}</h4>
                       <button 
                         onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
-                        className="p-1 rounded bg-[var(--bg-layer-0)] text-[var(--text-muted)] hover:text-red-400 hover:bg-red-400/20 transition-all opacity-0 group-hover:opacity-100"
+                        className="p-1 rounded bg-[var(--bg-layer-0)] text-[var(--text-muted)] hover:text-red-400 hover:bg-red-400/20 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -422,12 +424,33 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                 </button>
                 <h3 className="font-bold text-[var(--text-primary)] tracking-wide">核心控制面板</h3>
               </div>
-              <button 
-                onClick={handleSaveSettings}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--accent-1)]/20 text-[var(--accent-1)] hover:bg-[var(--accent-1)]/30 transition-colors text-sm cursor-pointer"
-              >
-                <Save size={14} /> 保存
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={async () => {
+                    try {
+                      const debugData = { activeSessionId, settings, messages };
+                      await navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
+                      const btn = document.getElementById('debug-copy-btn');
+                      if (btn) {
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = '已复制!';
+                        setTimeout(() => btn.innerHTML = originalText, 2000);
+                      }
+                    } catch (e) {}
+                  }}
+                  id="debug-copy-btn"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-layer-0)] border border-[var(--glass-border)] text-[var(--text-muted)] hover:text-white hover:bg-white/10 transition-colors text-sm cursor-pointer"
+                  title="复制当前会话完整信息用于DEBUG"
+                >
+                  <History size={14} /> 复制调试信息
+                </button>
+                <button 
+                  onClick={handleSaveSettings}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--accent-1)]/20 text-[var(--accent-1)] hover:bg-[var(--accent-1)]/30 transition-colors text-sm cursor-pointer"
+                >
+                  <Save size={14} /> 保存
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
               <div className="space-y-6">
@@ -442,6 +465,31 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                     className="w-full h-48 bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-1)]/50 focus:shadow-[0_0_20px_rgba(var(--accent-1-rgb), 15)] outline-none resize-none font-mono leading-relaxed custom-scrollbar"
                     placeholder="输入系统提示词..."
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-[var(--text-primary)] mb-2 flex items-center gap-2">
+                    <Zap size={14} className="text-yellow-400" />
+                    思考深度 (Reasoning Effort)
+                  </label>
+                  <p className="text-xs text-[var(--text-muted)] mb-3 leading-relaxed">
+                    调整支持此参数的模型（如 o1, o3, DeepSeek-R1）的推理深度。较深推理可获得更好的提示词结构，但生成更慢。
+                  </p>
+                  <div className="flex bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-1 gap-1">
+                    {(['low', 'medium', 'high'] as const).map(effort => (
+                      <button
+                        key={effort}
+                        onClick={() => setTempReasoningEffort(effort)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                          tempReasoningEffort === effort
+                            ? 'bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]'
+                            : 'text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)]'
+                        }`}
+                      >
+                        {effort.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-[var(--accent-2)]/20 border border-[var(--accent-2)]/20 relative overflow-hidden">

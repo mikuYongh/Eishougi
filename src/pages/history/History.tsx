@@ -211,7 +211,7 @@ export function History() {
                   {/* Hover Actions (Desktop Only) */}
                     <div className="absolute inset-0 bg-[var(--glass-bg)] opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center gap-3">
                       <button 
-                        onClick={() => setPreviewImage(img)}
+                        onClick={(e) => { e.stopPropagation(); setPreviewImage(img); }}
                         className="w-10 h-10 rounded-full bg-green-500/80 text-[var(--text-primary)] flex items-center justify-center hover:scale-110 transition-transform shadow-lg cursor-pointer"
                         title="全屏查看"
                       >
@@ -219,21 +219,21 @@ export function History() {
                       </button>
                       <div className="flex gap-2">
                         <button 
-                          onClick={() => handleToggleSave(img)}
+                          onClick={(e) => { e.stopPropagation(); handleToggleSave(img); }}
                           className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer ${img.isSaved ? 'bg-[var(--accent-1)] text-white hover:bg-[var(--accent-1)]/80' : 'bg-white/20 text-[var(--text-primary)] hover:bg-white/40'}`}
                           title={img.isSaved ? "取消收藏" : "收藏到典藏库"}
                         >
                           <Sparkles size={14} className={img.isSaved ? 'fill-white' : ''} />
                         </button>
                         <button 
-                          onClick={() => setAddingToPrompt(img)}
+                          onClick={(e) => { e.stopPropagation(); setAddingToPrompt(img); }}
                           className="w-8 h-8 rounded-full bg-[var(--accent-1)]/80 text-[var(--text-primary)] flex items-center justify-center hover:bg-[var(--accent-1)] transition-colors cursor-pointer"
                           title="添加为示范图"
                         >
                           <BookmarkPlus size={14} />
                         </button>
                         <button 
-                          onClick={() => handleDelete(img.id)}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }}
                           className="w-8 h-8 rounded-full bg-red-500/80 text-[var(--text-primary)] flex items-center justify-center hover:bg-red-500 transition-colors cursor-pointer"
                           title="删除"
                         >
@@ -251,13 +251,16 @@ export function History() {
                       </span>
                       {/* Mobile Actions */}
                       <div className="flex md:hidden items-center gap-1.5 flex-shrink-0">
-                        <button onClick={() => setPreviewImage(img)} className="w-6 h-6 rounded-full bg-[var(--accent-1)]/20 text-[var(--accent-1)] flex items-center justify-center">
+                        <button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); }} className="w-6 h-6 rounded-full bg-[var(--accent-1)]/20 text-[var(--accent-1)] flex items-center justify-center">
                           <Maximize2 size={12} />
                         </button>
-                        <button onClick={() => handleToggleSave(img)} className={`w-6 h-6 rounded-full flex items-center justify-center ${img.isSaved ? 'bg-[var(--accent-1)] text-white' : 'bg-white/10 text-[var(--text-muted)]'}`}>
+                        <button onClick={(e) => { e.stopPropagation(); downloadImage(img.url, `history_${img.id}.png`); }} className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                          <Download size={12} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); handleToggleSave(img); }} className={`w-6 h-6 rounded-full flex items-center justify-center ${img.isSaved ? 'bg-[var(--accent-1)] text-white' : 'bg-white/10 text-[var(--text-muted)]'}`}>
                           <Sparkles size={12} className={img.isSaved ? 'fill-white' : ''} />
                         </button>
-                        <button onClick={() => handleDelete(img.id)} className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }} className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
                           <Trash2 size={12} />
                         </button>
                       </div>
@@ -391,7 +394,7 @@ export function History() {
             </div>
 
             <div className="flex gap-3 p-4 border-b border-[var(--glass-border)] flex-shrink-0">
-              <img src={addingToPrompt.url} className="w-20 h-20 object-cover rounded-lg border border-[var(--glass-border)]" />
+              <img src={addingToPrompt.url.startsWith('http') ? addingToPrompt.url : convertFileSrc(addingToPrompt.url)} className="w-20 h-20 object-cover rounded-lg border border-[var(--glass-border)]" />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-[var(--accent-1)] font-bold mb-1">{addingToPrompt.promptTitle}</p>
                 <p className="text-[10px] text-[var(--text-muted)] font-mono line-clamp-3 leading-relaxed">{addingToPrompt.prompt}</p>
@@ -409,7 +412,7 @@ export function History() {
                       : 'bg-white/5 border-[var(--glass-border)] hover:bg-[var(--accent-1)]/10 hover:border-[var(--accent-1)]/30'
                   }`}
                 >
-                  {p.coverImage && <img src={p.coverImage} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
+                  {p.coverImage && <img src={p.coverImage.startsWith('http') ? p.coverImage : convertFileSrc(p.coverImage)} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
                   {!p.coverImage && <div className="w-10 h-10 rounded-lg bg-[var(--accent-1)]/20 flex items-center justify-center flex-shrink-0 text-[var(--accent-1)]"><FileText size={18} /></div>}
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-bold text-[var(--text-primary)] truncate">{p.title}</p>

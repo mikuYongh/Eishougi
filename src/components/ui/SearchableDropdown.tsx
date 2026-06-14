@@ -13,6 +13,9 @@ interface SearchableDropdownProps {
   accentColor?: "blue" | "purple" | "orange";
   placeholder?: string;
   searchPlaceholder?: string;
+  triggerClassName?: string;
+  dropdownClassName?: string;
+  containerClassName?: string;
 }
 
 export function SearchableDropdown({ 
@@ -21,7 +24,10 @@ export function SearchableDropdown({
   options, 
   accentColor = "blue",
   placeholder = "请选择...",
-  searchPlaceholder = "搜索选项..."
+  searchPlaceholder = "搜索选项...",
+  triggerClassName = "",
+  dropdownClassName = "",
+  containerClassName = "",
 }: SearchableDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -79,11 +85,15 @@ export function SearchableDropdown({
   }, [isOpen]);
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className={`relative ${containerClassName}`} ref={containerRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--glass-bg)] border transition-all cursor-pointer ${isOpen ? theme.border + ' ' + theme.shadow : 'border-[var(--glass-border)] hover:border-[var(--glass-border-active)]'}`}
+        className={`flex items-center justify-between transition-all cursor-pointer ${
+          triggerClassName 
+            ? `${triggerClassName} ${isOpen ? 'ring-2 ring-[var(--accent-2)]/50' : ''}`
+            : `w-full px-3 py-2 rounded-lg bg-[var(--glass-bg)] border ${isOpen ? theme.border + ' ' + theme.shadow : 'border-[var(--glass-border)] hover:border-[var(--glass-border-active)]'}`
+        }`}
       >
         <span className={`text-[12px] truncate ${selectedOption ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
           {selectedOption ? selectedOption.label : placeholder}
@@ -92,7 +102,7 @@ export function SearchableDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-2 bg-[#1A1625]/95 backdrop-blur-xl border border-[var(--glass-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className={`absolute z-50 mt-2 bg-[#1A1625]/95 backdrop-blur-xl border border-[var(--glass-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in slide-in-from-top-2 duration-200 ${dropdownClassName || 'w-full left-0'}`}>
           
           <div className="p-2 border-b border-[var(--glass-border)] flex-shrink-0">
             <div className="relative flex items-center">

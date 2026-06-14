@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import { Sparkles, HeartOff, Video, Download } from "lucide-react";
+import { Sparkles, HeartOff, Video, Download, X, Maximize2 } from "lucide-react";
 import { useSettingsStore } from "../../stores/settingsStore";
 import type { GeneratedImage } from "../../types";
 import { downloadImage } from "../../utils/download";
@@ -11,6 +11,7 @@ export function Vault() {
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [loading, setLoading] = useState(true);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
+  const [previewImage, setPreviewImage] = useState<GeneratedImage | null>(null);
 
   const [allImages, setAllImages] = useState<GeneratedImage[]>([]);
   const [limit, setLimit] = useState(50);
@@ -74,7 +75,7 @@ export function Vault() {
             {images.map(img => {
               const video = isVideo(img.output_path || (img as any).outputPath || '');
               return (
-                <div key={img.id} className="break-inside-avoid relative group rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-[var(--glass-bg)] hover:shadow-[0_8px_30px_rgba(var(--accent-1-rgb),0.15)] hover:border-[var(--accent-1)]/50 transition-all duration-300">
+                <div key={img.id} onClick={() => setPreviewImage(img)} className="break-inside-avoid relative group rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-[var(--glass-bg)] hover:shadow-[0_8px_30px_rgba(var(--accent-1-rgb),0.15)] hover:border-[var(--accent-1)]/50 transition-all duration-300 cursor-pointer">
                   {video ? (
                     <div className="relative">
                       <video 
@@ -100,14 +101,14 @@ export function Vault() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden md:flex flex-col justify-between p-3 z-20 pointer-events-none">
                     <div className="flex justify-end gap-2 pointer-events-auto">
                       <button 
-                        onClick={() => downloadImage(img.output_path || (img as any).outputPath, `vault_${img.id}.png`)}
+                        onClick={(e) => { e.stopPropagation(); downloadImage(img.output_path || (img as any).outputPath, `vault_${img.id}.png`); }}
                         className="w-8 h-8 rounded-full bg-black/50 text-white/70 hover:text-blue-400 hover:bg-black/80 flex items-center justify-center backdrop-blur-md transition-all cursor-pointer"
                         title="下载到本地"
                       >
                         <Download size={14} />
                       </button>
                       <button 
-                        onClick={() => unsaveImage(img.id)}
+                        onClick={(e) => { e.stopPropagation(); unsaveImage(img.id); }}
                         className="w-8 h-8 rounded-full bg-black/50 text-white/70 hover:text-red-400 hover:bg-black/80 flex items-center justify-center backdrop-blur-md transition-all cursor-pointer"
                         title="取消收藏"
                       >
@@ -127,10 +128,13 @@ export function Vault() {
                       {new Date(img.createdAt || img.created_at || Date.now()).toLocaleDateString()}
                     </span>
                     <div className="flex gap-2">
-                      <button onClick={() => downloadImage(img.output_path || (img as any).outputPath, `vault_${img.id}.png`)} className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                      <button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); }} className="w-6 h-6 rounded-full bg-[var(--accent-1)]/20 text-[var(--accent-1)] flex items-center justify-center">
+                        <Maximize2 size={12} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); downloadImage(img.output_path || (img as any).outputPath, `vault_${img.id}.png`); }} className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
                         <Download size={12} />
                       </button>
-                      <button onClick={() => unsaveImage(img.id)} className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
+                      <button onClick={(e) => { e.stopPropagation(); unsaveImage(img.id); }} className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
                         <HeartOff size={12} />
                       </button>
                     </div>
@@ -153,6 +157,76 @@ export function Vault() {
           </div>
         )}
       </div>
+
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 md:p-8 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div 
+            className="flex flex-col md:flex-row bg-[#1A1020]/95 border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden w-full max-w-6xl max-h-[90vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex-1 flex items-center justify-center bg-black/50 p-4 relative min-h-[40vh] md:min-h-[auto]">
+              {isVideo(previewImage.output_path || (previewImage as any).outputPath || '') ? (
+                <video 
+                  src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)} 
+                  className={`max-w-full max-h-[50vh] md:max-h-[85vh] object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
+                  autoPlay controls loop
+                />
+              ) : (
+                <img 
+                  src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)} 
+                  alt="Preview full" 
+                  className={`max-w-full max-h-[50vh] md:max-h-[85vh] object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
+                />
+              )}
+            </div>
+            
+            <div className="w-full md:w-[350px] flex-shrink-0 bg-[var(--bg-layer-1)] p-6 flex flex-col gap-5 border-l border-[var(--glass-border)] overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">典藏详情</h3>
+                <button onClick={() => setPreviewImage(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">正向提示词</label>
+                <div className="text-[12px] text-[var(--text-primary)] font-mono leading-relaxed bg-[var(--glass-bg)] p-3 rounded-xl border border-[var(--glass-border)] max-h-40 overflow-y-auto custom-scrollbar">
+                  {(previewImage as any).prompt || previewImage.prompt_id || "暂无对应的提示词记录"}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">基础模型</label>
+                  <div className="text-[12px] font-bold text-[var(--text-primary)] truncate" title={(previewImage as any).model || "未知"}>{(previewImage as any).model || "未知"}</div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">分辨率 / Seed</label>
+                  <div className="text-[12px] font-bold text-[var(--text-primary)]">{(previewImage as any).resolution || previewImage.seed || "未知"}</div>
+                </div>
+              </div>
+
+              <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-[var(--glass-border)]">
+                <button 
+                  onClick={() => downloadImage(previewImage.output_path || (previewImage as any).outputPath, `vault_${previewImage.id}.png`)}
+                  className="w-full py-3 rounded-xl bg-[var(--accent-1)]/20 text-[var(--accent-1)] border border-[var(--accent-1)]/50 font-bold text-[13px] hover:bg-[var(--accent-1)] hover:text-white transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Download size={16} /> 保存到本地
+                </button>
+                <button 
+                  onClick={() => { unsaveImage(previewImage.id); setPreviewImage(null); }}
+                  className="w-full py-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/30 font-bold text-[13px] hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <HeartOff size={16} /> 取消收藏
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,16 @@ import { Search, X, Paintbrush, Check } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useSettingsStore } from "../../stores/settingsStore";
 
+const getImgSrc = (url?: string | null) => {
+  if (!url) return '';
+  if (url.startsWith('http') || url.startsWith('data:')) return url;
+  // If it's a bare filename from the database (AnimaDex thumbname)
+  if (!url.includes('/') && !url.includes('\\')) {
+    return `https://blobs.animadex.net/ArtistOutputs/thumbs/${url}`;
+  }
+  return convertFileSrc(url);
+};
+
 interface ArtistSelectorProps {
   selectedTriggers: string;
   onChange: (triggers: string) => void;
@@ -68,7 +78,7 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
           <div key={artist.id} className="relative group rounded-xl overflow-hidden border border-pink-500/30 bg-[var(--glass-bg-hover)] flex items-center pr-3 shadow-md h-12">
             <div className="w-12 h-12 flex-shrink-0 bg-black/20 border-r border-pink-500/30">
               {artist.imgUrl ? (
-                <img src={convertFileSrc(artist.imgUrl)} className={`w-full h-full object-cover ${privacyMode ? 'blur-md group-hover:blur-none' : ''}`} alt={artist.nameEn} />
+                <img src={getImgSrc(artist.imgUrl)} className={`w-full h-full object-cover ${privacyMode ? 'blur-md group-hover:blur-none' : ''}`} alt={artist.nameEn} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]"><Paintbrush size={14}/></div>
               )}
@@ -113,8 +123,8 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
         <textarea 
           value={selectedTriggers}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-3 text-[12px] font-mono text-pink-300 outline-none focus:border-pink-500/50 transition-colors resize-none h-16"
-          placeholder="例如: by greg rutkowski, studio ghibli..."
+          className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-3 text-[12px] font-mono text-pink-300 outline-none focus:border-pink-500/50 transition-colors resize-none h-16 scrollbar-thin scrollbar-thumb-white/10"
+          placeholder="例如: @greg_rutkowski, studio_ghibli..."
         />
       </div>
 
@@ -148,7 +158,7 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
                 >
                   <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-black/20 border border-[var(--glass-border)]">
                     {artist.imgUrl ? (
-                      <img src={convertFileSrc(artist.imgUrl)} className={`w-full h-full object-cover ${privacyMode ? 'blur-sm' : ''}`} />
+                      <img src={getImgSrc(artist.imgUrl)} className={`w-full h-full object-cover ${privacyMode ? 'blur-sm' : ''}`} alt={artist.nameEn} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center"><Paintbrush size={12} className="opacity-50 text-[var(--text-muted)]"/></div>
                     )}

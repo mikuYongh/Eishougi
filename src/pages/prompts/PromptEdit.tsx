@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X, History } from "lucide-react";
+import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X, History, FileText } from "lucide-react";
 import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
 import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -238,18 +238,81 @@ export function PromptEdit() {
           </div>
 
           <div className="flex flex-col gap-4 flex-1">
-            <PromptTagEditor
-              label="正向提示词 (Positive)"
-              value={project.positivePrompt || ""}
-              onChange={v => updateField('positivePrompt', v)}
-              type="positive"
-            />
-            <PromptTagEditor
-              label="负向提示词 (Negative)"
-              value={project.negativePrompt || ""}
-              onChange={v => updateField('negativePrompt', v)}
-              type="negative"
-            />
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-3 px-4 shadow-lg">
+              <div className="flex items-center gap-4 flex-wrap">
+                <label className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2 whitespace-nowrap">
+                  <Cpu size={14} className="text-[var(--accent-2)]" />
+                  Prompt Syntax
+                </label>
+                <div className="flex bg-black/30 rounded-lg p-1 gap-1 overflow-x-auto max-w-full">
+                  {(['danbooru', 'natural', 'xml'] as const).map(syntax => (
+                    <button
+                      key={syntax}
+                      type="button"
+                      onClick={() => updateField('promptSyntax', syntax)}
+                      className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
+                        (project.promptSyntax || 'danbooru') === syntax
+                          ? 'bg-[var(--accent-2)] text-white shadow-[0_0_15px_var(--accent-2)]'
+                          : 'text-[var(--text-muted)] hover:text-white hover:bg-white/10'
+                      }`}
+                    >
+                      {syntax.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="text-[11px] text-[var(--text-muted)] bg-black/20 px-3 py-1.5 rounded-lg whitespace-nowrap text-center lg:text-right">
+                {(project.promptSyntax || 'danbooru') === 'danbooru' && "标准逗号分隔标签 (支持智能预测)"}
+                {project.promptSyntax === 'natural' && "自然语言描述 (无限制输入)"}
+                {project.promptSyntax === 'xml' && "结构化 XML (兼容 NewBie/Anima)"}
+              </div>
+            </div>
+
+            {(project.promptSyntax === 'natural' || project.promptSyntax === 'xml') ? (
+              <>
+                <div className="flex flex-col h-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-2xl overflow-hidden p-4 shadow-lg relative group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none" />
+                  <label className="text-[12px] font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2 relative z-10">
+                    <FileText size={16} className="text-blue-400" />
+                    正向提示词 ({project.promptSyntax === 'xml' ? 'XML Structure' : 'Natural Language'})
+                  </label>
+                  <textarea
+                    value={project.positivePrompt || ""}
+                    onChange={e => updateField('positivePrompt', e.target.value)}
+                    className="flex-1 w-full bg-black/30 border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-blue-500/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
+                    placeholder={project.promptSyntax === 'xml' ? "<character>\n  <name>Hatsune Miku</name>\n</character>\n<caption>...</caption>" : "A beautifully detailed cinematic wide shot of..."}
+                  />
+                </div>
+                <div className="flex flex-col h-48 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-2xl overflow-hidden p-4 shadow-lg relative group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent pointer-events-none" />
+                  <label className="text-[12px] font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2 relative z-10">
+                    <FileText size={16} className="text-pink-400" />
+                    负向提示词
+                  </label>
+                  <textarea
+                    value={project.negativePrompt || ""}
+                    onChange={e => updateField('negativePrompt', e.target.value)}
+                    className="flex-1 w-full bg-black/30 border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-pink-500/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
+                    placeholder="low quality, bad anatomy, worst quality..."
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <PromptTagEditor
+                  label="正向提示词 (Positive)"
+                  value={project.positivePrompt || ""}
+                  onChange={v => updateField('positivePrompt', v)}
+                  type="positive"
+                />
+                <PromptTagEditor
+                  label="负向提示词 (Negative)"
+                  value={project.negativePrompt || ""}
+                  onChange={v => updateField('negativePrompt', v)}
+                  type="negative"
+                />
+              </>
+            )}
           </div>
 
         </div>

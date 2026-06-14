@@ -339,12 +339,9 @@ export function Generate() {
               <div className="relative w-full h-full flex items-center justify-center group">
                 <img src={results[0].startsWith('http') ? results[0] : convertFileSrc(results[0])} alt="Generated" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} />
                 
-                <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-2xl px-4 absolute bottom-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-2xl px-4 absolute bottom-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   <button onClick={() => downloadImage(results[0], `generated_${Date.now()}.png`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-blue-400/50 cursor-pointer">
                     <Download size={16} /> 下载原图
-                  </button>
-                  <button onClick={() => setPreviewImage(results[0])} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-green-500 transition-colors shadow-lg cursor-pointer">
-                    <Maximize2 size={16} /> 全屏预览
                   </button>
                 </div>
               </div>

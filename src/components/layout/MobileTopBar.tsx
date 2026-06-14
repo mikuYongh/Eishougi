@@ -15,7 +15,7 @@ export function MobileTopBar() {
   return (
     <div className="flex-shrink-0 flex items-center justify-between px-4 bg-[var(--bg-base)]/80 backdrop-blur-xl border-b border-[var(--glass-border)] z-40 sticky top-0 pb-3 pt-[max(env(safe-area-inset-top),16px)]">
       <div className="flex items-center gap-2">
-        <Sparkles size={18} className="text-[var(--accent-1)]" />
+        <img src="/icon.png" alt="Logo" className="w-5 h-5 object-contain drop-shadow-[0_0_8px_rgba(var(--accent-1-rgb),0.5)]" />
         <h1 className="text-sm font-bold text-[var(--text-primary)] tracking-wider">
           {title} <span className="text-[10px] text-[var(--text-muted)] font-normal uppercase tracking-widest ml-1">Eishougi</span>
         </h1>

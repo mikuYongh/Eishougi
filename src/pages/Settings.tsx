@@ -702,13 +702,23 @@ export function Settings() {
           )}
 
           {activeTab === "about" && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 glass-panel p-6 text-center max-w-2xl mx-auto py-12">
-              <SettingsIcon size={48} className="text-[var(--accent-1)] mx-auto mb-4 animate-[spin_10s_linear_infinite]" />
-              <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">詠唱机 EISHOUGI</h3>
-              <p className="text-xs text-[var(--text-muted)] uppercase tracking-widest mb-4">Version 0.1.0</p>
-              <p className="text-sm text-[var(--text-primary)] max-w-md mx-auto leading-relaxed">
-                用文字咒语召唤画面的 AI 创作工作台。集成了提示词工程管理、本地工作流调度以及高级 AI 辅助生图指令。
-              </p>
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 glass-panel p-6 text-center max-w-2xl mx-auto py-12 border border-[var(--glass-border)] shadow-[0_0_30px_rgba(var(--accent-1-rgb),0.1)] relative overflow-hidden">
+              <div className="absolute -top-32 -left-32 w-64 h-64 bg-[var(--accent-1)] opacity-10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-32 -right-32 w-64 h-64 bg-blue-500 opacity-10 rounded-full blur-3xl pointer-events-none" />
+              
+              <img src="/logo.png" alt="EISHOUGI Logo" className="w-64 h-auto mx-auto mb-6 drop-shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.5)] hover:scale-105 transition-all duration-500 object-contain" />
+              <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2 drop-shadow-md tracking-wider">詠唱机 <span className="text-[var(--accent-1)] font-black">EISHOUGI</span></h3>
+              <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-widest mb-6">v0.1.0 • Stable</p>
+              
+              <div className="bg-black/30 p-6 rounded-xl border border-[var(--glass-border)] mx-auto max-w-lg relative shadow-inner">
+                <p className="text-sm text-[var(--text-primary)] leading-relaxed tracking-wide text-left indent-8 mb-3">
+                  <span className="text-[var(--accent-1)] font-bold text-lg">在</span>这里，想象力是您唯一的边界。
+                  <strong>詠唱机 (EISHOUGI)</strong> 是一款为您量身打造的灵感具现化工坊。
+                </p>
+                <p className="text-sm text-[var(--text-muted)] leading-relaxed tracking-wide text-left indent-8">
+                  我们将繁杂冰冷的技术参数温柔剥离，赋予纯粹的文字以魔法般的重构力量。您只需尽情倾诉您的创意，它便会静候在侧，将您的思绪编织为最精准的视觉咒语，并于指尖召唤出突破现实的绚丽画卷。让每一次微小的灵感闪烁，都能毫无阻碍地结晶为永恒的杰作。
+                </p>
+              </div>
             </div>
           )}
         </div>

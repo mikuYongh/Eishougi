@@ -3,6 +3,7 @@ import { Plus, Search, Star, Edit3, Rocket, Copy, Trash2, Cpu, Maximize, Layers,
 import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useNavigate } from "react-router-dom";
+import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import { aiService } from "../../services/aiService";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
@@ -118,7 +119,7 @@ export function PromptList() {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--glass-border)] pb-3 pt-1">
         {/* Dynamic Tag Filter Bar */}
-        <div className="flex items-center gap-3 flex-1 min-w-0 overflow-x-auto custom-scrollbar pb-2 md:pb-0 hide-scrollbar-on-mobile">
+        <div className="flex items-center flex-wrap gap-3 flex-1 min-w-0 pb-2 md:pb-0">
           
           {/* Favorite Toggle */}
           <button 
@@ -135,26 +136,26 @@ export function PromptList() {
           <div className="w-[1px] h-6 bg-white/10 flex-shrink-0 mx-1" />
 
           <div className="relative flex-shrink-0">
-            <select
+            <SearchableDropdown
               value={activeTag || ""}
-              onChange={(e) => {
-                setActiveTag(e.target.value === "" ? null : e.target.value);
+              onChange={(val) => {
+                setActiveTag(val === "" ? null : val);
                 setCurrentPage(1);
               }}
-              className={`appearance-none bg-[var(--bg-layer-1)] border text-[var(--text-primary)] px-4 py-1.5 pr-8 rounded-full text-[12px] font-bold outline-none cursor-pointer transition-colors shadow-sm ${
+              options={[
+                { label: "全部标签", value: "" },
+                ...tagCounts.map(([tag, count]) => ({ label: `${tag} (${count})`, value: tag }))
+              ]}
+              placeholder="全部标签"
+              searchPlaceholder="搜索标签..."
+              accentColor="blue"
+              triggerClassName={`px-4 py-1.5 rounded-full text-[12px] font-bold outline-none cursor-pointer transition-colors shadow-sm min-w-[120px] ${
                 activeTag
-                  ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
-                  : "border-[var(--glass-border)] hover:bg-white/10"
+                  ? "border border-blue-500/50 bg-blue-500/10 text-blue-400"
+                  : "border border-[var(--glass-border)] bg-[var(--bg-layer-1)] text-[var(--text-primary)] hover:bg-white/10"
               }`}
-            >
-              <option value="">全部标签</option>
-              {tagCounts.map(([tag, count]) => (
-                <option key={tag} value={tag} className="bg-[var(--bg-panel)] text-[var(--text-primary)]">
-                  {tag} ({count})
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={14} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${activeTag ? 'text-blue-400' : 'text-[var(--text-muted)]'}`} />
+              dropdownClassName="w-48 left-0"
+            />
           </div>
         </div>
 

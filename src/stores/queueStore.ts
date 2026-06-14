@@ -12,6 +12,7 @@ export interface QueueJob {
   images?: string[];
   error?: string;
   workflowId?: string;
+  comfyPromptId?: string;
   createdAt: number;
 }
 
@@ -44,11 +45,27 @@ export const useQueueStore = create<QueueStore>((set, get) => {
 
   const setupCallbacks = () => {
     comfyService.connect(
-      (progress) => {
-        console.log("[Queue] progress callback", progress);
+      (progress, promptId) => {
+        console.log("[Queue] progress callback", progress, "promptId:", promptId);
         set(state => {
-          const activeIndex = state.jobs.findIndex(j => j.status === 'pending' || j.status === 'generating');
-          if (activeIndex === -1) { console.log("[Queue] progress: no active job found"); return state; }
+          const activeIndex = promptId 
+            ? state.jobs.findIndex(j => j.comfyPromptId === promptId)
+            : state.jobs.findIndex(j => j.status === 'pending' || j.status === 'generating');
+            
+          if (activeIndex === -1) { 
+            // Fallback just in case promptId wasn't mapped yet
+            const fbIndex = state.jobs.findIndex(j => j.status === 'pending' || j.status === 'generating');
+            if (fbIndex === -1) { console.log("[Queue] progress: no active job found"); return state; }
+            
+            const newJobs = [...state.jobs];
+            newJobs[fbIndex] = {
+              ...newJobs[fbIndex],
+              status: 'generating',
+              progress: Math.round((progress.value / progress.max) * 100),
+              node: progress.node
+            };
+            return { jobs: newJobs };
+          }
           
           const newJobs = [...state.jobs];
           newJobs[activeIndex] = {
@@ -61,12 +78,15 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           return { jobs: newJobs };
         });
       },
-      async (images) => {
-        console.log("[Queue] complete callback, images:", images?.length);
+      async (images, promptId) => {
+        console.log("[Queue] complete callback, images:", images?.length, "promptId:", promptId);
         let completedJob: QueueJob | null = null;
         
         set(state => {
-          const activeIndex = state.jobs.findIndex(j => j.status === 'generating' || j.status === 'pending');
+          let activeIndex = promptId ? state.jobs.findIndex(j => j.comfyPromptId === promptId) : -1;
+          if (activeIndex === -1) {
+            activeIndex = state.jobs.findIndex(j => j.status === 'generating' || j.status === 'pending');
+          }
           if (activeIndex === -1) { console.log("[Queue] complete: no active job found"); return state; }
           
           const newJobs = [...state.jobs];
@@ -154,10 +174,13 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           }
         }
       },
-      (error) => {
-        console.log("[Queue] error callback:", error);
+      (error, promptId) => {
+        console.log("[Queue] error callback:", error, "promptId:", promptId);
         set(state => {
-          const activeIndex = state.jobs.findIndex(j => j.status === 'generating' || j.status === 'pending');
+          let activeIndex = promptId ? state.jobs.findIndex(j => j.comfyPromptId === promptId) : -1;
+          if (activeIndex === -1) {
+            activeIndex = state.jobs.findIndex(j => j.status === 'generating' || j.status === 'pending');
+          }
           if (activeIndex === -1) return state;
           
           const newJobs = [...state.jobs];
@@ -277,7 +300,18 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         if (!injectedWf) throw new Error("Failed to construct workflow JSON");
 
         console.log("[Queue] addJob: queueing prompt", i + 1, "of", batchCount);
-        await comfyService.queuePrompt(injectedWf);
+        const res = await comfyService.queuePrompt(injectedWf);
+        if (res && res.prompt_id) {
+          console.log("[Queue] addJob: got comfyPromptId:", res.prompt_id, "for job", jobs[i].id);
+          set(state => {
+            const newJobs = [...state.jobs];
+            const jIdx = newJobs.findIndex(j => j.id === jobs[i].id);
+            if (jIdx !== -1) {
+              newJobs[jIdx] = { ...newJobs[jIdx], comfyPromptId: res.prompt_id };
+            }
+            return { jobs: newJobs };
+          });
+        }
         console.log("[Queue] addJob: prompt", i + 1, "queued successfully");
       }
 

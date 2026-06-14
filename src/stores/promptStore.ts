@@ -15,6 +15,7 @@ export interface PromptProject {
   positivePrompt: string;
   negativePrompt: string;
   artistPrompt: string;
+  promptSyntax: 'danbooru' | 'natural' | 'xml';
   
   // Generation Params
   width: number;
@@ -58,6 +59,7 @@ function toRustPrompt(p: PromptProject): any {
     positivePrompt: p.positivePrompt || '',
     negativePrompt: p.negativePrompt || '',
     artistPrompt: p.artistPrompt || '',
+    promptSyntax: p.promptSyntax || 'danbooru',
     width: p.width || 896,
     height: p.height || 1088,
     steps: p.steps || 20,
@@ -96,6 +98,7 @@ function fromRustPrompt(r: any): PromptProject {
     positivePrompt: r.positivePrompt,
     negativePrompt: r.negativePrompt,
     artistPrompt: r.artistPrompt,
+    promptSyntax: r.promptSyntax || 'danbooru',
     width: r.width,
     height: r.height,
     steps: r.steps,
