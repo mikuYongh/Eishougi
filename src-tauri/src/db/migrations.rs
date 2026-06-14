@@ -9,6 +9,7 @@ pub fn run(conn: &Connection) -> Result<()> {
         (MIGRATION_V3, 3),
         (MIGRATION_V4, 4),
         (MIGRATION_V5, 5),
+        (MIGRATION_V6, 6),
     ];
 
     for (sql, ver) in migrations {
@@ -23,6 +24,10 @@ pub fn run(conn: &Connection) -> Result<()> {
 
 const MIGRATION_V3: &str = r#"
 ALTER TABLE prompts ADD COLUMN workflow_id TEXT;
+"#;
+
+const MIGRATION_V6: &str = r#"
+ALTER TABLE prompts ADD COLUMN prompt_syntax TEXT NOT NULL DEFAULT 'danbooru';
 "#;
 
 const MIGRATION_V1: &str = r#"

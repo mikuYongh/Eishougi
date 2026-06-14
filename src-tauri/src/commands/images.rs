@@ -38,3 +38,36 @@ pub async fn download_comfyui_image(app: AppHandle, url: String) -> Result<Strin
     // Return absolute path so frontend can use convertFileSrc
     Ok(file_path.to_string_lossy().to_string())
 }
+
+#[tauri::command]
+pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<String, String> {
+    let download_dir = app.path().download_dir().map_err(|e| format!("Failed to get download dir: {}", e))?;
+    
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+    let dest_path = download_dir.join(format!("eishougi_{}.png", timestamp));
+
+    if url.starts_with("http") {
+        let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+        let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+        fs::write(&dest_path, bytes).map_err(|e| e.to_string())?;
+    } else if url.starts_with("data:") {
+        return Err("Data URIs are not supported for export via backend".to_string());
+    } else {
+        // Local path
+        #[cfg(target_os = "windows")]
+        let mut source_path = url.replace("asset://localhost/", "").replace("%20", " ");
+        
+        #[cfg(not(target_os = "windows"))]
+        let mut source_path = url.replace("asset://localhost", "").replace("%20", " ");
+        
+        // Handle tauri convertFileSrc path formatting
+        if source_path.starts_with("asset://") {
+            source_path = source_path.replace("asset://", "");
+        }
+        
+        let path = PathBuf::from(&source_path);
+        fs::copy(&path, &dest_path).map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
+    }
+    
+    Ok(dest_path.to_string_lossy().to_string())
+}

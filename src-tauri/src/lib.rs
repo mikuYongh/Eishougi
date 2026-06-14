@@ -60,6 +60,7 @@ pub fn run() {
             commands::favorites::get_favorite_prompts,
             commands::favorites::add_favorite_prompt,
             commands::images::download_comfyui_image,
+            commands::images::export_image_to_downloads,
             commands::favorites::delete_favorite_prompt,
             commands::styles::get_custom_styles,
             commands::styles::add_custom_style,

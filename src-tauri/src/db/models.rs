@@ -9,6 +9,7 @@ pub struct Prompt {
     pub positive_prompt: String,
     pub negative_prompt: String,
     pub artist_prompt: String,
+    pub prompt_syntax: String, // 'danbooru' | 'natural' | 'xml'
     pub seed: String,
     pub width: i32,
     pub height: i32,
