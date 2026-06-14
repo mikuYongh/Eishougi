@@ -22,7 +22,7 @@ export function Sidebar() {
 
   return (
     <div
-      className="w-[var(--spacing-sidebar-w)] flex flex-shrink-0 flex-col pt-3 relative z-20"
+      className="hidden md:flex w-[var(--spacing-sidebar-w)] flex-shrink-0 flex-col pt-3 relative z-20"
       style={{
         background: "var(--glass-bg)",
         backdropFilter: "blur(24px)",

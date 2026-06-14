@@ -22,9 +22,13 @@ import { ArtistLibrary } from "./pages/library/ArtistLibrary";
 import { Vault } from "./pages/vault/Vault";
 import { usePromptStore } from "./stores/promptStore";
 import { useWorkflowStore } from "./stores/workflowStore";
+import { useDevice } from "./hooks/useDevice";
+import { DesktopLayout } from "./components/layout/DesktopLayout";
+import { MobileLayout } from "./components/layout/MobileLayout";
 
 export default function App() {
-  const { wallpaperPath, appTheme, colorTheme, blurLevel } = useSettingsStore();
+  const { isMobile } = useDevice();
+  const { wallpaperPath, appTheme, colorTheme, blurLevel, uiScale } = useSettingsStore();
   const fetchPrompts = usePromptStore((state) => state.fetchPrompts);
   const fetchWorkflows = useWorkflowStore((state) => state.fetchWorkflows);
 
@@ -70,43 +74,44 @@ export default function App() {
 
       {/* App Window */}
       <div className={`relative z-10 w-screen h-screen flex flex-col bg-transparent transition-colors duration-700 ${isLight ? "light-mode" : ""} theme-${colorTheme}`}>
-        <TitleBar />
+        {/* TitleBar for desktop window dragging (hidden on mobile naturally if not Tauri window, but we keep it) */}
+        {!isMobile && <TitleBar />}
 
-        <div className="flex-1 flex overflow-hidden">
-          <Sidebar />
-
-          {/* Main Area */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-transparent relative">
-            <TopBar />
-            <CompletionToast />
-            <div className="flex-1 overflow-y-auto px-5 py-5">
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/prompts" element={<PromptList />} />
-                <Route path="/prompts/new" element={<PromptEdit />} />
-                <Route path="/prompts/:id" element={<PromptDetail />} />
-                <Route path="/prompts/:id/edit" element={<PromptEdit />} />
-                <Route path="/workflows" element={<WorkflowList />} />
-                <Route path="/workflows/new" element={<WorkflowEdit />} />
-                <Route path="/workflows/:id" element={<WorkflowEdit />} />
-                <Route path="/workflows/:id/edit" element={<WorkflowEdit />} />
-                <Route path="/generate/:promptId?" element={<Generate />} />
-                <Route path="/video/:imagePath?" element={<VideoGenerate />} />
-                <Route path="/tagger" element={<Tagger />} />
-                <Route path="/characters" element={<CharacterLibrary />} />
-                <Route path="/artists" element={<ArtistLibrary />} />
-                <Route path="/history" element={<History />} />
-                <Route path="/vault" element={<Vault />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
-            </div>
-            <BottomNav />
-            <StatusBar />
-          </div>
-
-          <AgentPanel />
-        </div>
+        {isMobile ? (
+          <MobileLayout>
+            <AppRoutes />
+          </MobileLayout>
+        ) : (
+          <DesktopLayout>
+            <AppRoutes />
+          </DesktopLayout>
+        )}
       </div>
     </BrowserRouter>
+  );
+}
+
+// Extract routes to avoid duplication
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/prompts" element={<PromptList />} />
+      <Route path="/prompts/new" element={<PromptEdit />} />
+      <Route path="/prompts/:id" element={<PromptDetail />} />
+      <Route path="/prompts/:id/edit" element={<PromptEdit />} />
+      <Route path="/workflows" element={<WorkflowList />} />
+      <Route path="/workflows/new" element={<WorkflowEdit />} />
+      <Route path="/workflows/:id" element={<WorkflowEdit />} />
+      <Route path="/workflows/:id/edit" element={<WorkflowEdit />} />
+      <Route path="/generate/:promptId?" element={<Generate />} />
+      <Route path="/video/:imagePath?" element={<VideoGenerate />} />
+      <Route path="/tagger" element={<Tagger />} />
+      <Route path="/characters" element={<CharacterLibrary />} />
+      <Route path="/artists" element={<ArtistLibrary />} />
+      <Route path="/history" element={<History />} />
+      <Route path="/vault" element={<Vault />} />
+      <Route path="/settings" element={<Settings />} />
+    </Routes>
   );
 }
