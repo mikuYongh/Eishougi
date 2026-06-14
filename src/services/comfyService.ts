@@ -5,6 +5,10 @@ import { useSettingsStore } from '../stores/settingsStore';
 // Get dynamically from settings
 export const getComfyUrl = () => {
   let url = useSettingsStore.getState().settings.comfyUrl || 'http://127.0.0.1:8188';
+  url = url.trim();
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'http://' + url;
+  }
   return url.endsWith('/') ? url.slice(0, -1) : url;
 };
 

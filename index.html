@@ -2,14 +2,8 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" id="viewport-meta" content="width=device-width, initial-scale=1.0" />
-    <script>
-      // 简单检测是否运行在 Android 或移动端
-      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-        // 如果是移动端，将视口宽度固定为1600，让WebView自动整体缩放页面以适配物理屏幕 (越大元素越小)
-        document.getElementById('viewport-meta').setAttribute('content', 'width=1600');
-      }
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
     <title>詠唱机 EISHOUGI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,6 +11,23 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Mock Tauri IPC to prevent React crashes when running in a pure browser (e.g. Mobile Chrome)
+      if (!window.__TAURI_INTERNALS__) {
+        console.warn("Tauri environment not detected. Mocking __TAURI_INTERNALS__ to prevent crashes.");
+        window.__TAURI_INTERNALS__ = {
+          invoke: async (cmd, args) => {
+            console.log(`[Mock Tauri] invoke: ${cmd}`);
+            if (['list_prompts', 'get_prompts', 'get_workflows', 'list_generated_images', 'get_favorites', 'get_mcp_tools'].includes(cmd)) return [];
+            if (cmd === 'get_artists') return { items: [], total: 0 };
+            return null;
+          }
+        };
+      }
+      if (!window.__TAURI_IPC__) {
+        window.__TAURI_IPC__ = async () => {};
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

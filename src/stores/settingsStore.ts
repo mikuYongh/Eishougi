@@ -24,6 +24,7 @@ export interface AppSettings {
   colorTheme: 'sakura' | 'classic' | 'green' | 'night' | 'cyber';
   blurLevel: number;
   privacyMode: boolean;
+  uiScale: number;
 }
 
 interface SettingsState {
@@ -32,11 +33,13 @@ interface SettingsState {
   blurLevel: number;
   appTheme: 'dark' | 'light' | 'system';
   colorTheme: 'sakura' | 'classic' | 'green' | 'night' | 'cyber';
+  uiScale: number;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
   setWallpaperPath: (path: string) => void;
   setBlurLevel: (level: number) => void;
   setAppTheme: (theme: 'dark' | 'light' | 'system') => void;
   setColorTheme: (theme: 'sakura' | 'classic' | 'green' | 'night' | 'cyber') => void;
+  setUiScale: (scale: number) => void;
   toggleTheme: () => void;
   resetWallpaper: () => void;
   setPrivacyMode: (enabled: boolean) => void;
@@ -65,6 +68,7 @@ const defaultSettings: AppSettings = {
   colorTheme: 'sakura',
   blurLevel: 20,
   privacyMode: false,
+  uiScale: 1,
 };
 
 export const useSettingsStore = create<SettingsState>()(
@@ -75,6 +79,7 @@ export const useSettingsStore = create<SettingsState>()(
       blurLevel: defaultSettings.blurLevel,
       appTheme: defaultSettings.appTheme,
       colorTheme: defaultSettings.colorTheme,
+      uiScale: defaultSettings.uiScale,
       updateSettings: (newSettings) => set((state) => ({
         settings: { ...state.settings, ...newSettings }
       })),
@@ -82,6 +87,7 @@ export const useSettingsStore = create<SettingsState>()(
       setBlurLevel: (level) => set({ blurLevel: level }),
       setAppTheme: (theme) => set({ appTheme: theme }),
       setColorTheme: (theme) => set({ colorTheme: theme }),
+      setUiScale: (scale) => set({ uiScale: scale }),
       toggleTheme: () => set((state) => ({ appTheme: state.appTheme === 'dark' ? 'light' : 'dark' })),
       resetWallpaper: () => set({ wallpaperPath: defaultSettings.wallpaperPath }),
       setPrivacyMode: (enabled) => set((state) => ({ settings: { ...state.settings, privacyMode: enabled } })),

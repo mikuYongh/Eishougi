@@ -266,42 +266,78 @@ pub async fn list_prompts(state: State<'_, AppState>, filter: Option<PromptFilte
     let mut prompts = Vec::new();
     for prompt_result in rows {
         let mut p = prompt_result.map_err(|e| e.to_string())?;
-        
-        let mut img_stmt = db.conn.prepare("SELECT * FROM prompt_images WHERE prompt_id = ?1").map_err(|e| e.to_string())?;
-        let img_rows = img_stmt.query_map(params![p.id], |row| {
-            Ok(PromptImage {
-                id: row.get("id")?,
-                prompt_id: row.get("prompt_id")?,
-                file_path: row.get("file_path")?,
-                file_name: row.get("file_name")?,
-                created_at: row.get("created_at")?,
-            })
-        }).map_err(|e| e.to_string())?;
-        
-        let mut images = Vec::new();
-        for img in img_rows {
-            images.push(img.map_err(|e| e.to_string())?);
-        }
-        p.images = Some(images);
+        p.images = Some(Vec::new());
+        p.tags = Some(Vec::new());
+        prompts.push(p);
+    }
 
-        let mut tags = Vec::new();
-        let mut tag_stmt = db.conn.prepare("SELECT t.* FROM tags t INNER JOIN prompt_tag_cross pt ON t.id = pt.tag_id WHERE pt.prompt_id = ?1").map_err(|e| e.to_string())?;
-        let tag_rows = tag_stmt.query_map(params![p.id], |row| {
-            Ok(crate::db::models::Tag {
+    if prompts.is_empty() {
+        return Ok(prompts);
+    }
+
+    // Prepare an IN clause for all prompt IDs
+    let id_list = prompts.iter()
+        .map(|p| format!("'{}'", p.id.replace('\'', "''")))
+        .collect::<Vec<String>>()
+        .join(",");
+
+    // 1. Bulk fetch all images for these prompts
+    let img_query = format!("SELECT * FROM prompt_images WHERE prompt_id IN ({})", id_list);
+    let mut img_stmt = db.conn.prepare(&img_query).map_err(|e| e.to_string())?;
+    
+    let img_rows = img_stmt.query_map([], |row| {
+        Ok(PromptImage {
+            id: row.get("id")?,
+            prompt_id: row.get("prompt_id")?,
+            file_path: row.get("file_path")?,
+            file_name: row.get("file_name")?,
+            created_at: row.get("created_at")?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    use std::collections::HashMap;
+    let mut images_map: HashMap<String, Vec<PromptImage>> = HashMap::new();
+    for img_result in img_rows {
+        if let Ok(img) = img_result {
+            images_map.entry(img.prompt_id.clone()).or_default().push(img);
+        }
+    }
+
+    // 2. Bulk fetch all tags for these prompts
+    let tag_query = format!(
+        "SELECT t.*, pt.prompt_id FROM tags t INNER JOIN prompt_tag_cross pt ON t.id = pt.tag_id WHERE pt.prompt_id IN ({})",
+        id_list
+    );
+    let mut tag_stmt = db.conn.prepare(&tag_query).map_err(|e| e.to_string())?;
+    
+    let tag_rows = tag_stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, String>("prompt_id")?,
+            crate::db::models::Tag {
                 id: row.get("id")?,
                 name: row.get("name")?,
                 color: row.get("color")?,
                 created_at: row.get("created_at")?,
-            })
-        }).map_err(|e| e.to_string())?;
-        
-        for tag in tag_rows {
-            tags.push(tag.map_err(|e| e.to_string())?);
+            }
+        ))
+    }).map_err(|e| e.to_string())?;
+
+    let mut tags_map: HashMap<String, Vec<crate::db::models::Tag>> = HashMap::new();
+    for tag_result in tag_rows {
+        if let Ok((prompt_id, tag)) = tag_result {
+            tags_map.entry(prompt_id).or_default().push(tag);
         }
-        p.tags = Some(tags);
-        
-        prompts.push(p);
     }
-    
+
+    // Assign back to prompts
+    for p in prompts.iter_mut() {
+        if let Some(imgs) = images_map.remove(&p.id) {
+            p.images = Some(imgs);
+        }
+        if let Some(tgs) = tags_map.remove(&p.id) {
+            p.tags = Some(tgs);
+        }
+    }
+
     Ok(prompts)
 }
