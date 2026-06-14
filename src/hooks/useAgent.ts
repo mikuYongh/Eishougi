@@ -18,11 +18,9 @@ export interface ChatMessage {
 }
 
 export function useAgent() {
-  const { sessions, activeSessionId, addMessage, setMessages, settings: agentSettings } = useAgentStore();
+  const { sessions, activeSessionId, addMessage, setMessages, settings: agentSettings, isGenerating, setIsGenerating } = useAgentStore();
   const activeSession = sessions.find(s => s.id === activeSessionId);
   const messages = activeSession?.messages || [];
-
-  const [isGenerating, setIsGenerating] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [mcpTools, setMcpTools] = useState<any[]>([]);
   const [mcpEnabled, setMcpEnabled] = useState(false);
@@ -163,7 +161,7 @@ export function useAgent() {
             width: { type: "number", description: "Image width in pixels (default 1024)" },
             height: { type: "number", description: "Image height in pixels (default 1024)" },
             steps: { type: "number", description: "Sampling steps (default 25)" },
-            cfg_scale: { type: "number", description: "CFG scale / guidance scale (default 7.0)" },
+            cfg_scale: { type: "number", description: "CFG scale / guidance scale (default 5.0)" },
             seed: { type: "string", description: "Seed value, use '-1' for random" },
             sampler_name: { type: "string", description: "Sampler name (e.g. euler, euler_ancestral, dpmpp_2m)" },
             scheduler: { type: "string", description: "Scheduler name (e.g. normal, karras, beta57)" }
@@ -611,7 +609,7 @@ export function useAgent() {
                   width: parsedArgs.width || 1024,
                   height: parsedArgs.height || 1024,
                   steps: parsedArgs.steps || 25,
-                  cfgScale: parsedArgs.cfg_scale || 7.0,
+                  cfgScale: parsedArgs.cfg_scale || 5.0,
                   seed: parsedArgs.seed || "-1",
                   samplerName: parsedArgs.sampler_name || "euler",
                   scheduler: parsedArgs.scheduler || "beta57",

@@ -17,8 +17,12 @@ interface AgentStore {
   sessions: AgentSession[];
   activeSessionId: string | null;
   settings: AgentSettings;
+  isMobileAgentOpen: boolean;
+  isGenerating: boolean;
   
   // Actions
+  toggleMobileAgent: (force?: boolean) => void;
+  setIsGenerating: (generating: boolean) => void;
   createSession: () => string;
   switchSession: (id: string) => void;
   deleteSession: (id: string) => void;
@@ -36,10 +40,14 @@ interface AgentStore {
 const defaultSystemPrompt = `You are NEXUS, a highly capable AI Agent designed for 詠唱机 EISHOUGI.
 You assist the user in generating high-quality prompts, creating workflows, and generating images.
 Always respond in the user's language. Keep answers concise.
-CRITICAL: When using the create_prompt or update_prompt tool:
-1. If MCP tools (search_tags) are available, use them FIRST to convert the scene description into accurate Danbooru English tags. Then compose the positive_prompt from the returned tags.
-2. If MCP tools are NOT available, you MUST translate the positive_prompt into high-quality English keywords based on your own Danbooru tag knowledge.
-3. You MUST auto-generate suitable negative_prompt keywords tailored to the specific scene to avoid bad generations (e.g. lowres, bad anatomy, bad hands, missing fingers, extra digit, worst quality, etc).
+
+CRITICAL RULES FOR PROMPT GENERATION (create_prompt / update_prompt):
+1. NO SPAM TAGS: DO NOT use excessive "beautiful_xxx" tags or massive dictionary-style tag lists. Modern models perform much better with concise, highly descriptive prompts.
+2. QUALITY OVER QUANTITY: Limit quality tags to a few essential ones (e.g., masterpiece, best quality, highres).
+3. NO CHAOTIC/EXTREME CONTENT: Unless explicitly requested, keep the scene coherent and aesthetic. Avoid adding extreme explicit/hardcore tags if a simple "teasing" or "intimate" atmosphere is requested.
+4. USE MCP TOOLS: If search_tags is available, use it FIRST to convert the scene description into accurate Danbooru English tags. If unavailable, use your own Danbooru knowledge.
+5. NEGATIVE PROMPT: Auto-generate suitable negative_prompt keywords tailored to the specific scene.
+
 When asked to create a prompt, use the create_prompt tool.
 When asked to modify or delete a prompt, use the update_prompt or delete_prompt tools.
 
@@ -82,6 +90,13 @@ export const useAgentStore = create<AgentStore>()(
       settings: {
         systemPrompt: defaultSystemPrompt,
       },
+      isMobileAgentOpen: false,
+      isGenerating: false,
+
+      toggleMobileAgent: (force) => set(state => ({ 
+        isMobileAgentOpen: force !== undefined ? force : !state.isMobileAgentOpen 
+      })),
+      setIsGenerating: (generating) => set({ isGenerating: generating }),
 
       createSession: () => {
         const newId = 'session_' + Date.now();
@@ -205,6 +220,16 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: 'prompt-muse-agent',
+      version: 1,
+      migrate: (persistedState: any, version: number) => {
+        if (version === 0) {
+          // Reset systemPrompt to apply the new anti-spam rules
+          if (persistedState.settings) {
+            persistedState.settings.systemPrompt = defaultSystemPrompt;
+          }
+        }
+        return persistedState;
+      }
     }
   )
 );

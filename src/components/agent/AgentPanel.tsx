@@ -12,6 +12,7 @@ import { HistoryImagePicker } from "../ui/HistoryImagePicker";
 import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { cn } from "../../lib/utils";
 
 const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
 
@@ -50,12 +51,12 @@ export function AgentPanel() {
 
   // Auto scroll to bottom when messages or isGenerating changes
   useEffect(() => {
-    if (viewMode === 'chat' && virtuosoRef.current && messages.length > 0) {
+    if (isExpanded && viewMode === 'chat' && virtuosoRef.current && messages.length > 0) {
       setTimeout(() => {
         virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'smooth' });
-      }, 50);
+      }, 100);
     }
-  }, [messages.length, isGenerating, viewMode]);
+  }, [messages.length, isGenerating, viewMode, isExpanded]);
 
   // Auto-upgrade system prompt for older sessions
   useEffect(() => {
@@ -232,9 +233,15 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
 
   return (
     <div
-      className="flex-shrink-0 flex flex-col relative z-50 transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] bg-[var(--glass-bg)] border-l border-[var(--glass-border)] shadow-[-10px_0_40px_rgba(0,0,0,0.5)] backdrop-blur-3xl h-full md:max-w-[420px] max-w-full"
+      className={cn(
+        "flex flex-col relative z-50 transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] bg-[var(--glass-bg)] border-[var(--glass-border)] backdrop-blur-3xl",
+        "md:flex-shrink-0 md:h-full md:border-l md:shadow-[-10px_0_40px_rgba(0,0,0,0.5)]",
+        "fixed md:static inset-x-0 bottom-0 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-none border-t md:border-t-0 rounded-t-3xl md:rounded-t-none",
+        isExpanded ? "h-[90vh] md:h-full translate-y-0 opacity-100" : "h-0 md:h-full translate-y-full md:translate-y-0 opacity-0 md:opacity-100"
+      )}
       style={{
-        width: isExpanded ? "100%" : "70px",
+        width: "100%",
+        maxWidth: isExpanded ? "420px" : "70px",
       }}
     >
       {/* Decorative vertical gradient line */}
@@ -246,11 +253,13 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
         className={`absolute top-1/2 -translate-y-1/2 -left-[24px] w-[24px] h-[80px] hidden md:flex items-center justify-center border-y border-l text-[var(--text-primary)] cursor-pointer transition-all duration-300 backdrop-blur-xl z-20 rounded-l-xl ${
           isExpanded 
             ? "bg-[var(--glass-bg)] border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] hover:border-[var(--glass-border-active)] hover:text-[var(--accent-1)] shadow-[-4px_0_15px_rgba(0,0,0,0.3)]" 
-            : "bg-[var(--accent-1)]/20 border-[var(--accent-1)]/40 text-[var(--accent-1)] hover:bg-[var(--accent-1)]/30 hover:border-[var(--accent-1)] hover:text-[var(--text-primary)] shadow-[0_0_20px_rgba(var(--accent-1-rgb), 30)] animate-pulse"
+            : isGenerating
+              ? "bg-[var(--accent-1)]/60 border-[var(--accent-1)]/80 text-white shadow-[0_0_25px_var(--accent-1)] animate-pulse"
+              : "bg-[var(--accent-1)]/20 border-[var(--accent-1)]/40 text-[var(--accent-1)] hover:bg-[var(--accent-1)]/30 hover:border-[var(--accent-1)] hover:text-[var(--text-primary)] shadow-[0_0_20px_rgba(var(--accent-1-rgb), 0.5)] animate-pulse"
         }`}
-        title={isExpanded ? "收起面板" : "唤出 AI 助手"}
+        title={isExpanded ? "收起面板" : isGenerating ? "NEXUS 运行中..." : "唤出 AI 助手"}
       >
-        {isExpanded ? <ChevronRight size={16} /> : <ChevronLeft size={16} className="animate-[bounce_2s_infinite_horizontal]" />}
+        {isExpanded ? <ChevronRight size={16} /> : isGenerating ? <Loader2 size={16} className="animate-spin text-white" /> : <ChevronLeft size={16} className="animate-[bounce_2s_infinite_horizontal]" />}
       </button>
 
       {/* INNER WRAPPER to prevent content from overflowing during transition */}
@@ -332,6 +341,20 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
           <Bot size={24} />
         </button>
       )}
+
+      {/* Mobile-only Header Close Button */}
+      <div className="md:hidden flex items-center justify-between p-4 border-b border-[var(--glass-border)] flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Bot size={20} className="text-[var(--accent-1)]" />
+          <span className="font-bold text-[14px] text-[var(--text-primary)]">NEXUS AGENT</span>
+        </div>
+        <button 
+          onClick={() => setIsExpanded(false)}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--glass-bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+        >
+          <X size={16} />
+        </button>
+      </div>
 
       {/* Content Area */}
       <div 
