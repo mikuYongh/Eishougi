@@ -67,7 +67,7 @@ export function CompletionToast() {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="fixed bottom-10 left-48 z-50 flex flex-col-reverse gap-2 pointer-events-none max-h-[80vh] overflow-hidden">
+    <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] md:bottom-10 left-4 right-4 md:right-auto md:left-48 z-50 flex flex-col-reverse gap-2 pointer-events-none max-h-[80vh] overflow-hidden">
       {notifications.map((item) => (
         <div key={item.id} className="pointer-events-auto">
           <ToastItem item={item} />

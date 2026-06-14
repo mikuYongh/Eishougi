@@ -47,10 +47,10 @@ export function VideoGenerate() {
         </button>
       </div>
 
-      <div className="flex gap-6 flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
         
         {/* Left Column - Input Image & Params */}
-        <div className="w-[420px] flex flex-col gap-5 flex-shrink-0">
+        <div className="w-full md:w-[420px] flex flex-col gap-5 flex-shrink-0">
           
           <div className="glass-panel p-1 rounded-2xl flex flex-col relative overflow-hidden group h-64 border border-[var(--glass-border)] hover:border-[var(--accent-2)]/30 transition-colors">
             <div className="absolute inset-0 bg-[var(--bg-layer-1)] z-0"></div>

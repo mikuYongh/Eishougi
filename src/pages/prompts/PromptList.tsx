@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Plus, Search, Star, Edit3, Rocket, Copy, Trash2, Cpu, Maximize, Layers, LayoutGrid, List as ListIcon, ChevronLeft, ChevronRight, Image as ImageIcon, Sparkles, FileText } from "lucide-react";
+import { Plus, Search, Star, Edit3, Rocket, Copy, Trash2, Cpu, Maximize, Layers, LayoutGrid, List as ListIcon, ChevronLeft, ChevronRight, ChevronDown, Image as ImageIcon, Sparkles, FileText } from "lucide-react";
 import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useNavigate } from "react-router-dom";
@@ -87,14 +87,14 @@ export function PromptList() {
     <div className="flex flex-col h-full relative z-10 gap-6">
       
       {/* PageHeader */}
-      <div className="flex items-center justify-between flex-shrink-0">
-        <div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 gap-4">
+        <div className="hidden md:block">
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
             <span className="text-blue-400 flex items-center justify-center"><FileText size={24} /></span> 提示词项目管理
           </h2>
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">管理生成配置项目，包含提示词、底模、LoRA及全部参数</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3 justify-end w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-start md:justify-end">
           <button 
             onClick={handleAutoTag}
             disabled={isAutoTagging}
@@ -109,7 +109,7 @@ export function PromptList() {
           <button 
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all text-[var(--text-primary)] cursor-pointer"
             style={{ background: "linear-gradient(135deg, #42A5F5, #7E57C2)", border: "1px solid rgba(255,255,255,0.2)" }}
-            onClick={() => navigate('/prompts/new/edit')}
+            onClick={() => navigate('/prompts/new')}
           >
             <Plus size={16} /> 新建项目
           </button>
@@ -134,37 +134,28 @@ export function PromptList() {
 
           <div className="w-[1px] h-6 bg-white/10 flex-shrink-0 mx-1" />
 
-          {/* All Tags button */}
-          <button
-            onClick={() => { setActiveTag(null); setCurrentPage(1); }}
-            className={`px-4 py-1.5 rounded-full text-[12px] font-bold transition-all flex-shrink-0 border ${
-              activeTag === null 
-                ? "bg-[var(--accent-2)]/20 text-blue-400 border-[var(--accent-2)]/30 shadow-[0_0_15px_rgba(59,130,246,0.2)]" 
-                : "bg-[var(--bg-layer-1)] text-[var(--text-muted)] border-[var(--glass-border)] hover:bg-white/10 hover:text-[var(--text-primary)]"
-            }`}
-          >
-            全部
-          </button>
-
-          {/* Dynamic Tags */}
-          {tagCounts.map(([tag, count]) => (
-            <button
-              key={tag}
-              onClick={() => { setActiveTag(activeTag === tag ? null : tag); setCurrentPage(1); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold transition-all flex-shrink-0 border group ${
-                activeTag === tag
-                  ? "bg-blue-500/20 text-blue-400 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-                  : "bg-[var(--bg-layer-1)] text-[var(--text-secondary)] border-[var(--glass-border)] hover:bg-white/10 hover:border-white/20"
+          <div className="relative flex-shrink-0">
+            <select
+              value={activeTag || ""}
+              onChange={(e) => {
+                setActiveTag(e.target.value === "" ? null : e.target.value);
+                setCurrentPage(1);
+              }}
+              className={`appearance-none bg-[var(--bg-layer-1)] border text-[var(--text-primary)] px-4 py-1.5 pr-8 rounded-full text-[12px] font-bold outline-none cursor-pointer transition-colors shadow-sm ${
+                activeTag
+                  ? "border-blue-500/50 bg-blue-500/10 text-blue-400"
+                  : "border-[var(--glass-border)] hover:bg-white/10"
               }`}
             >
-              {tag}
-              <span className={`px-1.5 py-0.5 rounded-full text-[9px] ${
-                activeTag === tag ? "bg-blue-500/30 text-blue-200" : "bg-white/10 text-[var(--text-muted)] group-hover:bg-white/20 group-hover:text-[var(--text-primary)]"
-              }`}>
-                {count}
-              </span>
-            </button>
-          ))}
+              <option value="">全部标签</option>
+              {tagCounts.map(([tag, count]) => (
+                <option key={tag} value={tag} className="bg-[var(--bg-panel)] text-[var(--text-primary)]">
+                  {tag} ({count})
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${activeTag ? 'text-blue-400' : 'text-[var(--text-muted)]'}`} />
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

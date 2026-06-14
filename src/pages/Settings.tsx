@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useSettingsStore } from "../stores/settingsStore";
+import { useSettingsStore, type McpServerConfig } from "../stores/settingsStore";
+import { useQueueStore } from "../stores/queueStore";
 import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database } from "lucide-react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -23,6 +24,7 @@ export function Settings() {
     blurLevel, setBlurLevel,
     appTheme, setAppTheme,
     colorTheme, setColorTheme,
+    uiScale, setUiScale,
     settings, setPrivacyMode, updateSettings
   } = useSettingsStore();
   const [localWallpaper, setLocalWallpaper] = useState(wallpaperPath);
@@ -63,11 +65,21 @@ export function Settings() {
       reader.onload = async (event) => {
         const base64Data = event.target?.result as string;
         try {
-          const savedPath = await invoke<string>('save_base64_image', { base64Data });
-          setLocalWallpaper(savedPath);
-          setWallpaperPath(savedPath);
+          // Attempt to save persistently via Tauri
+          // Check if we are actually inside Tauri environment
+          if ('__TAURI_INTERNALS__' in window || '__TAURI_IPC__' in window) {
+            const savedPath = await invoke<string>('save_base64_image', { base64Data });
+            setLocalWallpaper(savedPath);
+            setWallpaperPath(savedPath);
+          } else {
+            // Fallback for mobile browser testing
+            setLocalWallpaper(base64Data);
+            setWallpaperPath(base64Data);
+          }
         } catch (err) {
-          console.error("Failed to save wallpaper persistently:", err);
+          console.warn("Tauri invoke failed or not available, falling back to base64 browser storage:", err);
+          setLocalWallpaper(base64Data);
+          setWallpaperPath(base64Data);
         }
       };
       reader.readAsDataURL(file);
@@ -171,7 +183,7 @@ export function Settings() {
   return (
     <div className="relative z-10 h-full flex flex-col">
       {/* Header matching Dashboard style */}
-      <div className="flex items-center justify-between mb-6 px-1 flex-shrink-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 px-1 flex-shrink-0">
         <div>
           <div className="flex items-center gap-2">
             <SettingsIcon size={20} className="text-[var(--accent-1)]" />
@@ -181,7 +193,7 @@ export function Settings() {
         </div>
         
         <div
-          className="group flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.1)] w-64 focus-within:w-80"
+          className="group flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-300 shadow-[0_4px_12px_rgba(0,0,0,0.1)] w-full md:w-64 md:focus-within:w-80"
           style={{
             background: "rgba(255, 255, 255, 0.05)",
             borderColor: "rgba(255, 255, 255, 0.1)",
@@ -199,18 +211,18 @@ export function Settings() {
         </div>
       </div>
 
-      <div className="flex flex-1 gap-6 min-h-0">
+      <div className="flex flex-col md:flex-row flex-1 gap-6 min-h-0">
         {/* Left Sidebar Menu */}
-        <div className="w-56 flex flex-col gap-2 flex-shrink-0">
+        <div className="w-full md:w-56 flex md:flex-col gap-2 flex-shrink-0 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
           {SETTINGS_TABS.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer ${
+                className={`flex-shrink-0 flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer whitespace-nowrap ${
                   isActive 
-                    ? "glass-panel bg-white/10 text-[var(--text-primary)] shadow-[0_4px_20px_rgba(179,136,255,0.15)] border-[var(--accent-1)]/30 translate-x-2" 
+                    ? "glass-panel bg-white/10 text-[var(--text-primary)] shadow-[0_4px_20px_rgba(179,136,255,0.15)] border-[var(--accent-1)]/30 md:translate-x-2" 
                     : "text-[var(--text-muted)] hover:bg-white/5 hover:text-[var(--text-primary)] border border-transparent"
                 }`}
               >
@@ -239,9 +251,9 @@ export function Settings() {
                   </div>
                 </div>
                 
-                <div className="flex gap-8">
+                <div className="flex flex-col md:flex-row gap-4 md:gap-8">
                   {/* Preview Monitor */}
-                  <div className="w-64 h-40 rounded-xl overflow-hidden relative border border-[var(--glass-border)] shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex-shrink-0 bg-[var(--glass-bg)]">
+                  <div className="w-full md:w-64 h-40 rounded-xl overflow-hidden relative border border-[var(--glass-border)] shadow-[0_10px_30px_rgba(0,0,0,0.5)] flex-shrink-0 bg-[var(--glass-bg)]">
                     <div 
                       className="absolute inset-0 bg-cover bg-center transition-all duration-700 hover:scale-110"
                       style={{ backgroundImage: `url("${(localWallpaper.startsWith('http') || localWallpaper.startsWith('data:') || localWallpaper.startsWith('blob:')) ? localWallpaper : convertFileSrc(localWallpaper)}")` }}
@@ -376,6 +388,29 @@ export function Settings() {
                       <span>极度朦胧 (60px)</span>
                     </div>
                   </div>
+
+                  {/* UI Scale */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-bold text-[var(--text-primary)]">界面缩放比例 (UI Scale)</h4>
+                      <span className="text-xs font-mono font-bold text-[var(--accent-1)] bg-[var(--accent-1)]/10 px-2 py-0.5 rounded border border-[var(--accent-1)]/20">
+                        {Math.round(uiScale * 100)}%
+                      </span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0.5" max="1.5" step="0.05"
+                      value={uiScale}
+                      onChange={(e) => setUiScale(Number(e.target.value))}
+                      className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer border border-[var(--glass-border)] outline-none"
+                      style={{ accentColor: "var(--accent-1)" }}
+                    />
+                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-bold mt-2">
+                      <span>迷你小巧 (50%)</span>
+                      <span>默认 (100%)</span>
+                      <span>超大视效 (150%)</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -436,8 +471,13 @@ export function Settings() {
                       type="text"
                       value={settings.comfyUrl}
                       onChange={(e) => updateSettings({ comfyUrl: e.target.value })}
+                      onBlur={() => {
+                        const qs = useQueueStore.getState();
+                        qs.disconnect();
+                        qs.connect();
+                      }}
                       className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
-                      placeholder="http://127.0.0.1:8188"
+                      placeholder="http://192.168.1.100:8188"
                     />
                   </div>
                 </div>
@@ -456,7 +496,7 @@ export function Settings() {
                 </div>
 
                 <div className="max-w-2xl space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">服务商 (Provider)</label>
                       <GlassDropdown
@@ -542,7 +582,7 @@ export function Settings() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Temperature Slider */}
                     <div>
                       <div className="flex justify-between items-center mb-2">

@@ -83,7 +83,7 @@ export function PromptDetail() {
       </div>
 
       {/* Content Grid */}
-      <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-3 gap-6 min-h-0">
+      <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-1 md:grid-cols-3 gap-6 min-h-0">
         {/* Left: Prompts & Params */}
         <div className="col-span-2 space-y-6">
           {/* Positive Prompt */}
@@ -135,7 +135,7 @@ export function PromptDetail() {
               </div>
               <h3 className="text-sm font-bold text-[var(--text-primary)]">生成参数</h3>
             </div>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
               {[
                 { label: "Seed", value: prompt.seed },
                 { label: "尺寸", value: `${prompt.width} × ${prompt.height}` },

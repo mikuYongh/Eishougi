@@ -4,6 +4,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useQueueStore } from "../../stores/queueStore";
+import { downloadImage } from "../../utils/download";
 
 interface HistoryImage {
   id: string;
@@ -25,6 +26,8 @@ interface HistoryGroup {
 
 export function History() {
   const [history, setHistory] = useState<HistoryGroup[]>([]);
+  const [allData, setAllData] = useState<any[]>([]);
+  const [limit, setLimit] = useState(50);
   const [previewImage, setPreviewImage] = useState<HistoryImage | null>(null);
   const [addingToPrompt, setAddingToPrompt] = useState<HistoryImage | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
@@ -36,65 +39,78 @@ export function History() {
     fetchHistory();
   }, [prompts, historyUpdateTick]);
 
+  useEffect(() => {
+    if (allData.length > 0) {
+      processData(allData);
+    }
+  }, [limit, allData, prompts]);
+
   const fetchHistory = async () => {
     try {
       const data = await invoke<any[]>('list_generated_images');
-      const prompts = usePromptStore.getState().prompts;
-
-      const grouped = new Map<string, HistoryImage[]>();
-      
-      data.forEach(item => {
-        // Skip failed or pending items
-        if (item.status !== 'completed' && item.status !== 'completed') return;
-        
-        const date = new Date(item.createdAt);
-        const dateStr = date.toLocaleDateString();
-        
-        const promptObj = prompts.find(p => p.id === item.promptId);
-        
-        const img: HistoryImage = {
-          id: item.id,
-          url: item.outputPath || '',
-          promptId: item.promptId || '',
-          promptTitle: promptObj ? promptObj.title : '未知项目',
-          prompt: promptObj ? promptObj.positivePrompt : 'Custom Generated Image',
-          model: promptObj ? (promptObj.baseModel || 'Default Model') : 'Unknown Model',
-          time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          resolution: promptObj ? `${promptObj.width}x${promptObj.height}` : 'Unknown',
-          isSaved: !!item.isSaved
-        };
-        
-        if (!grouped.has(dateStr)) {
-          grouped.set(dateStr, []);
-        }
-        grouped.get(dateStr)!.push(img);
-      });
-      
-      const newHistory: HistoryGroup[] = Array.from(grouped.entries()).map(([date, images], idx) => ({
-        id: "group_" + idx,
-        date,
-        images
-      }));
-      
-      setHistory(newHistory);
+      setAllData(data);
     } catch (error) {
       console.error("Failed to fetch history:", error);
     }
   };
 
+  const processData = (data: any[]) => {
+    const promptsMap = new Map(prompts.map(p => [p.id, p]));
+    const grouped = new Map<string, HistoryImage[]>();
+    
+    // Process only up to 'limit' items to prevent OOM
+    const limitedData = data.slice(0, limit);
+    
+    limitedData.forEach(item => {
+      // Skip failed or pending items
+      if (item.status !== 'completed' && item.status !== 'completed') return;
+      
+      const date = new Date(item.createdAt);
+      const dateStr = date.toLocaleDateString();
+      
+      const promptObj = promptsMap.get(item.promptId);
+      
+      const img: HistoryImage = {
+        id: item.id,
+        url: item.outputPath || '',
+        promptId: item.promptId || '',
+        promptTitle: promptObj ? promptObj.title : '未知项目',
+        prompt: promptObj ? promptObj.positivePrompt : 'Custom Generated Image',
+        model: promptObj ? (promptObj.baseModel || 'Default Model') : 'Unknown Model',
+        time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        resolution: promptObj ? `${promptObj.width}x${promptObj.height}` : 'Unknown',
+        isSaved: !!item.isSaved
+      };
+      
+      if (!grouped.has(dateStr)) {
+        grouped.set(dateStr, []);
+      }
+      grouped.get(dateStr)!.push(img);
+    });
+    
+    const newHistory: HistoryGroup[] = Array.from(grouped.entries()).map(([date, images], idx) => ({
+      id: "group_" + idx,
+      date,
+      images
+    }));
+    
+    setHistory(newHistory);
+  };
+
   const handleDelete = async (id: string) => {
+    if (!confirm("确定要删除这张生成的图片吗？")) return;
     try {
       await invoke('delete_generated_image', { id });
-      fetchHistory();
+      await fetchHistory();
     } catch (e) {
-      console.error("Failed to delete image:", e);
+      console.error("Failed to delete instance image:", e);
     }
   };
 
   const handleToggleSave = async (img: HistoryImage) => {
     try {
       const newSavedState = !img.isSaved;
-      await invoke('toggle_save_image', { id: img.id, is_saved: newSavedState });
+      await invoke('toggle_save_image', { id: img.id, isSaved: newSavedState });
       
       // Update local state
       setHistory(prev => prev.map(group => ({
@@ -146,7 +162,7 @@ export function History() {
           await invoke('delete_generated_image', { id: img.id });
         }
       }
-      fetchHistory();
+      await fetchHistory();
     } catch (e) {
       console.error("Failed to clear history:", e);
     }
@@ -156,8 +172,8 @@ export function History() {
     <div className="flex flex-col h-full relative z-10 gap-6">
       
       {/* PageHeader */}
-      <div className="flex items-center justify-between flex-shrink-0">
-        <div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 gap-4">
+        <div className="hidden md:block">
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
             <span className="text-green-400">📜</span> 生成历史 (History)
           </h2>
@@ -165,9 +181,9 @@ export function History() {
         </div>
         <button 
           onClick={handleClearHistory}
-          className="px-4 py-2 rounded-xl text-[13px] font-bold border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer flex items-center gap-2"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all cursor-pointer w-full md:w-auto shadow-[0_0_15px_rgba(239,68,68,0.1)]"
         >
-          <Trash2 size={16} /> 清空历史
+          <Trash2 size={16} /> 彻底清空历史
         </button>
       </div>
 
@@ -186,11 +202,14 @@ export function History() {
                 <div key={i} className="glass-panel rounded-xl flex flex-col group border border-[var(--glass-border)] hover:border-green-400/50 transition-all hover:shadow-[0_8px_30px_rgba(76,175,80,0.15)] overflow-hidden bg-[var(--glass-bg)]">
                   
                   {/* Image Container */}
-                  <div className="aspect-square w-full relative overflow-hidden flex items-center justify-center">
+                  <div 
+                    className="aspect-square w-full relative overflow-hidden flex items-center justify-center cursor-pointer"
+                    onClick={() => setPreviewImage(img)}
+                  >
                     <img src={img.url.startsWith('http') ? img.url : convertFileSrc(img.url)} alt="Result" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                     
-                  {/* Hover Actions */}
-                    <div className="absolute inset-0 bg-[var(--glass-bg)] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
+                  {/* Hover Actions (Desktop Only) */}
+                    <div className="absolute inset-0 bg-[var(--glass-bg)] opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center gap-3">
                       <button 
                         onClick={() => setPreviewImage(img)}
                         className="w-10 h-10 rounded-full bg-green-500/80 text-[var(--text-primary)] flex items-center justify-center hover:scale-110 transition-transform shadow-lg cursor-pointer"
@@ -226,10 +245,22 @@ export function History() {
 
                   {/* Meta Bar */}
                   <div className="p-2.5 bg-[var(--glass-bg)] flex flex-col gap-1 border-t border-[var(--glass-border)]">
-                    <div className="flex items-center gap-1.5 mb-0.5">
+                    <div className="flex items-center justify-between gap-1.5 mb-0.5">
                       <span className="text-[10px] font-bold text-[var(--accent-1)]/80 bg-[var(--accent-1)]/10 border border-[var(--accent-1)]/20 px-1.5 py-0.5 rounded-md truncate max-w-full">
                         {img.promptTitle}
                       </span>
+                      {/* Mobile Actions */}
+                      <div className="flex md:hidden items-center gap-1.5 flex-shrink-0">
+                        <button onClick={() => setPreviewImage(img)} className="w-6 h-6 rounded-full bg-[var(--accent-1)]/20 text-[var(--accent-1)] flex items-center justify-center">
+                          <Maximize2 size={12} />
+                        </button>
+                        <button onClick={() => handleToggleSave(img)} className={`w-6 h-6 rounded-full flex items-center justify-center ${img.isSaved ? 'bg-[var(--accent-1)] text-white' : 'bg-white/10 text-[var(--text-muted)]'}`}>
+                          <Sparkles size={12} className={img.isSaved ? 'fill-white' : ''} />
+                        </button>
+                        <button onClick={() => handleDelete(img.id)} className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 font-mono">{img.prompt}</p>
                     <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-bold">
@@ -245,6 +276,17 @@ export function History() {
             </div>
           </div>
         ))}
+        {allData.length > limit && (
+          <div className="flex justify-center mt-6 pt-4 pb-8">
+            <button
+              onClick={() => setLimit(prev => prev + 50)}
+              className="px-6 py-2.5 rounded-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] font-bold shadow-lg hover:bg-[var(--glass-bg-hover)] transition-all cursor-pointer flex items-center gap-2"
+            >
+              <Sparkles size={16} className="text-green-400" />
+              加载更多 ({limit} / {allData.length})
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Fullscreen Preview Modal */}
@@ -262,7 +304,7 @@ export function History() {
               <img 
                 src={previewImage.url.startsWith('http') ? previewImage.url : convertFileSrc(previewImage.url)} 
                 alt="Preview full" 
-                className={`max-w-full max-h-[85vh] object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
+                className={`max-w-full max-h-[50vh] md:max-h-[85vh] object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
               />
             </div>
             
@@ -287,7 +329,7 @@ export function History() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">基础模型</label>
                   <div className="text-[12px] font-bold text-[var(--text-primary)] truncate" title={previewImage.model}>{previewImage.model}</div>
@@ -303,6 +345,12 @@ export function History() {
               </div>
 
               <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-[var(--glass-border)]">
+                <button 
+                  onClick={() => downloadImage(previewImage.url, `history_${previewImage.id}.png`)}
+                  className="w-full py-3 rounded-xl bg-[var(--glass-bg)] text-[var(--text-primary)] border border-[var(--glass-border)] font-bold text-[13px] hover:bg-white/10 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Download size={16} /> 保存到本地相册
+                </button>
                 <button 
                   onClick={() => handleToggleSave(previewImage)}
                   className={`w-full py-3 rounded-xl border font-bold text-[13px] transition-colors flex items-center justify-center gap-2 ${

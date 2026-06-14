@@ -27,6 +27,20 @@ export function WorkflowList() {
   const removeWorkflow = useWorkflowStore(state => state.removeWorkflow);
   const navigate = useNavigate();
 
+  const handleImportClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) {
+        alert("剪贴板为空");
+        return;
+      }
+      JSON.parse(text); // validate JSON
+      navigate('/workflows/new/edit', { state: { importJson: text } });
+    } catch (e) {
+      alert("无法读取剪贴板或剪贴板内容不是有效的 JSON");
+    }
+  };
+
   return (
     <div className="flex flex-col h-full relative z-10 gap-6">
       
@@ -39,7 +53,7 @@ export function WorkflowList() {
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">配置并保存 ComfyUI JSON 渲染节点图，与提示词项目绑定</p>
         </div>
         <div className="flex gap-3">
-          <button className="px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-white/10 transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)]">
+          <button onClick={handleImportClipboard} className="px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-white/10 transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)]">
             从剪贴板导入 JSON
           </button>
           <button 

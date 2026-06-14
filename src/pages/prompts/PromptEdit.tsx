@@ -105,10 +105,10 @@ export function PromptEdit() {
   };
 
   return (
-    <div className="flex flex-col h-full relative z-10 gap-6 max-w-6xl mx-auto w-full">
+    <div className="flex flex-col relative z-10 gap-6 max-w-6xl mx-auto w-full">
       
       {/* Header Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md sticky top-0 z-50 shadow-lg">
         <div className="flex items-center gap-4 w-full md:w-auto">
           <button 
             onClick={() => navigate('/prompts')}
@@ -116,7 +116,7 @@ export function PromptEdit() {
           >
             <ArrowLeft size={18} />
           </button>
-          <div>
+          <div className="hidden md:block">
             <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md">
               {id === 'new' ? '新建提示词项目' : '编辑提示词项目'}
             </h2>
@@ -124,15 +124,15 @@ export function PromptEdit() {
           </div>
         </div>
         
-        <div className="flex gap-2 w-full md:w-auto justify-end">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto justify-end">
           <button 
             onClick={handleSave}
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-white/10 hover:bg-white/20 text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-white/10 hover:bg-white/20 text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)] w-full sm:w-auto"
           >
             <Save size={16} /> 保存项目
           </button>
           <button 
-            className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all text-[var(--text-primary)] cursor-pointer"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all text-[var(--text-primary)] cursor-pointer w-full sm:w-auto"
             style={{ background: "linear-gradient(135deg, #42A5F5, #7E57C2)", border: "1px solid rgba(255,255,255,0.2)" }}
           >
             <Play size={16} fill="currentColor" /> 立即生成
@@ -140,7 +140,7 @@ export function PromptEdit() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0 overflow-y-auto pb-10">
+      <div className="flex flex-col md:flex-row gap-6 pb-10">
         
         {/* Left Column - Content & Params */}
         <div className="flex-1 flex flex-col gap-5 min-w-0">
@@ -263,12 +263,12 @@ export function PromptEdit() {
               <Cpu size={16} className="text-[var(--accent-1)]" /> 生成参数配置
             </h3>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">采样器 (Sampler)</label>
                 <GlassDropdown 
-                  value={project.samplerName || "euler"}
-                  onChange={v => updateField('samplerName', v)}
+                  value={project.sampler || "euler"}
+                  onChange={v => updateField('sampler', v)}
                   options={[
                     { label: "euler", value: "euler" },
                     { label: "euler_ancestral", value: "euler_ancestral" },

@@ -87,7 +87,7 @@ export function Dashboard() {
   return (
     <div className="relative z-10 overflow-y-auto h-full pr-1 space-y-6 pb-6">
       {/* Header */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-1 gap-4">
         <div>
           <div className="flex items-center gap-2">
             <Sparkles size={20} className="text-[var(--accent-1)]" />
@@ -106,7 +106,7 @@ export function Dashboard() {
             提示词管理
           </button>
           <button
-            onClick={() => navigate('/prompts/edit/new')}
+            onClick={() => navigate('/prompts/new')}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold cursor-pointer transition-all duration-300 hover:scale-105 shadow-[0_4px_15px_rgba(0,0,0,0.2)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.3)] text-[var(--bg-layer-0)]"
             style={{ background: "linear-gradient(135deg, var(--accent-1), var(--accent-2))", border: "1px solid var(--glass-border-active)" }}
           >
@@ -263,7 +263,7 @@ export function Dashboard() {
               查看全部历史 <ChevronRight size={12} />
             </button>
           </div>
-          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {recentImages.map((img, i) => (
               <div
                 key={i}

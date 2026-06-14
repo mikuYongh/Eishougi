@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { ArrowLeft, Save, UploadCloud, FileJson, Layers, Sliders, Cpu, Plus, Trash2, Maximize2 } from "lucide-react";
 import { useWorkflowStore, type WorkflowProject, type WorkflowType } from "../../stores/workflowStore";
@@ -29,6 +29,7 @@ const SDXL_RESOLUTIONS = [
 export function WorkflowEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const workflows = useWorkflowStore((state) => state.workflows);
   const updateWorkflow = useWorkflowStore((state) => state.updateWorkflow);
   const addWorkflow = useWorkflowStore((state) => state.addWorkflow);
@@ -64,8 +65,15 @@ export function WorkflowEdit() {
           parseAndSetParams(w.jsonContent);
         }
       }
+    } else if (id === 'new' && location.state?.importJson) {
+      updateField('jsonContent', location.state.importJson);
+      try {
+        parseAndSetParams(location.state.importJson);
+      } catch (e) {
+        console.error("Failed to parse imported json", e);
+      }
     }
-  }, [id, workflows]);
+  }, [id, workflows, location.state]);
 
   const parseAndSetParams = (jsonStr: string) => {
     const parsed = comfyService.analyzeWorkflow(jsonStr);
@@ -84,20 +92,22 @@ export function WorkflowEdit() {
     });
   };
 
-  const handleImportJson = async () => {
-    try {
-      const filePath = await open({
-        filters: [{ name: "JSON", extensions: ["json"] }],
-        multiple: false
-      });
-      if (filePath && typeof filePath === 'string') {
-        const content: string = await invoke('read_text_file', { path: filePath });
+  const handleImportJson = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const content = await file.text();
         updateField('jsonContent', content);
         parseAndSetParams(content);
+      } catch (err) {
+        console.error("Failed to parse JSON file", err);
       }
-    } catch (e) {
-      console.error("Failed to import JSON", e);
-    }
+    };
+    input.click();
   };
 
   const handleSave = async () => {
@@ -168,35 +178,35 @@ export function WorkflowEdit() {
   return (
     <div className="flex flex-col h-full relative z-10 gap-6 max-w-6xl mx-auto w-full">
       {/* Header */}
-      <div className="flex items-center justify-between flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md gap-4">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate('/workflows')}
-            className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
+            className="w-10 h-10 flex-shrink-0 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
           >
             <ArrowLeft size={18} />
           </button>
-          <div>
-            <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md truncate">
               {id === 'new' ? '新建工作流配置' : '编辑工作流配置'}
             </h2>
-            <p className="text-[12px] text-[var(--text-muted)]">{workflow.name || "未命名工作流"}</p>
+            <p className="text-[12px] text-[var(--text-muted)] truncate">{workflow.name || "未命名工作流"}</p>
           </div>
         </div>
         
         <button 
           onClick={handleSave}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(255,213,79,0.3)] hover:scale-[1.02] transition-all text-black cursor-pointer"
+          className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(255,213,79,0.3)] hover:scale-[1.02] transition-all text-black cursor-pointer w-full md:w-auto"
           style={{ background: "linear-gradient(135deg, #FFCA28, #FF9800)", border: "1px solid rgba(255,255,255,0.4)" }}
         >
           <Save size={16} /> 保存配置
         </button>
       </div>
 
-      <div className="flex gap-6 flex-1 min-h-0 overflow-y-auto pb-10">
+      <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0 overflow-y-auto pb-[20vh] custom-scrollbar">
         
         {/* Left Column - Metadata */}
-        <div className="w-[380px] flex-shrink-0 flex flex-col gap-5">
+        <div className="w-full md:w-[380px] flex-shrink-0 flex flex-col gap-5">
           <div className="glass-panel p-5 space-y-5">
             <div>
               <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">工作流名称</label>
@@ -248,7 +258,7 @@ export function WorkflowEdit() {
         </div>
 
         {/* Right Column - Parameters / Editor */}
-        <div className="flex-1 flex flex-col min-w-0 glass-panel overflow-hidden bg-[var(--bg-layer-1)]">
+        <div className="flex-1 flex flex-col min-w-0 glass-panel xl:overflow-hidden bg-[var(--bg-layer-1)] min-h-[500px]">
           <div className="flex items-center justify-between p-4 border-b border-[var(--glass-border)]">
             <h3 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
               <Sliders size={18} className="text-yellow-400" /> 默认参数配置
@@ -284,7 +294,7 @@ export function WorkflowEdit() {
                 <h4 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
                   <Cpu size={14} /> 模型设定
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="relative z-[60]">
                     <label className="text-[11px] font-bold text-[var(--text-muted)] mb-1.5 block">基础模型 (Base Model)</label>
                     <SearchableDropdown 
@@ -309,7 +319,7 @@ export function WorkflowEdit() {
                 <h4 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
                   <Maximize2 size={14} /> 分辨率与尺寸
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="relative z-[50]">
                     <label className="text-[11px] font-bold text-[var(--text-muted)] mb-1.5 block">预设分辨率</label>
                     <GlassDropdown 

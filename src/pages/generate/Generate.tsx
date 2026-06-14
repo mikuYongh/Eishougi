@@ -3,7 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders, Zap } from "lucide-react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { usePromptStore, type LoraConfig } from "../../stores/promptStore";
-import { useQueueStore } from "../../stores/queueStore";
+import { useQueueStore, type QueueJob } from "../../stores/queueStore";
+import { downloadImage } from "../../utils/download";
 import { useWorkflowStore } from "../../stores/workflowStore";
 import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -258,10 +259,10 @@ export function Generate() {
   }
 
   return (
-    <div className="flex flex-col h-full relative z-10 gap-6 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col relative z-10 gap-6 max-w-7xl mx-auto w-full">
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md sticky top-0 z-50 shadow-lg">
         <div className="flex items-center gap-4 w-full md:w-auto">
           <button 
             onClick={() => navigate('/prompts')}
@@ -269,11 +270,11 @@ export function Generate() {
           >
             <ArrowLeft size={18} />
           </button>
-          <div>
-            <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-              <span className="text-blue-400 flex items-center justify-center"><Zap size={24} /></span> 渲染控制台
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
+              <span className="text-blue-400 flex items-center justify-center"><Zap size={20} className="md:w-6 md:h-6" /></span> 渲染控制台
             </h2>
-            <p className="text-[12px] text-[var(--text-muted)]">当前项目: {project.title}</p>
+            <p className="text-[11px] md:text-[12px] text-[var(--text-muted)] truncate whitespace-nowrap overflow-hidden text-ellipsis">当前项目: {project.title}</p>
           </div>
         </div>
         
@@ -299,10 +300,10 @@ export function Generate() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row gap-6 pb-10">
         
         {/* Left Column - Main Preview & Editor */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0 overflow-y-auto custom-scrollbar pr-1">
+        <div className="flex-1 flex flex-col gap-4 min-w-0 pr-1">
           
           {/* Prompts Tag Editors */}
           <div className="flex flex-col gap-4">
@@ -338,13 +339,13 @@ export function Generate() {
               <div className="relative w-full h-full flex items-center justify-center group">
                 <img src={results[0].startsWith('http') ? results[0] : convertFileSrc(results[0])} alt="Generated" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} />
                 
-                <div className="absolute bottom-6 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => window.open(results[0], '_blank')} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--glass-bg)] backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--glass-bg)] transition-colors shadow-lg border border-[var(--glass-border)]">
-                    <Maximize2 size={16} /> 放大
-                  </button>
-                  <a href={results[0]} download="generated.png" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-blue-400/50">
+                <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-2xl px-4 absolute bottom-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => downloadImage(results[0], `generated_${Date.now()}.png`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-blue-400/50 cursor-pointer">
                     <Download size={16} /> 下载原图
-                  </a>
+                  </button>
+                  <button onClick={() => setPreviewImage(results[0])} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-green-500 transition-colors shadow-lg cursor-pointer">
+                    <Maximize2 size={16} /> 全屏预览
+                  </button>
                 </div>
               </div>
             ) : isGenerating ? (
@@ -378,7 +379,7 @@ export function Generate() {
 
         {/* Right Column - Project Params Summary */}
         <div className="w-full md:w-[320px] flex-shrink-0 flex flex-col gap-4">
-          <div className="glass-panel p-5 rounded-2xl flex-1 flex flex-col gap-5 overflow-y-auto">
+          <div className="glass-panel p-5 rounded-2xl flex-1 flex flex-col gap-5">
             <div className="flex items-center justify-between border-b border-[var(--glass-border)] pb-3">
               <h3 className="text-[13px] font-bold text-[var(--text-primary)]">项目参数概览</h3>
               <button 
@@ -474,7 +475,7 @@ export function Generate() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)]">
                   <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">Steps</label>
                   <input type="number" value={overrideSteps} onChange={e => setOverrideSteps(Number(e.target.value))} className="w-full bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
@@ -495,7 +496,7 @@ export function Generate() {
               </div>
 
               {/* Sampler & Scheduler Overrides */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">采样器 (Sampler)</label>
                   <GlassDropdown 

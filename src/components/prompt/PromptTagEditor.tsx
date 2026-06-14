@@ -101,9 +101,9 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
   return (
     <div className="w-full flex flex-col gap-3 rounded-2xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] p-4 shadow-[inset_0_2px_15px_rgba(0,0,0,0.1)] transition-all duration-300">
       {/* Editor Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-white/5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-white/5 gap-3">
         <span className="text-sm font-semibold tracking-wide text-[var(--text-secondary)]">{label}</span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Mode Switcher */}
           <div className="flex bg-white/5 rounded-lg p-0.5 border border-white/5">
             <button
@@ -134,7 +134,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
           {type === 'positive' && (
             <button
               onClick={() => setIsLibraryModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1 bg-[var(--accent-1)]/20 hover:bg-[var(--accent-1)] text-[var(--accent-1)] hover:text-white border border-[var(--accent-1)]/30 hover:border-transparent rounded-lg text-xs font-bold transition-all shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.2)] ml-2"
+              className="flex items-center gap-1.5 px-3 py-1 bg-[var(--accent-1)]/20 hover:bg-[var(--accent-1)] text-[var(--accent-1)] hover:text-white border border-[var(--accent-1)]/30 hover:border-transparent rounded-lg text-xs font-bold transition-all shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.2)] md:ml-2"
               title="召唤图库，快速插入画师或角色"
             >
               <Sparkles size={14} /> <span>召唤图库</span>

@@ -76,17 +76,47 @@ export function LibraryModal({ isOpen, onClose, onSelect, title = "召唤图库"
         }}
       >
         {/* Header */}
-        <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-[var(--glass-border)] bg-[var(--glass-bg)]">
-          <div className="flex items-center gap-6">
+        <div className="flex-shrink-0 flex flex-col p-4 border-b border-[var(--glass-border)] bg-[var(--glass-bg)] gap-4">
+          
+          {/* Top Row: Title & Controls */}
+          <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-[var(--text-primary)] flex items-center gap-2">
               {title}
             </h2>
             
+            <div className="flex items-center gap-2">
+              {/* Favorite Filter Toggle */}
+              <button
+                onClick={toggleFavoriteFilter}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors border ${
+                  showFavorites
+                    ? "bg-[var(--accent-1)]/20 text-[var(--accent-1)] border-[var(--accent-1)]"
+                    : "bg-[var(--bg-layer-1)] text-[var(--text-secondary)] border-[var(--glass-border)] hover:bg-[var(--bg-layer-2)]"
+                }`}
+                title="只看收藏"
+              >
+                <Star size={14} className={showFavorites ? "fill-[var(--accent-1)]" : ""} />
+                <span className="hidden sm:inline">收藏</span>
+              </button>
+
+              <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
+
+              <button
+                onClick={onClose}
+                className="p-2 rounded-xl hover:bg-white/10 text-[var(--text-secondary)] hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Row: Tabs & Search */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             {/* Tabs */}
-            <div className="flex p-1 bg-black/20 rounded-lg border border-[var(--glass-border)]">
+            <div className="flex p-1 bg-black/20 rounded-lg border border-[var(--glass-border)] w-full sm:w-auto">
               <button
                 onClick={() => setActiveTab('characters')}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                   activeTab === 'characters' ? 'bg-[var(--accent-1)] text-white shadow-md' : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
                 }`}
               >
@@ -94,7 +124,7 @@ export function LibraryModal({ isOpen, onClose, onSelect, title = "召唤图库"
               </button>
               <button
                 onClick={() => setActiveTab('artists')}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                   activeTab === 'artists' ? 'bg-[var(--accent-1)] text-white shadow-md' : 'text-[var(--text-secondary)] hover:text-white hover:bg-white/5'
                 }`}
               >
@@ -102,8 +132,8 @@ export function LibraryModal({ isOpen, onClose, onSelect, title = "召唤图库"
               </button>
             </div>
 
-            {/* Model Type Selector */}
-            <div className="flex p-1 bg-black/20 rounded-lg border border-[var(--glass-border)] hidden md:flex ml-4">
+            {/* Model Type Selector (Hidden on Mobile) */}
+            <div className="hidden md:flex p-1 bg-black/20 rounded-lg border border-[var(--glass-border)] mx-auto">
               <button className="px-3 py-1 rounded-md text-xs font-bold transition-all bg-[var(--accent-1)] text-white shadow-md">
                 Anima
               </button>
@@ -111,10 +141,9 @@ export function LibraryModal({ isOpen, onClose, onSelect, title = "召唤图库"
                 即将推出
               </button>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative group w-48 sm:w-64 hidden sm:block">
+            {/* Search Input */}
+            <div className="relative group w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent-1)] transition-colors" size={16} />
               <input
                 type="text"
@@ -124,29 +153,6 @@ export function LibraryModal({ isOpen, onClose, onSelect, title = "召唤图库"
                 className="w-full bg-black/20 border border-white/10 rounded-xl py-1.5 pl-9 pr-4 text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-1)] transition-all"
               />
             </div>
-            
-            {/* Favorite Filter Toggle */}
-            <button
-              onClick={toggleFavoriteFilter}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-colors border ${
-                showFavorites
-                  ? "bg-[var(--accent-1)]/20 text-[var(--accent-1)] border-[var(--accent-1)]"
-                  : "bg-[var(--bg-layer-1)] text-[var(--text-secondary)] border-[var(--glass-border)] hover:bg-[var(--bg-layer-2)]"
-              }`}
-              title="只看收藏"
-            >
-              <Star size={14} className={showFavorites ? "fill-[var(--accent-1)]" : ""} />
-              <span className="hidden sm:inline">收藏</span>
-            </button>
-
-            <div className="w-[1px] h-6 bg-white/10 mx-1"></div>
-
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl hover:bg-white/10 text-[var(--text-secondary)] hover:text-white transition-colors"
-            >
-              <X size={20} />
-            </button>
           </div>
         </div>
 
