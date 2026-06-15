@@ -2,7 +2,7 @@ import { useSettingsStore } from "../stores/settingsStore";
 
 export class LLMService {
   private baseUrl = "https://apihub.agnes-ai.com/v1";
-  private apiKey = "sk-PB5Hb91TB08bu3qrv9gaYJipMyUvZ686jnEeIIf254xr6ami";
+  private apiKey = import.meta.env.VITE_AGNES_API_KEY || "";
   private model = "agnes-2.0-flash";
 
   async tagImage(imageBase64: string): Promise<{ tag: string, confidence: number }[]> {
