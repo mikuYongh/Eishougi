@@ -168,7 +168,7 @@ export function Vault() {
             className="flex flex-col md:flex-row bg-[#1A1020]/95 border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden w-full max-w-6xl max-h-[90vh] min-h-0"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex-1 flex items-center justify-center bg-black/50 p-4 relative min-h-0 md:min-h-0 overflow-hidden">
+            <div className="w-full h-[45vh] flex-shrink-0 md:h-auto md:flex-1 flex items-center justify-center bg-black/50 p-4 relative overflow-hidden">
               {isVideo(previewImage.output_path || (previewImage as any).outputPath || '') ? (
                 <video 
                   src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)} 
@@ -186,7 +186,7 @@ export function Vault() {
               )}
             </div>
             
-            <div className="w-full md:w-[350px] flex-shrink-0 bg-[var(--bg-layer-1)] p-6 flex flex-col gap-5 border-l border-[var(--glass-border)] overflow-y-auto">
+            <div className="w-full md:w-[350px] flex-1 md:flex-none min-h-0 bg-[var(--bg-layer-1)] p-6 flex flex-col gap-5 border-t md:border-t-0 md:border-l border-[var(--glass-border)] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-[var(--text-primary)]">典藏详情</h3>
                 <button onClick={() => setPreviewImage(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">

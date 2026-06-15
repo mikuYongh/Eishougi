@@ -6,8 +6,9 @@ import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useQueueStore } from "../../stores/queueStore";
 import { downloadImage } from "../../utils/download";
+import { getImgSrc } from "../../utils/imageUtils";
 
-const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 interface HistoryImage {
   id: string;
@@ -247,34 +248,36 @@ export function History() {
                   </div>
 
                   {/* Meta Bar */}
-                  <div className="p-2.5 bg-[var(--glass-bg)] flex flex-col gap-1 border-t border-[var(--glass-border)]">
-                    <div className="flex items-center justify-between gap-1.5 mb-0.5">
-                      <span className="text-[10px] font-bold text-[var(--accent-1)]/80 bg-[var(--accent-1)]/10 border border-[var(--accent-1)]/20 px-1.5 py-0.5 rounded-md truncate max-w-full">
+                  <div className="p-2.5 bg-[var(--glass-bg)] flex flex-col gap-1.5 border-t border-[var(--glass-border)]">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-bold text-[var(--accent-1)]/80 bg-[var(--accent-1)]/10 border border-[var(--accent-1)]/20 px-1.5 py-0.5 rounded-md truncate w-fit max-w-full">
                         {img.promptTitle}
                       </span>
-                      {/* Mobile Actions */}
-                      <div className="flex md:hidden items-center gap-1.5 flex-shrink-0">
-                        <button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); }} className="w-6 h-6 rounded-full bg-[var(--accent-1)]/20 text-[var(--accent-1)] flex items-center justify-center">
-                          <Maximize2 size={12} />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); downloadImage(img.url, `history_${img.id}.png`); }} className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
-                          <Download size={12} />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); handleToggleSave(img); }} className={`w-6 h-6 rounded-full flex items-center justify-center ${img.isSaved ? 'bg-[var(--accent-1)] text-white' : 'bg-white/10 text-[var(--text-muted)]'}`}>
-                          <Sparkles size={12} className={img.isSaved ? 'fill-white' : ''} />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }} className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 font-mono">{img.prompt}</p>
                     </div>
-                    <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 font-mono">{img.prompt}</p>
-                    <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] font-bold">
-                      <span className="px-1.5 py-0.5 rounded bg-white/5 truncate max-w-[100px]">{img.model}</span>
-                      <div className="flex gap-2">
+                    
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-[var(--text-muted)] font-bold">
+                      <span className="px-1.5 py-0.5 rounded bg-white/5 truncate max-w-[120px]">{img.model}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <span>{img.resolution}</span>
                         <span>{img.time}</span>
                       </div>
+                    </div>
+
+                    {/* Mobile Actions */}
+                    <div className="flex md:hidden items-center justify-end gap-2 mt-1 pt-2 border-t border-white/5">
+                      <button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); }} className="w-7 h-7 rounded-full bg-[var(--accent-1)]/20 text-[var(--accent-1)] flex items-center justify-center">
+                        <Maximize2 size={14} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); downloadImage(img.url, `history_${img.id}.png`); }} className="w-7 h-7 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                        <Download size={14} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleToggleSave(img); }} className={`w-7 h-7 rounded-full flex items-center justify-center ${img.isSaved ? 'bg-[var(--accent-1)] text-white' : 'bg-white/10 text-[var(--text-muted)]'}`}>
+                        <Sparkles size={14} className={img.isSaved ? 'fill-white' : ''} />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }} className="w-7 h-7 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -306,7 +309,7 @@ export function History() {
             onClick={e => e.stopPropagation()}
           >
             {/* Left: Image */}
-            <div className="flex-1 flex items-center justify-center bg-black/50 p-4 relative min-h-0 md:min-h-0 overflow-hidden">
+            <div className="w-full h-[45vh] flex-shrink-0 md:h-auto md:flex-1 flex items-center justify-center bg-black/50 p-4 relative overflow-hidden">
               <PhotoView src={getImgSrc(previewImage.url)}>
                 <img 
                   src={getImgSrc(previewImage.url)} 
@@ -317,7 +320,7 @@ export function History() {
             </div>
             
             {/* Right: Info */}
-            <div className="w-full md:w-[350px] flex-shrink-0 bg-[var(--bg-layer-1)] p-6 flex flex-col gap-5 border-l border-[var(--glass-border)] overflow-y-auto">
+            <div className="w-full md:w-[350px] flex-1 md:flex-none min-h-0 bg-[var(--bg-layer-1)] p-6 flex flex-col gap-5 border-t md:border-t-0 md:border-l border-[var(--glass-border)] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-[var(--text-primary)]">生成详情</h3>
                 <button onClick={() => setPreviewImage(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
