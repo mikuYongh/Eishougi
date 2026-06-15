@@ -1,5 +1,5 @@
-mod db;
 mod commands;
+mod db;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -29,6 +29,7 @@ pub fn run() {
     let state = AppState::new(app_data_dir).expect("Failed to initialize app state");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -52,7 +53,6 @@ pub fn run() {
             commands::history::delete_generated_image,
             commands::history::toggle_save_image,
             commands::files::save_base64_image,
-
             commands::files::read_image_base64,
             commands::files::read_text_file,
             commands::files::write_bytes_to_file,
@@ -81,19 +81,33 @@ pub fn run() {
 fn get_app_data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
-        let mut dir = std::env::var("APPDATA").ok().map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+        let mut dir = std::env::var("APPDATA")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
         dir.push("prompt-muse");
         dir
     }
     #[cfg(target_os = "macos")]
     {
-        let mut dir = std::env::var("HOME").ok().map(|h| PathBuf::from(h).join("Library/Application Support")).unwrap_or_else(|| PathBuf::from("."));
+        let mut dir = std::env::var("HOME")
+            .ok()
+            .map(|h| PathBuf::from(h).join("Library/Application Support"))
+            .unwrap_or_else(|| PathBuf::from("."));
         dir.push("prompt-muse");
         dir
     }
     #[cfg(target_os = "linux")]
     {
-        let mut dir = std::env::var("XDG_DATA_HOME").ok().map(PathBuf::from).or_else(|| std::env::var("HOME").ok().map(|h| PathBuf::from(h).join(".local/share"))).unwrap_or_else(|| PathBuf::from("."));
+        let mut dir = std::env::var("XDG_DATA_HOME")
+            .ok()
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var("HOME")
+                    .ok()
+                    .map(|h| PathBuf::from(h).join(".local/share"))
+            })
+            .unwrap_or_else(|| PathBuf::from("."));
         dir.push("prompt-muse");
         dir
     }

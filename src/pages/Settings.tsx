@@ -5,6 +5,7 @@ import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIco
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { save, open } from "@tauri-apps/plugin-dialog";
+import { writeFile, readFile } from "@tauri-apps/plugin-fs";
 import { GlassDropdown } from "../components/ui/GlassDropdown";
 
 const SETTINGS_TABS = [
@@ -112,7 +113,7 @@ export function Settings() {
 
       setExportStatus("正在写入文件...");
       // 3. Write zip file
-      await invoke('write_bytes_to_file', { path: filePath, data: zipBytes });
+      await writeFile(filePath, new Uint8Array(zipBytes));
 
       // 4. Also save frontend localStorage into a sidecar JSON
       const frontendData: Record<string, any> = {};
@@ -124,7 +125,7 @@ export function Settings() {
       const encoder = new TextEncoder();
       const frontendBytes = encoder.encode(JSON.stringify(frontendData));
       const frontendPath = filePath + ".frontend.json";
-      await invoke('write_bytes_to_file', { path: frontendPath, data: Array.from(frontendBytes) });
+      await writeFile(frontendPath, frontendBytes);
 
       setExportStatus("导出成功！");
       setTimeout(() => setExportStatus(null), 3000);
@@ -156,15 +157,16 @@ export function Settings() {
       setImportStatus("正在读取备份...");
 
       // 2. Read zip bytes and send to Rust for import
-      const zipBytes: number[] = await invoke('read_file_as_bytes', { path: filePath });
+      const fileBytes = await readFile(filePath);
+      const zipBytes: number[] = Array.from(fileBytes);
       const result = await invoke('import_all_data', { zipBytes });
 
       // 3. Restore frontend localStorage from sidecar if present
       const frontendPath = filePath + ".frontend.json";
       try {
-        const frontendBytes: number[] = await invoke('read_file_as_bytes', { path: frontendPath });
+        const frontendBytes = await readFile(frontendPath);
         const decoder = new TextDecoder();
-        const jsonStr = decoder.decode(new Uint8Array(frontendBytes));
+        const jsonStr = decoder.decode(frontendBytes);
         const frontendData = JSON.parse(jsonStr);
         for (const [key, value] of Object.entries(frontendData)) {
           localStorage.setItem(key, JSON.stringify(value));

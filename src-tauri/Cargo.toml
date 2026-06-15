@@ -32,3 +32,4 @@ futures-util = "0.3"
 base64 = "0.22.1"
 tauri-plugin-dialog = "2.7.1"
 zip = { version = "4.2.0", features = ["deflate"] }
+tauri-plugin-fs = "2"
