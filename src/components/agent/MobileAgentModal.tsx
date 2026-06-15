@@ -6,6 +6,7 @@ import { useSettingsStore, type McpServerConfig } from "../../stores/settingsSto
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { PhotoView } from 'react-photo-view';
 import { HistoryImagePicker } from "../ui/HistoryImagePicker";
 import { cn } from "../../lib/utils";
 
@@ -15,7 +16,11 @@ type ViewMode = 'chat' | 'history' | 'settings';
 
 function ChatImage({ src }: { src: string }) {
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
-  return <img src={getImgSrc(src)} className={`max-w-xs max-h-64 object-contain rounded-lg border border-[var(--glass-border)] mt-2 transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} alt="chat-attachment" />;
+  return (
+    <PhotoView src={getImgSrc(src)}>
+      <img src={getImgSrc(src)} className={`max-w-xs max-h-64 object-contain rounded-lg border border-[var(--glass-border)] mt-2 cursor-zoom-in transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} alt="chat-attachment" />
+    </PhotoView>
+  );
 }
 
 export function MobileAgentModal() {
@@ -174,7 +179,18 @@ export function MobileAgentModal() {
                       <div className="prose prose-invert prose-sm max-w-none break-words">
                         {msg.content ? (
                           <>
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                            <ReactMarkdown 
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                img: ({node, ...props}) => (
+                                  <PhotoView src={getImgSrc(props.src)}>
+                                    <img {...props} src={getImgSrc(props.src)} className="max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in" />
+                                  </PhotoView>
+                                )
+                              }}
+                            >
+                              {msg.content}
+                            </ReactMarkdown>
                             {msg.tool_calls && msg.tool_calls.length > 0 && (
                               <div className="mt-3 pt-3 border-t border-[var(--glass-border)] flex flex-col gap-2">
                                 {msg.tool_calls.map((tc, idx) => (

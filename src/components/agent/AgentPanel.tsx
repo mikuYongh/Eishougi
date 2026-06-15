@@ -12,6 +12,7 @@ import { HistoryImagePicker } from "../ui/HistoryImagePicker";
 import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { PhotoView } from 'react-photo-view';
 import { cn } from "../../lib/utils";
 
 const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
@@ -22,7 +23,11 @@ type ViewMode = 'chat' | 'history' | 'settings';
 function ChatImage({ src }: { src: string }) {
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
-  return <img src={getImgSrc(src)} className={`max-w-xs max-h-64 object-contain rounded-lg border border-[var(--glass-border)] mt-2 transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} alt="chat-attachment" />;
+  return (
+    <PhotoView src={getImgSrc(src)}>
+      <img src={getImgSrc(src)} className={`max-w-xs max-h-64 object-contain rounded-lg border border-[var(--glass-border)] mt-2 cursor-zoom-in transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} alt="chat-attachment" />
+    </PhotoView>
+  );
 }
 
 export function AgentPanel() {
@@ -199,7 +204,12 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                 h1: ({node, ...props}) => <h1 className="text-lg font-bold text-[var(--text-primary)] mt-4 mb-2" {...props} />,
                 h2: ({node, ...props}) => <h2 className="text-md font-bold text-[var(--text-primary)] mt-3 mb-2" {...props} />,
                 h3: ({node, ...props}) => <h3 className="text-sm font-bold text-[var(--text-primary)] mt-2 mb-1" {...props} />,
-                blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-[var(--accent-1)]/30 pl-3 py-1 text-[var(--text-muted)] italic my-2" {...props} />
+                blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-[var(--accent-1)]/30 pl-3 py-1 text-[var(--text-muted)] italic my-2" {...props} />,
+                img: ({node, ...props}) => (
+                  <PhotoView src={getImgSrc(props.src)}>
+                    <img {...props} src={getImgSrc(props.src)} className="max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in" />
+                  </PhotoView>
+                )
               }}
             >
               {msg.content}

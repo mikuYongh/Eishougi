@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders, Zap } from "lucide-react";
+import { PhotoView } from 'react-photo-view';
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { usePromptStore, type LoraConfig } from "../../stores/promptStore";
 import { useQueueStore, type QueueJob } from "../../stores/queueStore";
@@ -14,6 +15,8 @@ import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
 import { StyleSelector } from "../../components/generate/StyleSelector";
 import { comfyService } from "../../services/comfyService";
 import type { PresetStyle } from "../../data/styles";
+
+const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
 
 const SDXL_RESOLUTIONS = [
   { label: "1024x1024 (1:1 方幅)", value: "1024x1024 (1.0)" },
@@ -337,7 +340,9 @@ export function Generate() {
             
             {results.length > 0 && !isGenerating ? (
               <div className="relative w-full h-full flex items-center justify-center group">
-                <img src={results[0].startsWith('http') ? results[0] : convertFileSrc(results[0])} alt="Generated" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} />
+                <PhotoView src={getImgSrc(results[0])}>
+                  <img src={getImgSrc(results[0])} alt="Generated" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-zoom-in transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} />
+                </PhotoView>
                 
                 <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-2xl px-4 absolute bottom-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                   <button onClick={() => downloadImage(results[0], `generated_${Date.now()}.png`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-blue-400/50 cursor-pointer">
@@ -617,7 +622,9 @@ export function Generate() {
         <div className="flex-shrink-0 glass-panel p-3 rounded-2xl border border-[var(--glass-border)] flex gap-3 overflow-x-auto no-scrollbar">
           {results.slice(1).map((res, i) => (
             <div key={i} className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[var(--glass-border)] hover:border-blue-400/50 cursor-pointer transition-colors relative group">
-              <img src={res.startsWith('http') ? res : convertFileSrc(res)} alt={`History ${i}`} className={`w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+              <PhotoView src={getImgSrc(res)}>
+                <img src={getImgSrc(res)} alt={`History ${i}`} className={`w-full h-full object-cover opacity-60 group-hover:opacity-100 cursor-zoom-in transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+              </PhotoView>
             </div>
           ))}
         </div>
