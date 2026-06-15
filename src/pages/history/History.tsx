@@ -1,10 +1,13 @@
 import { Download, Info, Trash2, CalendarDays, Maximize2, BookmarkPlus, Check, X, FileText, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import { PhotoView } from 'react-photo-view';
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useQueueStore } from "../../stores/queueStore";
 import { downloadImage } from "../../utils/download";
+
+const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
 
 interface HistoryImage {
   id: string;
@@ -206,7 +209,7 @@ export function History() {
                     className="aspect-square w-full relative overflow-hidden flex items-center justify-center cursor-pointer"
                     onClick={() => setPreviewImage(img)}
                   >
-                    <img src={img.url.startsWith('http') ? img.url : convertFileSrc(img.url)} alt="Result" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                    <img src={getImgSrc(img.url)} alt="Result" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                     
                   {/* Hover Actions (Desktop Only) */}
                     <div className="absolute inset-0 bg-[var(--glass-bg)] opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center gap-3">
@@ -299,16 +302,18 @@ export function History() {
           onClick={() => setPreviewImage(null)}
         >
           <div 
-            className="flex flex-col md:flex-row bg-[#1A1020]/95 border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden w-full max-w-6xl max-h-[90vh]"
+            className="flex flex-col md:flex-row bg-[#1A1020]/95 border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden w-full max-w-6xl max-h-[90vh] min-h-0"
             onClick={e => e.stopPropagation()}
           >
             {/* Left: Image */}
-            <div className="flex-1 flex items-center justify-center bg-black/50 p-4 relative min-h-[40vh] md:min-h-[auto]">
-              <img 
-                src={previewImage.url.startsWith('http') ? previewImage.url : convertFileSrc(previewImage.url)} 
-                alt="Preview full" 
-                className={`max-w-full max-h-[50vh] md:max-h-[85vh] object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
-              />
+            <div className="flex-1 flex items-center justify-center bg-black/50 p-4 relative min-h-0 md:min-h-0 overflow-hidden">
+              <PhotoView src={getImgSrc(previewImage.url)}>
+                <img 
+                  src={getImgSrc(previewImage.url)} 
+                  alt="Preview full" 
+                  className={`max-w-full max-h-full object-contain shadow-2xl rounded-lg cursor-zoom-in ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
+                />
+              </PhotoView>
             </div>
             
             {/* Right: Info */}
@@ -394,7 +399,7 @@ export function History() {
             </div>
 
             <div className="flex gap-3 p-4 border-b border-[var(--glass-border)] flex-shrink-0">
-              <img src={addingToPrompt.url.startsWith('http') ? addingToPrompt.url : convertFileSrc(addingToPrompt.url)} className="w-20 h-20 object-cover rounded-lg border border-[var(--glass-border)]" />
+              <img src={getImgSrc(addingToPrompt.url)} className="w-20 h-20 object-cover rounded-lg border border-[var(--glass-border)]" />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-[var(--accent-1)] font-bold mb-1">{addingToPrompt.promptTitle}</p>
                 <p className="text-[10px] text-[var(--text-muted)] font-mono line-clamp-3 leading-relaxed">{addingToPrompt.prompt}</p>
@@ -412,7 +417,7 @@ export function History() {
                       : 'bg-white/5 border-[var(--glass-border)] hover:bg-[var(--accent-1)]/10 hover:border-[var(--accent-1)]/30'
                   }`}
                 >
-                  {p.coverImage && <img src={p.coverImage.startsWith('http') ? p.coverImage : convertFileSrc(p.coverImage)} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
+                  {p.coverImage && <img src={getImgSrc(p.coverImage)} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
                   {!p.coverImage && <div className="w-10 h-10 rounded-lg bg-[var(--accent-1)]/20 flex items-center justify-center flex-shrink-0 text-[var(--accent-1)]"><FileText size={18} /></div>}
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-bold text-[var(--text-primary)] truncate">{p.title}</p>

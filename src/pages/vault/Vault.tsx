@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { Sparkles, HeartOff, Video, Download, X, Maximize2 } from "lucide-react";
+import { PhotoView } from 'react-photo-view';
 import { useSettingsStore } from "../../stores/settingsStore";
 import type { GeneratedImage } from "../../types";
 import { downloadImage } from "../../utils/download";
@@ -164,22 +165,24 @@ export function Vault() {
           onClick={() => setPreviewImage(null)}
         >
           <div 
-            className="flex flex-col md:flex-row bg-[#1A1020]/95 border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden w-full max-w-6xl max-h-[90vh]"
+            className="flex flex-col md:flex-row bg-[#1A1020]/95 border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden w-full max-w-6xl max-h-[90vh] min-h-0"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex-1 flex items-center justify-center bg-black/50 p-4 relative min-h-[40vh] md:min-h-[auto]">
+            <div className="flex-1 flex items-center justify-center bg-black/50 p-4 relative min-h-0 md:min-h-0 overflow-hidden">
               {isVideo(previewImage.output_path || (previewImage as any).outputPath || '') ? (
                 <video 
                   src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)} 
-                  className={`max-w-full max-h-[50vh] md:max-h-[85vh] object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
+                  className={`max-w-full max-h-full object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
                   autoPlay controls loop
                 />
               ) : (
-                <img 
-                  src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)} 
-                  alt="Preview full" 
-                  className={`max-w-full max-h-[50vh] md:max-h-[85vh] object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
-                />
+                <PhotoView src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)}>
+                  <img 
+                    src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)} 
+                    alt="Preview full" 
+                    className={`max-w-full max-h-full object-contain shadow-2xl rounded-lg cursor-zoom-in ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
+                  />
+                </PhotoView>
               )}
             </div>
             
