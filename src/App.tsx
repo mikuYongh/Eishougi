@@ -25,6 +25,7 @@ import { useWorkflowStore } from "./stores/workflowStore";
 import { useDevice } from "./hooks/useDevice";
 import { DesktopLayout } from "./components/layout/DesktopLayout";
 import { MobileLayout } from "./components/layout/MobileLayout";
+import { GlobalPhotoProvider } from "./components/ui/GlobalPhotoProvider";
 
 export default function App() {
   const { isMobile } = useDevice();
@@ -77,15 +78,17 @@ export default function App() {
         {/* TitleBar for desktop window dragging (hidden on mobile naturally if not Tauri window, but we keep it) */}
         {!isMobile && <TitleBar />}
 
-        {isMobile ? (
-          <MobileLayout>
-            <AppRoutes />
-          </MobileLayout>
-        ) : (
-          <DesktopLayout>
-            <AppRoutes />
-          </DesktopLayout>
-        )}
+        <GlobalPhotoProvider>
+          {isMobile ? (
+            <MobileLayout>
+              <AppRoutes />
+            </MobileLayout>
+          ) : (
+            <DesktopLayout>
+              <AppRoutes />
+            </DesktopLayout>
+          )}
+        </GlobalPhotoProvider>
       </div>
     </BrowserRouter>
   );
