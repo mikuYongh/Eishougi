@@ -11,10 +11,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { HistoryImagePicker } from "../../components/ui/HistoryImagePicker";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
-const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
 import { ArtistSelector } from "../../components/prompt/ArtistSelector";
+import { getImgSrc } from "../../utils/imageUtils";
 
 export function PromptEdit() {
   const { id } = useParams();

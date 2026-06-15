@@ -3,8 +3,9 @@ import { useWorkflowStore, type WorkflowType } from "../../stores/workflowStore"
 import { useNavigate } from "react-router-dom";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { getImgSrc } from "../../utils/imageUtils";
 
-const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 
 const TypeBadge = ({ type }: { type: WorkflowType }) => {

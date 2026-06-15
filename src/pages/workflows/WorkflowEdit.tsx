@@ -6,7 +6,7 @@ import { useWorkflowStore, type WorkflowProject, type WorkflowType } from "../..
 import { useModelStore } from "../../stores/modelStore";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
-const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
@@ -15,6 +15,7 @@ import { LoraPickerModal } from "../../components/ui/LoraPickerModal";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { comfyService } from "../../services/comfyService";
+import { getImgSrc } from "../../utils/imageUtils";
 
 const SDXL_RESOLUTIONS = [
   { label: "1024x1024 (1:1 方幅)", value: "1024x1024" },

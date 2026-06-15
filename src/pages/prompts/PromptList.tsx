@@ -6,8 +6,9 @@ import { useNavigate } from "react-router-dom";
 import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import { aiService } from "../../services/aiService";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { getImgSrc } from "../../utils/imageUtils";
 
-const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 
 type ViewMode = 'grid' | 'list';
@@ -201,31 +202,46 @@ export function PromptList() {
             {paginatedPrompts.map((p) => (
               <div key={p.id} className="glass-panel rounded-xl flex flex-col group border border-[var(--glass-border)] hover:border-blue-400/30 transition-all hover:shadow-[0_8px_30px_rgba(66,165,245,0.1)] overflow-hidden">
                 
-                {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) && (
-                  <div className="h-24 w-full relative overflow-hidden flex-shrink-0 bg-[var(--glass-bg)]">
+                <div className="h-28 w-full relative overflow-hidden flex-shrink-0 bg-[var(--glass-bg)] border-b border-[var(--glass-border)]">
+                  {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) ? (
                     <img src={getImgSrc(p.coverImage || p.instanceImages?.[0])} alt={p.title} className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
-                    <div className="absolute top-2 right-2 z-20 flex gap-1.5">
-                      <button 
-                        onClick={() => toggleFavorite(p.id)}
-                        className="p-1.5 rounded-full bg-[var(--glass-bg)] backdrop-blur hover:bg-[var(--glass-bg)] transition-colors cursor-pointer"
-                      >
-                        <Star size={14} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-[var(--text-primary)]"} />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (confirm("确定要删除该提示词项目吗？")) {
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--bg-layer-0)] to-[var(--glass-border)] flex flex-col items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
+                      <div className="w-10 h-10 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.2)] mb-2">
+                        <Sparkles size={18} className="text-[var(--accent-1)] opacity-50 group-hover:opacity-100 group-hover:animate-pulse transition-all" />
+                      </div>
+                      <span className="text-[10px] text-[var(--text-muted)] font-mono tracking-widest uppercase">EISHOUGI PROJECT</span>
+                    </div>
+                  )}
+                  
+                  <div className="absolute top-2 right-2 z-20 flex gap-1.5">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); toggleFavorite(p.id); }}
+                      className="p-1.5 rounded-full bg-[var(--glass-bg)] backdrop-blur hover:bg-[var(--glass-bg)] transition-colors cursor-pointer"
+                    >
+                      <Star size={14} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-[var(--text-primary)]"} />
+                    </button>
+                    <button 
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const yes = await confirm("确定要删除该提示词项目吗？");
+                          if (yes) {
                             removePrompt(p.id);
                           }
-                        }}
-                        className="p-1.5 rounded-full bg-[var(--glass-bg)] backdrop-blur hover:bg-red-500/20 text-red-400/80 hover:text-red-400 transition-colors cursor-pointer"
-                        title="删除项目"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+                        } catch (err) {
+                          if (window.confirm("确定要删除该提示词项目吗？")) {
+                            removePrompt(p.id);
+                          }
+                        }
+                      }}
+                      className="p-1.5 rounded-full bg-[var(--glass-bg)] backdrop-blur hover:bg-red-500/20 text-red-400/80 hover:text-red-400 transition-colors cursor-pointer"
+                      title="删除项目"
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
-                )}
+                </div>
 
                 <div className="p-4 flex flex-col gap-3 flex-1">
                   <div className="flex items-start justify-between gap-3">
@@ -233,33 +249,6 @@ export function PromptList() {
                       <h3 className="text-[14px] font-bold text-[var(--text-primary)] truncate mb-1" title={p.title}>{p.title}</h3>
                       <p className="text-[11px] text-[var(--text-muted)] line-clamp-1">{p.description || "暂无描述"}</p>
                     </div>
-                    {(!p.coverImage && (!p.instanceImages || p.instanceImages.length === 0)) && (
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button onClick={() => toggleFavorite(p.id)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer">
-                          <Star size={14} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-[var(--text-muted)]"} />
-                        </button>
-                        <button 
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              const yes = await confirm("确定要删除该提示词项目吗？");
-                              if (yes) {
-                                removePrompt(p.id);
-                              }
-                            } catch (err) {
-                              // Fallback to native confirm if tauri dialog plugin is not ready
-                              if (window.confirm("确定要删除该提示词项目吗？")) {
-                                removePrompt(p.id);
-                              }
-                            }
-                          }}
-                          className="p-1.5 rounded-full hover:bg-red-500/10 text-red-400/80 hover:text-red-400 transition-colors cursor-pointer"
-                          title="删除项目"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    )}
                   </div>
 
                   {/* Tags */}
@@ -309,12 +298,12 @@ export function PromptList() {
                 {/* Square Thumbnail & Info Wrapper for Mobile Stack */}
                 <div className="flex items-center gap-4 w-full md:w-auto flex-1 min-w-0">
                 {/* Square Thumbnail */}
-                <div className="w-16 h-16 rounded-lg overflow-hidden bg-[var(--glass-bg)] flex-shrink-0 relative">
+                <div className="w-16 h-16 rounded-lg overflow-hidden bg-[var(--glass-bg)] flex-shrink-0 relative border border-[var(--glass-border)] group-hover:border-blue-400/30 transition-all">
                   {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) ? (
                     <img src={getImgSrc(p.coverImage || p.instanceImages?.[0])} className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} alt="cover"/>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/10">
-                      <ImageIcon size={20} />
+                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--bg-layer-0)] to-[var(--bg-layer-1)] flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
+                      <Sparkles size={20} className="text-[var(--accent-1)] opacity-50 group-hover:opacity-100 group-hover:animate-pulse transition-all" />
                     </div>
                   )}
                 </div>

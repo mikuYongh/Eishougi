@@ -15,8 +15,9 @@ import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
 import { StyleSelector } from "../../components/generate/StyleSelector";
 import { comfyService } from "../../services/comfyService";
 import type { PresetStyle } from "../../data/styles";
+import { getImgSrc } from "../../utils/imageUtils";
 
-const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 const SDXL_RESOLUTIONS = [
   { label: "1024x1024 (1:1 方幅)", value: "1024x1024 (1.0)" },

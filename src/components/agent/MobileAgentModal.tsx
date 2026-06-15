@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
-import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X, Menu } from "lucide-react";
+import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X, Menu, ArrowDown } from "lucide-react";
 import { useAgentStore } from "../../stores/agentStore";
 import { useAgent, type ChatMessage } from "../../hooks/useAgent";
 import { useSettingsStore, type McpServerConfig } from "../../stores/settingsStore";
@@ -9,8 +9,9 @@ import remarkGfm from "remark-gfm";
 import { PhotoView } from 'react-photo-view';
 import { HistoryImagePicker } from "../ui/HistoryImagePicker";
 import { cn } from "../../lib/utils";
+import { getImgSrc } from "../../utils/imageUtils";
 
-const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 type ViewMode = 'chat' | 'history' | 'settings';
 
@@ -38,15 +39,34 @@ export function MobileAgentModal() {
   const [tempSystemPrompt, setTempSystemPrompt] = useState(settings.systemPrompt);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    // Show if we're not at the bottom (allow 50px threshold)
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    setShowScrollBottom(!isAtBottom);
+  };
 
   // Auto scroll to bottom
   useEffect(() => {
-    if (viewMode === 'chat' && messagesEndRef.current && session?.messages?.length) {
+    if (viewMode === 'chat' && scrollContainerRef.current && session?.messages?.length) {
+      // Immediate scroll
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        }
       }, 50);
+      // Fallback scroll after slide-in animation finishes (300ms)
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        }
+      }, 350);
     }
-  }, [session?.messages?.length, isGenerating, viewMode]);
+  }, [session?.messages?.length, isGenerating, viewMode, isMobileAgentOpen]);
 
   if (!isMobileAgentOpen) return null;
 
@@ -127,7 +147,11 @@ export function MobileAgentModal() {
         {/* CHAT VIEW */}
         {viewMode === 'chat' && (
           <>
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar pb-32">
+            <div 
+              ref={scrollContainerRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar pb-32"
+            >
               {(!session?.messages || session.messages.length === 0) && !isGenerating && (
                 <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] space-y-4 opacity-50 px-8 text-center">
                   <div className="relative">
@@ -232,6 +256,20 @@ export function MobileAgentModal() {
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Scroll to bottom button */}
+            {showScrollBottom && session?.messages && session.messages.length > 0 && (
+              <button
+                onClick={() => {
+                  if (scrollContainerRef.current) {
+                    scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
+                  }
+                }}
+                className="absolute bottom-28 right-4 z-20 w-10 h-10 rounded-full bg-[var(--accent-1)] text-white flex items-center justify-center shadow-[0_4px_15px_rgba(var(--accent-1-rgb),0.5)] transition-all animate-in fade-in slide-in-from-bottom-2"
+              >
+                <ArrowDown size={18} />
+              </button>
+            )}
 
             {/* Input Area */}
             <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[var(--bg-base)] via-[var(--bg-base)]/90 to-transparent flex flex-col gap-2 pointer-events-none">

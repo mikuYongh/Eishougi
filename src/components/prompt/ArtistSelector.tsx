@@ -3,16 +3,9 @@ import { useLibraryStore, type Artist } from "../../stores/libraryStore";
 import { Search, X, Paintbrush, Check } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { getImgSrc } from "../../utils/imageUtils";
 
-const getImgSrc = (url?: string | null) => {
-  if (!url) return '';
-  if (url.startsWith('http') || url.startsWith('data:')) return url;
-  // If it's a bare filename from the database (AnimaDex thumbname)
-  if (!url.includes('/') && !url.includes('\\')) {
-    return `https://blobs.animadex.net/ArtistOutputs/thumbs/${url}`;
-  }
-  return convertFileSrc(url);
-};
+
 
 interface ArtistSelectorProps {
   selectedTriggers: string;

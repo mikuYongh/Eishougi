@@ -7,8 +7,9 @@ import { useWorkflowStore } from "../stores/workflowStore";
 import { useQueueStore } from "../stores/queueStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { getImgSrc } from "../utils/imageUtils";
 
-const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 export function Dashboard() {
   const navigate = useNavigate();

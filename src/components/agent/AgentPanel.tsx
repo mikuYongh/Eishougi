@@ -1,4 +1,4 @@
-import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X } from "lucide-react";
+import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X, ArrowDown } from "lucide-react";
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
 import { useAgent } from "../../hooks/useAgent";
 import { useAgentStore } from "../../stores/agentStore";
@@ -14,8 +14,9 @@ import type { VirtuosoHandle } from "react-virtuoso";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { PhotoView } from 'react-photo-view';
 import { cn } from "../../lib/utils";
+import { getImgSrc } from "../../utils/imageUtils";
 
-const getImgSrc = (url?: string) => !url ? '' : (url.startsWith('http') || url.startsWith('data:') ? url : convertFileSrc(url));
+
 
 
 type ViewMode = 'chat' | 'history' | 'settings';
@@ -36,6 +37,7 @@ export function AgentPanel() {
   const [inputValue, setInputValue] = useState("");
   const [selectedImages, setSelectedImages] = useState<{ path: string, previewUrl: string }[]>([]);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   
   const { messages, isGenerating, sendMessage, stopGenerating } = useAgent();
@@ -55,18 +57,21 @@ export function AgentPanel() {
   
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
-  // Auto scroll to bottom when messages or isGenerating changes
+  // Auto scroll to bottom when messages or isGenerating changes, or panel opens
   useEffect(() => {
     if (isExpanded && viewMode === 'chat' && virtuosoRef.current && messages.length > 0) {
       setTimeout(() => {
-        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'smooth' });
-      }, 100);
+        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'auto' });
+      }, 150);
     }
   }, [messages.length, isGenerating, viewMode, isExpanded]);
 
   // Auto-upgrade system prompt for older sessions
   useEffect(() => {
-    if (!settings.systemPrompt.includes('MCP_TOOLS')) {
+    let currentPrompt = settings.systemPrompt;
+    let needsUpdate = false;
+
+    if (!currentPrompt.includes('MCP_TOOLS')) {
       const defaultSystemPrompt = `You are NEXUS, a highly capable AI Agent designed for 詠唱机 EISHOUGI.
 You assist the user in generating high-quality prompts, creating workflows, and generating images.
 Always respond in the user's language. Keep answers concise.
@@ -91,6 +96,7 @@ When using create_prompt or update_prompt:
 2. If MCP tools are NOT available, you MUST translate the positive_prompt into high-quality English keywords based on your own Danbooru tag knowledge.
 3. You MUST auto-generate suitable negative_prompt keywords tailored to the specific scene to avoid bad generations (e.g. lowres, bad anatomy, bad hands, missing fingers, extra digit, worst quality, etc).
 4. CAN specify model params: base_model, lora_configs [{name, strength, enabled}], width, height, steps, cfg_scale, seed.
+5. DO NOT invent or hallucinate physical traits (like hair color, eye color, breast size, etc.) when a specific character name or Danbooru character tag is provided. Character tags already encapsulate their appearance. Only add basic physical trait tags if the user explicitly requests an original character (OC) or a specific trait variation.
 
 ## MCP TOOLS — Danbooru Tag Search (MCP_TOOLS):
 When MCP tools (search_tags, get_related_tags, get_artist_recommendations) are loaded:
@@ -106,6 +112,7 @@ Use these proactively when creating prompts to ensure tags are valid Danbooru ke
 ## GENERATION RULES:
 - When asked to generate an image, simply call the generate_image tool with the prompt_id. DO NOT ask the user which workflow to use. The generate_image tool will automatically use the prompt's default bound workflow.
 - Only if generate_image returns an error stating "No workflows exist", you should tell the user to import a workflow from the Workflows page.
+import { getImgSrc } from "../../utils/imageUtils";
 
 ## CONTEXT AWARENESS:
 - You will be provided with [System Context] containing the active prompt ID if the user is viewing one.
@@ -115,10 +122,25 @@ Use these proactively when creating prompts to ensure tags are valid Danbooru ke
 When asked to create/modify/delete prompts → use create_prompt / update_prompt_content / update_prompt_settings / delete_prompt.
 When asked to set model/LoRA on a project → use update_prompt_settings.`;
 
-      updateSettings({ systemPrompt: defaultSystemPrompt });
-      setTempSystemPrompt(defaultSystemPrompt);
+      currentPrompt = defaultSystemPrompt;
+      needsUpdate = true;
+    } else if (!currentPrompt.includes('hallucinate physical traits')) {
+      const rule5 = "\n5. DO NOT invent or hallucinate physical traits (like hair color, eye color, breast size, etc.) when a specific character name or Danbooru character tag is provided. Character tags already encapsulate their appearance. Only add basic physical trait tags if the user explicitly requests an original character (OC) or a specific trait variation.";
+      
+      if (currentPrompt.includes("4. CAN specify model params")) {
+        currentPrompt = currentPrompt.replace(
+          "4. CAN specify model params: base_model, lora_configs [{name, strength, enabled}], width, height, steps, cfg_scale, seed.",
+          "4. CAN specify model params: base_model, lora_configs [{name, strength, enabled}], width, height, steps, cfg_scale, seed." + rule5
+        );
+        needsUpdate = true;
+      }
     }
-  }, [settings.systemPrompt]);
+
+    if (needsUpdate) {
+      updateSettings({ systemPrompt: currentPrompt });
+      setTempSystemPrompt(currentPrompt);
+    }
+  }, [settings.systemPrompt, updateSettings]);
 
 
 
@@ -581,52 +603,63 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
               </div>
             </div>
           ) : (
-            <Virtuoso
-              ref={virtuosoRef}
-              className="h-full custom-scrollbar"
-              data={messages}
-              initialTopMostItemIndex={messages.length > 0 ? messages.length - 1 : 0}
-              followOutput="smooth"
-              itemContent={(index, msg) => (
-                <div className="px-6 py-3">
-                  <div 
-                    className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 fade-in duration-300`}
-                  >
+              <Virtuoso
+                ref={virtuosoRef}
+                className="h-full custom-scrollbar"
+                data={messages}
+                initialTopMostItemIndex={messages.length > 0 ? messages.length - 1 : 0}
+                followOutput="smooth"
+                atBottomStateChange={(atBottom) => setShowScrollBottom(!atBottom)}
+                itemContent={(index, msg) => (
+                  <div className="px-6 py-3">
                     <div 
-                      className={`max-w-[92%] text-[14px] relative group ${
-                        msg.role === 'user' 
-                          ? 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tr-sm border border-[var(--accent-1)]/30 backdrop-blur-md shadow-[0_4px_15px_rgba(var(--accent-1-rgb), 10)]' 
-                          : msg.role === 'tool' || (!msg.content && msg.tool_calls && msg.tool_calls.length > 0)
-                          ? 'p-0 bg-transparent w-full shadow-none mt-2'
-                          : 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl shadow-[0_4px_15px_rgba(0,0,0,0.15)]'
-                      }`}
+                      className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-in slide-in-from-bottom-2 fade-in duration-300`}
                     >
-                      {msg.role === 'assistant' && (
-                        <div className="absolute -left-10 top-0 w-8 h-8 rounded-full border border-[var(--accent-1)]/30 bg-[var(--bg-layer-0)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Bot size={14} className="text-[var(--accent-1)]" />
-                        </div>
-                      )}
-                      {renderMessageContent(msg)}
+                      <div 
+                        className={`max-w-[92%] text-[14px] relative group ${
+                          msg.role === 'user' 
+                            ? 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tr-sm border border-[var(--accent-1)]/30 backdrop-blur-md shadow-[0_4px_15px_rgba(var(--accent-1-rgb), 10)]' 
+                            : msg.role === 'tool' || (!msg.content && msg.tool_calls && msg.tool_calls.length > 0)
+                            ? 'p-0 bg-transparent w-full shadow-none mt-2'
+                            : 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl shadow-[0_4px_15px_rgba(0,0,0,0.15)]'
+                        }`}
+                      >
+                        {msg.role === 'assistant' && (
+                          <div className="absolute -left-10 top-0 w-8 h-8 rounded-full border border-[var(--accent-1)]/30 bg-[var(--bg-layer-0)] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Bot size={14} className="text-[var(--accent-1)]" />
+                          </div>
+                        )}
+                        {renderMessageContent(msg)}
+                      </div>
+                      <span className="text-[10px] text-[var(--text-muted)] mt-1.5 font-mono px-1">
+                        {msg.role.toUpperCase()}
+                      </span>
                     </div>
-                    <span className="text-[10px] text-[var(--text-muted)] mt-1.5 font-mono px-1">
-                      {msg.role.toUpperCase()}
-                    </span>
                   </div>
-                </div>
-              )}
-              components={{
-                Footer: () => isGenerating ? (
-                  <div className="px-6 py-3 flex items-start animate-in fade-in duration-300">
-                    <div className="bg-[var(--glass-bg)] border border-[var(--accent-1)]/20 p-4 rounded-2xl rounded-tl-sm flex gap-3 items-center backdrop-blur-md shadow-[0_0_15px_rgba(var(--accent-1-rgb), 10)]">
-                      <Loader2 size={16} className="text-[var(--accent-1)] animate-spin" />
-                      <span className="text-xs font-mono text-[var(--accent-1)] tracking-widest uppercase animate-pulse">Processing...</span>
+                )}
+                components={{
+                  Footer: () => isGenerating ? (
+                    <div className="px-6 py-3 flex items-start animate-in fade-in duration-300">
+                      <div className="bg-[var(--glass-bg)] border border-[var(--accent-1)]/20 p-4 rounded-2xl rounded-tl-sm flex gap-3 items-center backdrop-blur-md shadow-[0_0_15px_rgba(var(--accent-1-rgb), 10)]">
+                        <Loader2 size={16} className="text-[var(--accent-1)] animate-spin" />
+                        <span className="text-xs font-mono text-[var(--accent-1)] tracking-widest uppercase animate-pulse">Processing...</span>
+                      </div>
                     </div>
-                  </div>
-                ) : <div className="h-4" />
-              }}
-            />
-          )}
-        </div>
+                  ) : <div className="h-4" />
+                }}
+              />
+            )}
+
+            {/* Scroll to bottom button */}
+            {showScrollBottom && messages.length > 0 && (
+              <button
+                onClick={() => virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'smooth' })}
+                className="absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full bg-[var(--accent-1)] text-white flex items-center justify-center hover:bg-[var(--accent-1)]/80 shadow-[0_4px_15px_rgba(var(--accent-1-rgb),0.5)] transition-all animate-in fade-in slide-in-from-bottom-2"
+              >
+                <ArrowDown size={18} />
+              </button>
+            )}
+          </div>
 
         {/* Input */}
         <div className="p-5 flex-shrink-0 border-t border-[var(--glass-border)] bg-[var(--bg-layer-2)]/80 z-10">
