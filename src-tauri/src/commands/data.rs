@@ -1,9 +1,9 @@
-use tauri::{State, AppHandle, Emitter};
 use crate::AppState;
-use serde::{Deserialize, Serialize};
 use rusqlite::params;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::io::{Read as IoRead, Write as IoWrite};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -29,29 +29,32 @@ fn now() -> i64 {
 }
 
 fn dump_table(conn: &rusqlite::Connection, table: &str) -> Result<Vec<serde_json::Value>, String> {
-    let mut stmt = conn.prepare(&format!("SELECT * FROM {}", table))
+    let mut stmt = conn
+        .prepare(&format!("SELECT * FROM {}", table))
         .map_err(|e| format!("Failed to query {}: {}", table, e))?;
     let col_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
 
-    let rows = stmt.query_map([], |row| {
-        let mut map = serde_json::Map::new();
-        for (i, col) in col_names.iter().enumerate() {
-            let val: serde_json::Value = match row.get_ref(i) {
-                Ok(rusqlite::types::ValueRef::Null) => serde_json::Value::Null,
-                Ok(rusqlite::types::ValueRef::Integer(n)) => serde_json::json!(n),
-                Ok(rusqlite::types::ValueRef::Real(f)) => serde_json::json!(f),
-                Ok(rusqlite::types::ValueRef::Text(s)) => {
-                    let s = String::from_utf8_lossy(s).to_string();
-                    serde_json::json!(s)
-                }
-                Ok(rusqlite::types::ValueRef::Blob(_)) => serde_json::Value::Null,
-                Err(_) => serde_json::Value::Null,
-            };
-            let camel_key = to_camel_case(col);
-            map.insert(camel_key, val);
-        }
-        Ok(serde_json::Value::Object(map))
-    }).map_err(|e| format!("Failed to map rows from {}: {}", table, e))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let mut map = serde_json::Map::new();
+            for (i, col) in col_names.iter().enumerate() {
+                let val: serde_json::Value = match row.get_ref(i) {
+                    Ok(rusqlite::types::ValueRef::Null) => serde_json::Value::Null,
+                    Ok(rusqlite::types::ValueRef::Integer(n)) => serde_json::json!(n),
+                    Ok(rusqlite::types::ValueRef::Real(f)) => serde_json::json!(f),
+                    Ok(rusqlite::types::ValueRef::Text(s)) => {
+                        let s = String::from_utf8_lossy(s).to_string();
+                        serde_json::json!(s)
+                    }
+                    Ok(rusqlite::types::ValueRef::Blob(_)) => serde_json::Value::Null,
+                    Err(_) => serde_json::Value::Null,
+                };
+                let camel_key = to_camel_case(col);
+                map.insert(camel_key, val);
+            }
+            Ok(serde_json::Value::Object(map))
+        })
+        .map_err(|e| format!("Failed to map rows from {}: {}", table, e))?;
 
     let mut result = Vec::new();
     for r in rows {
@@ -111,8 +114,14 @@ fn collect_all_image_paths(rows: &[serde_json::Value], field: &str) -> Vec<Strin
 /// Export all data as a zip archive (Vec<u8>).
 /// Structure: data.json + images/* (local image files bundled in)
 #[tauri::command]
-pub async fn export_all_data(state: State<'_, AppState>, app: AppHandle) -> Result<Vec<u8>, String> {
-    let _ = app.emit("export-progress", serde_json::json!({ "stage": "reading_db", "message": "正在读取数据库..." }));
+pub async fn export_all_data(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Vec<u8>, String> {
+    let _ = app.emit(
+        "export-progress",
+        serde_json::json!({ "stage": "reading_db", "message": "正在读取数据库..." }),
+    );
     let db = state.db.lock().await;
 
     // 1. Dump all tables
@@ -133,19 +142,25 @@ pub async fn export_all_data(state: State<'_, AppState>, app: AppHandle) -> Resu
     // 2. Collect all image paths/URLs from relevant tables
     let mut image_paths: Vec<String> = Vec::new();
     image_paths.extend(collect_all_image_paths(&data.prompt_images, "filePath"));
-    image_paths.extend(collect_all_image_paths(&data.generated_images, "outputPath"));
+    image_paths.extend(collect_all_image_paths(
+        &data.generated_images,
+        "outputPath",
+    ));
 
     // Deduplicate
     let mut seen = HashSet::new();
     image_paths.retain(|p| seen.insert(p.clone()));
 
     let total_images = image_paths.len();
-    let _ = app.emit("export-progress", serde_json::json!({
-        "stage": "preparing_images",
-        "message": format!("准备打包 {} 张图片...", total_images),
-        "current": 0,
-        "total": total_images
-    }));
+    let _ = app.emit(
+        "export-progress",
+        serde_json::json!({
+            "stage": "preparing_images",
+            "message": format!("准备打包 {} 张图片...", total_images),
+            "current": 0,
+            "total": total_images
+        }),
+    );
 
     // 3. Build zip in memory
     let buf = std::io::Cursor::new(Vec::new());
@@ -173,7 +188,10 @@ pub async fn export_all_data(state: State<'_, AppState>, app: AppHandle) -> Resu
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     // Collect download tasks
-    let mut download_tasks: Vec<(String, std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<u8>>> + Send>>) >= Vec::new();
+    let mut download_tasks: Vec<(
+        String,
+        std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<u8>>> + Send>>,
+    )> = Vec::new();
     let mut local_tasks: Vec<(String, Option<Vec<u8>>)> = Vec::new();
 
     for path in &image_paths {
@@ -250,12 +268,15 @@ pub async fn export_all_data(state: State<'_, AppState>, app: AppHandle) -> Resu
             skipped += 1;
         }
         processed += 1;
-        let _ = app.emit("export-progress", serde_json::json!({
-            "stage": "downloading",
-            "message": format!("打包本地图片 {}/{}", processed, total_images),
-            "current": processed,
-            "total": total_images
-        }));
+        let _ = app.emit(
+            "export-progress",
+            serde_json::json!({
+                "stage": "downloading",
+                "message": format!("打包本地图片 {}/{}", processed, total_images),
+                "current": processed,
+                "total": total_images
+            }),
+        );
     }
 
     // Download HTTP images (sequentially to show progress)
@@ -273,18 +294,25 @@ pub async fn export_all_data(state: State<'_, AppState>, app: AppHandle) -> Resu
             }
         }
         processed += 1;
-        let _ = app.emit("export-progress", serde_json::json!({
-            "stage": "downloading",
-            "message": format!("下载图片 {}/{}", processed, total_images),
-            "current": processed,
-            "total": total_images
-        }));
+        let _ = app.emit(
+            "export-progress",
+            serde_json::json!({
+                "stage": "downloading",
+                "message": format!("下载图片 {}/{}", processed, total_images),
+                "current": processed,
+                "total": total_images
+            }),
+        );
     }
 
-    let result = zip.finish()
+    let result = zip
+        .finish()
         .map_err(|e| format!("Zip finalize error: {}", e))?;
 
-    eprintln!("[Export] Bundled {} images, skipped {} (not found on disk)", bundled, skipped);
+    eprintln!(
+        "[Export] Bundled {} images, skipped {} (not found on disk)",
+        bundled, skipped
+    );
 
     Ok(result.into_inner())
 }
@@ -312,7 +340,8 @@ fn insert_table(
         return Ok(0);
     }
 
-    let first = rows[0].as_object()
+    let first = rows[0]
+        .as_object()
         .ok_or_else(|| format!("Row in {} is not an object", table))?;
     let camel_cols: Vec<String> = first.keys().cloned().collect();
     let snake_cols: Vec<String> = camel_cols.iter().map(|c| from_camel_case(c)).collect();
@@ -327,7 +356,8 @@ fn insert_table(
 
     let mut count = 0;
     for row in rows {
-        let obj = row.as_object()
+        let obj = row
+            .as_object()
             .ok_or_else(|| format!("Row in {} is not an object", table))?;
 
         let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -335,7 +365,9 @@ fn insert_table(
             let val = obj.get(camel_key).unwrap_or(&serde_json::Value::Null);
             match val {
                 serde_json::Value::Null => param_values.push(Box::new(Option::<String>::None)),
-                serde_json::Value::Bool(b) => param_values.push(Box::new(if *b { 1i32 } else { 0i32 })),
+                serde_json::Value::Bool(b) => {
+                    param_values.push(Box::new(if *b { 1i32 } else { 0i32 }))
+                }
                 serde_json::Value::Number(n) => {
                     if let Some(i) = n.as_i64() {
                         param_values.push(Box::new(i as i32));
@@ -350,7 +382,8 @@ fn insert_table(
             }
         }
 
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            param_values.iter().map(|p| p.as_ref()).collect();
         match conn.execute(&sql, param_refs.as_slice()) {
             Ok(_) => count += 1,
             Err(e) => {
@@ -364,23 +397,28 @@ fn insert_table(
 /// Import data from a zip archive (Vec<u8>).
 /// Extracts data.json for DB records and restores images from images/*.
 #[tauri::command]
-pub async fn import_all_data(state: State<'_, AppState>, zip_bytes: Vec<u8>) -> Result<String, String> {
+pub async fn import_all_data(
+    state: State<'_, AppState>,
+    zip_bytes: Vec<u8>,
+) -> Result<String, String> {
     let reader = std::io::Cursor::new(zip_bytes);
-    let mut archive = zip::ZipArchive::new(reader)
-        .map_err(|e| format!("Invalid zip file: {}", e))?;
+    let mut archive =
+        zip::ZipArchive::new(reader).map_err(|e| format!("Invalid zip file: {}", e))?;
 
     // 1. Read data.json from zip
     let mut json_str = String::new();
-    archive.by_name("data.json")
+    archive
+        .by_name("data.json")
         .map_err(|e| format!("data.json not found in zip: {}", e))?
         .read_to_string(&mut json_str)
         .map_err(|e| format!("Failed to read data.json: {}", e))?;
-    let data: ImportPayload = serde_json::from_str(&json_str)
-        .map_err(|e| format!("Invalid data.json format: {}", e))?;
+    let data: ImportPayload =
+        serde_json::from_str(&json_str).map_err(|e| format!("Invalid data.json format: {}", e))?;
 
     // 2. Restore image files from zip to app uploads dir
     let uploads_dir = state.app_data_dir.join("uploads");
-    std::fs::create_dir_all(&uploads_dir).map_err(|e| format!("Failed to create uploads dir: {}", e))?;
+    std::fs::create_dir_all(&uploads_dir)
+        .map_err(|e| format!("Failed to create uploads dir: {}", e))?;
 
     let mut restored_images = 0u32;
     let file_indices: Vec<usize> = (0..archive.len()).collect();
@@ -395,7 +433,8 @@ pub async fn import_all_data(state: State<'_, AppState>, zip_bytes: Vec<u8>) -> 
             let dest = uploads_dir.join(file_name);
             let mut buf = Vec::new();
             file.read_to_end(&mut buf).map_err(|e| e.to_string())?;
-            std::fs::write(&dest, &buf).map_err(|e| format!("Failed to write image {}: {}", file_name, e))?;
+            std::fs::write(&dest, &buf)
+                .map_err(|e| format!("Failed to write image {}: {}", file_name, e))?;
             restored_images += 1;
         }
     }
@@ -412,23 +451,29 @@ pub async fn import_all_data(state: State<'_, AppState>, zip_bytes: Vec<u8>) -> 
                             // Extract original filename
                             // For ComfyUI URLs: extract from ?filename=xxx or last path segment
                             // For local paths: use file_name()
-                            let file_name = if path.starts_with("http://") || path.starts_with("https://") {
-                                if let Some(idx) = path.find("filename=") {
-                                    let start = idx + 9;
-                                    let rest = &path[start..];
-                                    let end = rest.find('&').unwrap_or(rest.len());
-                                    rest[..end].to_string()
+                            let file_name =
+                                if path.starts_with("http://") || path.starts_with("https://") {
+                                    if let Some(idx) = path.find("filename=") {
+                                        let start = idx + 9;
+                                        let rest = &path[start..];
+                                        let end = rest.find('&').unwrap_or(rest.len());
+                                        rest[..end].to_string()
+                                    } else {
+                                        path.rsplit('/').next().unwrap_or("unknown").to_string()
+                                    }
                                 } else {
-                                    path.rsplit('/').next().unwrap_or("unknown").to_string()
-                                }
-                            } else {
-                                std::path::Path::new(path)
-                                    .file_name()
-                                    .and_then(|n| n.to_str())
-                                    .unwrap_or("unknown")
-                                    .to_string()
-                            };
-                            *val = serde_json::json!(format!("{}{}{}", uploads_dir_str, std::path::MAIN_SEPARATOR, file_name));
+                                    std::path::Path::new(path)
+                                        .file_name()
+                                        .and_then(|n| n.to_str())
+                                        .unwrap_or("unknown")
+                                        .to_string()
+                                };
+                            *val = serde_json::json!(format!(
+                                "{}{}{}",
+                                uploads_dir_str,
+                                std::path::MAIN_SEPARATOR,
+                                file_name
+                            ));
                         }
                     }
                 }
@@ -455,7 +500,8 @@ pub async fn import_all_data(state: State<'_, AppState>, zip_bytes: Vec<u8>) -> 
         "workflows",
     ];
     for t in &tables {
-        db.conn.execute(&format!("DELETE FROM {}", t), [])
+        db.conn
+            .execute(&format!("DELETE FROM {}", t), [])
             .map_err(|e| format!("Failed to clear {}: {}", t, e))?;
     }
 

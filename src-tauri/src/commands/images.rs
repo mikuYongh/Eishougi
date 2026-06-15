@@ -1,7 +1,7 @@
-use tauri::{AppHandle, Manager};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{AppHandle, Manager};
 
 #[tauri::command]
 pub async fn download_comfyui_image(app: AppHandle, url: String) -> Result<String, String> {
@@ -25,7 +25,7 @@ pub async fn download_comfyui_image(app: AppHandle, url: String) -> Result<Strin
 
     // Download the image
     let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
-    
+
     if !response.status().is_success() {
         return Err(format!("Failed to download image: {}", response.status()));
     }
@@ -41,9 +41,15 @@ pub async fn download_comfyui_image(app: AppHandle, url: String) -> Result<Strin
 
 #[tauri::command]
 pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<String, String> {
-    let download_dir = app.path().download_dir().map_err(|e| format!("Failed to get download dir: {}", e))?;
-    
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+    let download_dir = app
+        .path()
+        .download_dir()
+        .map_err(|e| format!("Failed to get download dir: {}", e))?;
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
     let dest_path = download_dir.join(format!("eishougi_{}.png", timestamp));
 
     if url.starts_with("http") {
@@ -56,18 +62,19 @@ pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<St
         // Local path
         #[cfg(target_os = "windows")]
         let mut source_path = url.replace("asset://localhost/", "").replace("%20", " ");
-        
+
         #[cfg(not(target_os = "windows"))]
         let mut source_path = url.replace("asset://localhost", "").replace("%20", " ");
-        
+
         // Handle tauri convertFileSrc path formatting
         if source_path.starts_with("asset://") {
             source_path = source_path.replace("asset://", "");
         }
-        
+
         let path = PathBuf::from(&source_path);
-        fs::copy(&path, &dest_path).map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
+        fs::copy(&path, &dest_path)
+            .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
     }
-    
+
     Ok(dest_path.to_string_lossy().to_string())
 }

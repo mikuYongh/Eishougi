@@ -185,4 +185,3 @@ const MIGRATION_V5: &str = r#"
 ALTER TABLE generated_images ADD COLUMN is_saved INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_gen_images_saved ON generated_images(is_saved);
 "#;
-

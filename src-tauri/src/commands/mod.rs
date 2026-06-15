@@ -1,13 +1,13 @@
-pub mod prompts;
-pub mod workflows;
-pub mod history;
-pub mod files;
-pub mod favorites;
-pub mod styles;
-pub mod mcp;
 pub mod data;
-pub mod library;
+pub mod favorites;
+pub mod files;
+pub mod history;
 pub mod images;
+pub mod library;
+pub mod mcp;
+pub mod prompts;
+pub mod styles;
+pub mod workflows;
 
 #[tauri::command]
 pub fn greet(name: &str) -> String {

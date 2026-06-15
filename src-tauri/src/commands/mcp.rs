@@ -102,7 +102,10 @@ async fn mcp_request(
         req = req.header("Mcp-Session-Id", sid);
     }
 
-    let resp = req.send().await.map_err(|e| format!("MCP request failed: {}", e))?;
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("MCP request failed: {}", e))?;
     let status = resp.status();
     let new_session_id = resp
         .headers()
@@ -116,7 +119,10 @@ async fn mcp_request(
         .unwrap_or("")
         .to_string();
 
-    let text = resp.text().await.map_err(|e| format!("Failed to read MCP response: {}", e))?;
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read MCP response: {}", e))?;
 
     if !status.is_success() {
         return Err(format!("MCP HTTP {}: {}", status.as_u16(), text));
@@ -136,8 +142,8 @@ async fn mcp_request(
         return Err(format!("MCP empty response body — {}", text));
     }
 
-    let parsed: JsonRpcResponse =
-        serde_json::from_str(&json_text).map_err(|e| format!("MCP parse error: {} — body: {}", e, text))?;
+    let parsed: JsonRpcResponse = serde_json::from_str(&json_text)
+        .map_err(|e| format!("MCP parse error: {} — body: {}", e, text))?;
 
     if let Some(err) = parsed.error {
         return Err(format!("MCP RPC error: {}", err));
@@ -155,7 +161,11 @@ pub struct McpSession {
 
 impl McpSession {
     pub fn new(url: String) -> Self {
-        Self { url, session_id: None, tools: Vec::new() }
+        Self {
+            url,
+            session_id: None,
+            tools: Vec::new(),
+        }
     }
 
     pub async fn connect(&mut self) -> Result<(), String> {
@@ -214,7 +224,11 @@ impl McpSession {
         let texts: Vec<String> = call_result
             .content
             .iter()
-            .filter_map(|c| c.get("text").and_then(|t| t.as_str()).map(|s| s.to_string()))
+            .filter_map(|c| {
+                c.get("text")
+                    .and_then(|t| t.as_str())
+                    .map(|s| s.to_string())
+            })
             .collect();
 
         Ok(texts.join("\n"))

@@ -18,7 +18,7 @@ pub struct Prompt {
     pub sampler_name: String,
     pub scheduler: String,
     pub base_model: Option<String>,
-    pub lora_configs: Option<String>,  // JSON string
+    pub lora_configs: Option<String>, // JSON string
     pub vae_model: Option<String>,
     pub resolution: Option<String>,
     pub workflow_id: Option<String>,
@@ -81,7 +81,7 @@ pub struct Workflow {
     pub description: String,
     pub json_content: String,
     #[serde(rename = "type")]
-    pub workflow_type: String,  // text2img | img2video | text2video | img2img
+    pub workflow_type: String, // text2img | img2video | text2video | img2img
     pub is_default: bool,
     pub is_builtin: bool,
     pub created_at: i64,
