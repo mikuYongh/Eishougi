@@ -612,13 +612,13 @@ export function useAgent() {
         for (const call of assistantMessage.tool_calls) {
           let resultStr = "";
           let rawArgs = "";
+          let res: any = undefined;
           try {
             // Clean up backslashes or trailing content in argument string if LLM outputted slightly malformed json
             rawArgs = (call.function.arguments || '{}').trim();
             call.function.arguments = rawArgs; // MUST write back so history has valid JSON for subsequent API calls
             const parsedArgs = JSON.parse(rawArgs);
             try {
-              let res: any;
               const fnName = call.function.name;
               if (fnName === 'create_prompt') {
                 const newPrompt = {
@@ -924,12 +924,20 @@ export function useAgent() {
             });
           }
 
+          let toolImages: string[] | undefined = undefined;
+          if (res && res.images && Array.isArray(res.images)) {
+            toolImages = res.images;
+          } else if (Array.isArray(res) && res.length > 0 && res[0].url) {
+            toolImages = res.map((item: any) => item.url).filter(Boolean);
+          }
+          
           const toolMsg: ChatMessage = {
             id: Date.now().toString() + Math.random().toString().slice(2, 6),
             role: 'tool',
             content: resultStr,
             tool_call_id: call.id,
-            name: call.function.name
+            name: call.function.name,
+            images: toolImages
           };
           newMessages.push(toolMsg);
           setMessages([...newMessages]);
