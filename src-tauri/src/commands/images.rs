@@ -46,11 +46,16 @@ pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<St
         .download_dir()
         .map_err(|e| format!("Failed to get download dir: {}", e))?;
 
+    let target_dir = download_dir.join("Eishougi").join("photo");
+    if !target_dir.exists() {
+        fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+    }
+
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis();
-    let dest_path = download_dir.join(format!("eishougi_{}.png", timestamp));
+    let dest_path = target_dir.join(format!("eishougi_{}.png", timestamp));
 
     if url.starts_with("http") {
         let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;

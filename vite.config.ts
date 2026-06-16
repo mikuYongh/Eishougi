@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [tailwindcss()],
   clearScreen: false,
   server: {
-    port: 5173,
+    port: 1420,
     strictPort: true,
     host: host || false,
     hmr: host ? { protocol: "ws", host, port: 5174 } : undefined,

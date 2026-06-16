@@ -12,9 +12,7 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
-import { StyleSelector } from "../../components/generate/StyleSelector";
 import { comfyService } from "../../services/comfyService";
-import type { PresetStyle } from "../../data/styles";
 import { getImgSrc } from "../../utils/imageUtils";
 
 
@@ -88,10 +86,9 @@ export function Generate() {
   const [overrideSampler, setOverrideSampler] = useState<string>("euler");
   const [overrideScheduler, setOverrideScheduler] = useState<string>("beta57");
 
-  // Prompts and style selectors states
+  // Prompts
   const [positivePrompt, setPositivePrompt] = useState<string>("");
   const [negativePrompt, setNegativePrompt] = useState<string>("");
-  const [selectedStyles, setSelectedStyles] = useState<PresetStyle[]>([]);
 
   // Workflow structure flag
   const [hasSizePicker, setHasSizePicker] = useState<boolean>(false);
@@ -162,13 +159,11 @@ export function Generate() {
           setOverrideScheduler(analysis.scheduler);
         }
 
-        // Align overrideLoras with current project preference if the parsed names exist
-        const parsedLoras = analysis.loras.map(al => {
-          // Check if project has a preference for this LoRA
-          const pref = project?.loraConfigs?.find(pc => pc.name === al.name);
-          return pref ? { name: al.name, strength: pref.strength, enabled: pref.enabled } : al;
-        });
-        setOverrideLoras(parsedLoras);
+        if (isProjectWf && project.loraConfigs && project.loraConfigs.length > 0) {
+          setOverrideLoras(JSON.parse(JSON.stringify(project.loraConfigs)));
+        } else {
+          setOverrideLoras(analysis.loras);
+        }
       }
     } else {
       setHasSizePicker(false);
@@ -224,14 +219,13 @@ export function Generate() {
   const handleGenerate = async () => {
     if (!project) return;
     
-    // Construct style triggers combined for artistPrompt
-    const artistPrompt = selectedStyles.map(s => s.trigger).join(', ');
+    // Determine final parameters
 
     const mergedProject = {
       ...project,
       positivePrompt,
       negativePrompt,
-      artistPrompt,
+      artistPrompt: "",
       baseModel: overrideBaseModel,
       vaeModel: overrideVaeModel,
       loraConfigs: overrideLoras,
@@ -283,23 +277,16 @@ export function Generate() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full md:w-auto justify-end">
-          {!isConnected && (
-            <button 
-              onClick={connect}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/20 text-red-400 text-sm hover:bg-red-500/30 transition-colors border border-red-500/30"
-            >
-              <RefreshCw size={14} /> 重新连接引擎
-            </button>
-          )}
+          {/* Removed Reconnect Engine button since Rust handles it on demand */}
           
           <button 
             onClick={handleGenerate}
-            disabled={isGenerating || !isConnected}
-            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-[14px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] transition-all ${(isGenerating || !isConnected) ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:scale-[1.02] cursor-pointer text-[var(--text-primary)]'}`}
+            disabled={isGenerating}
+            className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-[14px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] transition-all ${isGenerating ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:scale-[1.02] cursor-pointer text-[var(--text-primary)]'}`}
             style={{ background: "linear-gradient(135deg, #42A5F5, #7E57C2)", border: "1px solid rgba(255,255,255,0.2)" }}
           >
             {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} fill="currentColor" />}
-            {isGenerating ? '排队/渲染中...' : (!isConnected ? '未连接引擎' : '开始渲染')}
+            {isGenerating ? '排队/渲染中...' : '开始渲染'}
           </button>
         </div>
       </div>
@@ -322,11 +309,6 @@ export function Generate() {
               value={negativePrompt}
               onChange={setNegativePrompt}
               type="negative"
-            />
-            
-            <StyleSelector
-              selectedStyles={selectedStyles}
-              onChange={setSelectedStyles}
             />
           </div>
 

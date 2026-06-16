@@ -101,7 +101,7 @@
     "@tailwindcss/oxide" "4.3.0"
     tailwindcss "4.3.0"
 
-"@tauri-apps/api@^2.10.1", "@tauri-apps/api@^2.11.0":
+"@tauri-apps/api@^2.10.1", "@tauri-apps/api@^2.11.0", "@tauri-apps/api@^2.8.0":
   version "2.11.0"
   resolved "https://registry.npmjs.org/@tauri-apps/api/-/api-2.11.0.tgz"
   integrity sha512-7CinYODhky9lmO23xHnUFv0Xt43fbtWMyxZcLcRBlFkcgXKuEirBvHpmtJ89YMhyeGcq20Wuc47Fa4XjyniywA==
@@ -141,6 +141,13 @@
   integrity sha512-9Lz+Jopp6QyeEWhlpkMx4R/+P9HgR+AVAI4vOZhlT8Xaymtz8iVI/Ov984/XTqgJz/5gz5NretqPB/XEMS3NhQ==
   dependencies:
     "@tauri-apps/api" "^2.11.0"
+
+"@tauri-apps/plugin-notification@^2.3.3":
+  version "2.3.3"
+  resolved "https://registry.npmjs.org/@tauri-apps/plugin-notification/-/plugin-notification-2.3.3.tgz"
+  integrity sha512-Zw+ZH18RJb41G4NrfHgIuofJiymusqN+q8fGUIIV7vyCH+5sSn5coqRv/MWB9qETsUs97vmU045q7OyseCV3Qg==
+  dependencies:
+    "@tauri-apps/api" "^2.8.0"
 
 "@tauri-apps/plugin-shell@^2.3.5":
   version "2.3.5"

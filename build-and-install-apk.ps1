@@ -13,7 +13,7 @@ Write-Host "=== 1/4 构建前端 ===" -ForegroundColor Cyan
 npm run build
 
 Write-Host "`n=== 2/4 编译 Rust -> Android APK ===" -ForegroundColor Cyan
-npx tauri android build
+npx tauri android build --apk
 
 Write-Host "`n=== 3/4 签名 APK ===" -ForegroundColor Cyan
 $keystore = "debug.keystore"

@@ -14,7 +14,6 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 
 
 import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
-import { ArtistSelector } from "../../components/prompt/ArtistSelector";
 import { getImgSrc } from "../../utils/imageUtils";
 
 export function PromptEdit() {
@@ -453,12 +452,114 @@ export function PromptEdit() {
             </div>
           </div>
 
-          {/* Artist / Style Selector */}
-          <div className="flex-1 min-h-[300px]">
-            <ArtistSelector 
-              selectedTriggers={project.artistPrompt || ""}
-              onChange={v => updateField('artistPrompt', v)}
-            />
+          {/* Model Configuration */}
+          <div className="flex-1 flex flex-col gap-4">
+            <div className="glass-panel p-5 space-y-4">
+              <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2 mb-2">
+                <Cpu size={16} className="text-blue-400" /> 模型配置
+              </h3>
+              
+              <div>
+                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block">
+                  基础模型 (Base Model)
+                </label>
+                <div className="relative z-50">
+                  <SearchableDropdown 
+                    value={project.baseModel || ""}
+                    onChange={v => updateField('baseModel', v)}
+                    options={[
+                      { label: "未配置", value: "" },
+                      ...checkpoints.map(c => ({ label: c, value: c }))
+                    ]}
+                    accentColor="purple"
+                    placeholder="选择基础模型..."
+                    searchPlaceholder="搜索模型文件..."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block">
+                  VAE 模型
+                </label>
+                <div className="relative z-40">
+                  <GlassDropdown 
+                    value={project.vaeModel || "auto"}
+                    onChange={v => updateField('vaeModel', v)}
+                    options={[
+                      { label: "Automatic (自动)", value: "auto" },
+                      { label: "sdxl_vae.safetensors", value: "sdxl_vae.safetensors" },
+                      { label: "sd_xl_base_1.0_vae.safetensors", value: "sd_xl_base_1.0_vae.safetensors" }
+                    ]}
+                    accentColor="purple"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2 mt-4">
+                  <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold flex items-center gap-1.5">
+                    <Layers size={12} className="text-orange-400" /> 挂载的 LoRA
+                  </label>
+                </div>
+                
+                <div className="space-y-2">
+                  {(project.loraConfigs || []).map((lora, i) => (
+                    <div key={i} className={`p-2 rounded-lg border transition-colors ${lora.enabled ? 'bg-[var(--glass-bg)] border-[var(--glass-border)]' : 'bg-[var(--bg-layer-1)] border-[var(--glass-border)] opacity-60'}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <input 
+                            type="checkbox" 
+                            checked={lora.enabled}
+                            onChange={(e) => updateLora(i, { enabled: e.target.checked })}
+                            className="w-3 h-3 rounded border-[var(--glass-border-active)] accent-orange-500 cursor-pointer"
+                          />
+                          <span className="text-[11px] font-bold text-[var(--text-primary)] truncate">{lora.name}</span>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const newLoras = [...(project.loraConfigs || [])];
+                            newLoras.splice(i, 1);
+                            updateField('loraConfigs', newLoras);
+                          }}
+                          className="text-red-400/50 hover:text-red-400 cursor-pointer transition-colors"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 pl-5">
+                        <input 
+                          type="range" 
+                          min="0" max="2" step="0.05" 
+                          value={lora.strength} 
+                          onChange={(e) => updateLora(i, { strength: parseFloat(e.target.value) })}
+                          className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-orange-400" 
+                        />
+                        <span className="text-[10px] font-mono font-bold text-orange-400 w-6 text-right">
+                          {lora.strength.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {(!project.loraConfigs || project.loraConfigs.length === 0) && (
+                    <div className="text-[11px] text-[var(--text-muted)] text-center py-3 border border-dashed border-[var(--glass-border)] rounded-lg">
+                      暂未添加 LoRA
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3 relative z-30">
+                  <SearchableDropdown 
+                    value=""
+                    onChange={v => { if(v) addLora(v); }}
+                    options={loras.map(l => ({ label: l, value: l }))}
+                    placeholder="+ 添加 LoRA..."
+                    searchPlaceholder="搜索可用 LoRA..."
+                    accentColor="orange"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
         </div>

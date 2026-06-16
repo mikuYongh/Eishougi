@@ -1,9 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLibraryStore } from "../../stores/libraryStore";
 import { Search, Star, Heart, Flame } from "lucide-react";
 import { VirtuosoGrid } from "react-virtuoso";
 
+import { ItemDetailModal } from "../../components/library/ItemDetailModal";
+import { Character } from "../../stores/libraryStore";
+
 export function CharacterLibrary() {
+  const [selectedItem, setSelectedItem] = useState<Character | null>(null);
+
   const {
     characters,
     characterSearch,
@@ -75,7 +80,10 @@ export function CharacterLibrary() {
           listClassName="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-10"
           itemClassName="flex"
           itemContent={(index, character) => (
-            <div className="w-full relative group cursor-pointer rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-[var(--bg-layer-1)] hover:border-[var(--accent-1)]/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,0,0,0.3)]">
+            <div 
+              className="w-full relative group cursor-pointer rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-[var(--bg-layer-1)] hover:border-[var(--accent-1)]/50 transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,0,0,0.3)]"
+              onClick={() => setSelectedItem(character)}
+            >
               {/* Image Container */}
               <div className="aspect-[3/4] w-full bg-[var(--bg-layer-2)] relative overflow-hidden">
                 {character.imgUrl ? (
@@ -136,6 +144,15 @@ export function CharacterLibrary() {
           )}
         />
       </div>
+
+      {selectedItem && (
+        <ItemDetailModal
+          item={selectedItem}
+          onClose={() => setSelectedItem(null)}
+          onToggleFavorite={toggleCharacterFavorite}
+          isArtist={false}
+        />
+      )}
     </div>
   );
 }

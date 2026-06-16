@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod comfy_ws;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -29,11 +30,13 @@ pub fn run() {
     let state = AppState::new(app_data_dir).expect("Failed to initialize app state");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
+        .manage(comfy_ws::ComfyState::new())
         .invoke_handler(tauri::generate_handler![
             commands::greet,
             commands::prompts::create_prompt,
@@ -73,6 +76,7 @@ pub fn run() {
             commands::library::search_artists,
             commands::library::toggle_favorite_character,
             commands::library::toggle_favorite_artist,
+            comfy_ws::queue_prompt_and_track,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -21,7 +21,13 @@ export const getImgSrc = (url?: string): string => {
     }
   }
 
-  // If it's a web URL or data URL, return as is.
+  // Support legacy relative paths from old database entries
+  if (finalUrl.startsWith('view?filename=')) {
+    const comfyUrl = useSettingsStore.getState().settings.comfyUrl || 'http://127.0.0.1:8188';
+    return `${comfyUrl.endsWith('/') ? comfyUrl.slice(0, -1) : comfyUrl}/${finalUrl}`;
+  }
+
+  // If it's a valid remote URL or data URI, return as-is.
   if (finalUrl.startsWith('http') || finalUrl.startsWith('data:')) {
     return finalUrl;
   }

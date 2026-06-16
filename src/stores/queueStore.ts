@@ -1,6 +1,8 @@
 import { create } from 'zustand';
-import { comfyService } from '../services/comfyService';
+import { comfyService, getComfyUrl } from '../services/comfyService';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 
 export interface QueueJob {
   id: string;
@@ -40,317 +42,227 @@ interface QueueStore {
 }
 
 export const useQueueStore = create<QueueStore>((set, get) => {
-  let _resolveConnect: (() => void) | null = null;
   let _jobResolvers = new Map<string, (images: string[]) => void>();
+  let _isSetup = false;
+  let _unlisteners: UnlistenFn[] = [];
+  const globalClientId = Math.random().toString(36).substring(2, 15);
 
-  const setupCallbacks = () => {
-    comfyService.connect(
-      (progress, promptId) => {
-        console.log("[Queue] progress callback", progress, "promptId:", promptId);
-        set(state => {
-          const activeIndex = promptId 
-            ? state.jobs.findIndex(j => j.comfyPromptId === promptId)
-            : state.jobs.findIndex(j => j.status === 'pending' || j.status === 'generating');
-            
-          if (activeIndex === -1) { 
-            // Fallback just in case promptId wasn't mapped yet
-            const fbIndex = state.jobs.findIndex(j => j.status === 'pending' || j.status === 'generating');
-            if (fbIndex === -1) { console.log("[Queue] progress: no active job found"); return state; }
-            
-            const newJobs = [...state.jobs];
-            newJobs[fbIndex] = {
-              ...newJobs[fbIndex],
-              status: 'generating',
-              progress: Math.round((progress.value / progress.max) * 100),
-              node: progress.node
-            };
-            return { jobs: newJobs };
-          }
-          
-          const newJobs = [...state.jobs];
-          newJobs[activeIndex] = {
-            ...newJobs[activeIndex],
-            status: 'generating',
-            progress: Math.round((progress.value / progress.max) * 100),
-            node: progress.node
-          };
-          console.log("[Queue] progress: updated job", newJobs[activeIndex].id, newJobs[activeIndex].status);
-          return { jobs: newJobs };
-        });
-      },
-      async (images, promptId) => {
-        console.log("[Queue] complete callback, images:", images?.length, "promptId:", promptId);
-        let completedJob: QueueJob | null = null;
-        
-        set(state => {
-          let activeIndex = promptId ? state.jobs.findIndex(j => j.comfyPromptId === promptId) : -1;
-          if (activeIndex === -1) {
-            activeIndex = state.jobs.findIndex(j => j.status === 'generating' || j.status === 'pending');
-          }
-          if (activeIndex === -1) { console.log("[Queue] complete: no active job found"); return state; }
-          
-          const newJobs = [...state.jobs];
-          completedJob = {
-            ...newJobs[activeIndex],
-            status: 'completed',
-            progress: 100,
-            images
-          };
-          newJobs[activeIndex] = completedJob;
-          console.log("[Queue] complete: updated job", completedJob.id, "-> completed");
-          return { jobs: newJobs };
-        });
+  const setupCallbacks = async () => {
+    if (_isSetup) return;
+    _isSetup = true;
 
-        if (completedJob) {
-          const job = completedJob as QueueJob;
-          // Resolve the waiting addJob Promise
-          const resolver = _jobResolvers.get(job.id);
-          if (resolver) {
-            resolver(job.images || []);
-            _jobResolvers.delete(job.id);
-          }
-
-          try {
-            const project = await invoke('get_prompt', { id: job.projectId }) as any;
-            const localPaths: string[] = [];
-            
-            if (project) {
-              for (let i = 0; i < images.length; i++) {
-                const url = images[i];
-                let localPath = url;
-                try {
-                  console.log("[Queue] Downloading image from ComfyUI:", url);
-                  localPath = await invoke('download_comfyui_image', { url }) as string;
-                  console.log("[Queue] Downloaded to:", localPath);
-                } catch (dlErr) {
-                  console.error("[Queue] Failed to download image, using remote URL fallback:", dlErr);
-                }
-                localPaths.push(localPath);
-
-                const imageObj = {
-                  id: "img_" + Date.now().toString() + "_" + i,
-                  promptId: project.id,
-                  workflowId: job.workflowId || null,
-                  seed: project.seed,
-                  outputPath: localPath,
-                  outputType: "image",
-                  status: "completed",
-                  errorMsg: null,
-                  isSaved: false,
-                  createdAt: Date.now()
-                };
-                try {
-                  await invoke('save_generated_image', { image: imageObj });
-                } catch (dbErr) {
-                  console.warn("[Queue] Failed to save image, retrying without workflowId...", dbErr);
-                  imageObj.workflowId = null;
-                  await invoke('save_generated_image', { image: imageObj });
-                }
-              }
-              console.log("[Queue] saved history for", job.projectId);
-              set(state => ({ historyUpdateTick: state.historyUpdateTick + 1 }));
-            } else {
-              // If project not found, still use raw images
-              localPaths.push(...images);
-            }
-
-            // Update notifications with the persistent local paths
-            set(state => ({
-              completedNotifications: [
-                {
-                  id: "notif_" + Date.now(),
-                  jobId: job.id,
-                  projectId: job.projectId,
-                  projectTitle: job.projectTitle,
-                  images: localPaths,
-                  createdAt: Date.now()
-                },
-                ...state.completedNotifications
-              ].slice(0, 5)
-            }));
-
-          } catch (e) {
-            console.error("[Queue] Failed to save history from queue:", e);
-          }
-        }
-      },
-      (error, promptId) => {
-        console.log("[Queue] error callback:", error, "promptId:", promptId);
-        set(state => {
-          let activeIndex = promptId ? state.jobs.findIndex(j => j.comfyPromptId === promptId) : -1;
-          if (activeIndex === -1) {
-            activeIndex = state.jobs.findIndex(j => j.status === 'generating' || j.status === 'pending');
-          }
-          if (activeIndex === -1) return state;
-          
-          const newJobs = [...state.jobs];
-          newJobs[activeIndex] = {
-            ...newJobs[activeIndex],
-            status: 'failed',
-            error
-          };
-          return { jobs: newJobs };
-        });
-      },
-      (status) => {
-        console.log("[Queue] connection status:", status);
-        set({ isConnected: status === 'connected' });
-        if (status === 'connected') {
-          _resolveConnect?.();
-          _resolveConnect = null;
-        }
-      }
-    );
-  };
-
-  let _connectPromise: Promise<void> | null = null;
-
-  const connectImpl = async () => {
-    if (get().isConnected) return;
-    if (_connectPromise) return _connectPromise;
-
-    console.log("[Queue] connect: starting WebSocket connection...");
-    
-    _connectPromise = new Promise<void>((resolve, reject) => {
-      _resolveConnect = resolve;
-      setupCallbacks();
-      
-      setTimeout(() => {
-        if (!get().isConnected) {
-          console.error("[Queue] connect: timeout after 15s");
-          _resolveConnect = null;
-          _connectPromise = null;
-          reject(new Error('WebSocket connection timeout'));
-        }
-      }, 15000);
+    const u1 = await listen<string>('comfy-status', (event) => {
+      console.log("[Queue] backend status:", event.payload);
+      set({ isConnected: event.payload === 'connected' });
     });
+    _unlisteners.push(u1);
 
-    try {
-      await _connectPromise;
-    } finally {
-      _connectPromise = null;
-    }
+    const u2 = await listen<any>('comfy-progress', (event) => {
+      const msg = event.payload;
+      const promptId = msg.data?.prompt_id;
+      const progress = { value: msg.data?.value || 0, max: msg.data?.max || 1, node: msg.data?.node || '' };
+      
+      set(state => {
+        const activeIndex = promptId 
+          ? state.jobs.findIndex(j => j.comfyPromptId === promptId)
+          : state.jobs.findIndex(j => j.status === 'pending' || j.status === 'generating');
+          
+        if (activeIndex === -1) return state;
+        
+        const newJobs = [...state.jobs];
+        newJobs[activeIndex] = {
+          ...newJobs[activeIndex],
+          status: 'generating',
+          progress: Math.round((progress.value / progress.max) * 100),
+          node: progress.node
+        };
+        return { jobs: newJobs };
+      });
+    });
+    _unlisteners.push(u2);
+
+    const u3 = await listen<any>('comfy-completed', (event) => {
+      const payload = event.payload;
+      console.log("[Queue] complete from backend:", payload);
+      const { job_id, images } = payload;
+      
+      const resolve = _jobResolvers.get(job_id);
+      if (resolve) {
+        resolve(images);
+        _jobResolvers.delete(job_id);
+      }
+
+      set(state => {
+        const activeIndex = state.jobs.findIndex(j => j.id === job_id);
+        if (activeIndex === -1) return state;
+        
+        const newJobs = [...state.jobs];
+        const job = newJobs[activeIndex];
+        newJobs[activeIndex] = {
+          ...job,
+          status: 'completed',
+          progress: 100,
+          images
+        };
+
+        const newNotif = {
+          id: "notif_" + Date.now(),
+          jobId: job.id,
+          projectId: job.projectId,
+          projectTitle: job.projectTitle,
+          images: images,
+          createdAt: Date.now()
+        };
+
+        return { 
+          jobs: newJobs,
+          completedNotifications: [newNotif, ...state.completedNotifications].slice(0, 5),
+          historyUpdateTick: state.historyUpdateTick + 1
+        };
+      });
+    });
+    _unlisteners.push(u3);
+
+    const u4 = await listen<any>('comfy-error', (event) => {
+      const msg = event.payload;
+      const promptId = msg.data?.prompt_id;
+      set(state => {
+        let activeIndex = promptId ? state.jobs.findIndex(j => j.comfyPromptId === promptId) : -1;
+        if (activeIndex === -1) return state;
+        
+        const newJobs = [...state.jobs];
+        newJobs[activeIndex] = {
+          ...newJobs[activeIndex],
+          status: 'failed',
+          error: msg.data?.exception_message || "Error"
+        };
+        return { jobs: newJobs };
+      });
+    });
+    _unlisteners.push(u4);
   };
 
   return {
-  jobs: [],
-  isConnected: false,
-  completedNotifications: [],
-  historyUpdateTick: 0,
+    jobs: [],
+    isConnected: false,
+    completedNotifications: [],
+    historyUpdateTick: 0,
 
-  connect: connectImpl,
+    connect: async () => {
+      await setupCallbacks();
+    },
 
-  disconnect: () => {
-    console.log("[Queue] disconnect");
-    comfyService.disconnect();
-    set({ isConnected: false });
-  },
+    disconnect: () => {
+      console.log("[Queue] disconnect");
+      _unlisteners.forEach(unlisten => unlisten());
+      _unlisteners = [];
+      _isSetup = false;
+      set({ isConnected: false });
+    },
 
-  addJob: async (project: any, workflowId?: string, batchCount: number = 1) => {
-    const jobIds: string[] = [];
-    const jobPromises: Promise<string[]>[] = [];
-    const jobs: QueueJob[] = [];
-    for (let i = 0; i < batchCount; i++) {
-      const jobId = "job_" + Date.now() + "_" + i;
-      jobIds.push(jobId);
-      const promise = new Promise<string[]>((resolve) => {
-        _jobResolvers.set(jobId, resolve);
-      });
-      jobPromises.push(promise);
-      jobs.push({
-        id: jobId,
-        projectId: project.id,
-        projectTitle: project.title,
-        status: 'pending',
-        progress: 0,
-        workflowId: workflowId,
-        createdAt: Date.now()
-      });
-    }
+    addJob: async (project: any, workflowId?: string, batchCount: number = 1) => {
+      await get().connect();
 
-    console.log("[Queue] addJob:", jobs.length, "job(s) for", project.title, "wf:", workflowId);
-    set(state => ({ jobs: [...state.jobs, ...jobs] }));
-
-    try {
-      if (!get().isConnected) {
-        console.log("[Queue] addJob: WebSocket disconnected, connecting...");
-        await get().connect();
-      }
-      console.log("[Queue] addJob: WebSocket connected, proceeding");
-
-      let wfString = "";
-      if (workflowId) {
-        try {
-          const w = await invoke('get_workflow', { id: workflowId }) as any;
-          if (w && w.jsonContent) {
-            wfString = w.jsonContent;
-          }
-        } catch (e) {
-          console.warn("[Queue] Failed to fetch workflow, falling back to default", e);
-        }
-      }
-
-      if (!wfString) {
-        const defaultWorkflow = (await import('../assets/default_workflow.json')).default;
-        wfString = JSON.stringify(defaultWorkflow);
-      }
-
+      const jobIds: string[] = [];
+      const jobPromises: Promise<string[]>[] = [];
+      const jobs: QueueJob[] = [];
       for (let i = 0; i < batchCount; i++) {
-        const injectedWf = await comfyService.injectParameters(wfString, project);
-        if (!injectedWf) throw new Error("Failed to construct workflow JSON");
+        const jobId = "job_" + Date.now() + "_" + i;
+        jobIds.push(jobId);
+        const promise = new Promise<string[]>((resolve) => {
+          _jobResolvers.set(jobId, resolve);
+        });
+        jobPromises.push(promise);
+        jobs.push({
+          id: jobId,
+          projectId: project.id,
+          projectTitle: project.title,
+          status: 'pending',
+          progress: 0,
+          workflowId: workflowId,
+          createdAt: Date.now()
+        });
+      }
 
-        console.log("[Queue] addJob: queueing prompt", i + 1, "of", batchCount);
-        const res = await comfyService.queuePrompt(injectedWf);
-        if (res && res.prompt_id) {
-          console.log("[Queue] addJob: got comfyPromptId:", res.prompt_id, "for job", jobs[i].id);
-          set(state => {
-            const newJobs = [...state.jobs];
-            const jIdx = newJobs.findIndex(j => j.id === jobs[i].id);
-            if (jIdx !== -1) {
-              newJobs[jIdx] = { ...newJobs[jIdx], comfyPromptId: res.prompt_id };
+      set(state => ({ jobs: [...state.jobs, ...jobs] }));
+
+      try {
+        let wfString = "";
+        if (workflowId) {
+          try {
+            const w = await invoke('get_workflow', { id: workflowId }) as any;
+            if (w && w.jsonContent) {
+              wfString = w.jsonContent;
             }
-            return { jobs: newJobs };
-          });
+          } catch (e) {
+            console.warn("[Queue] Failed to fetch workflow", e);
+          }
         }
-        console.log("[Queue] addJob: prompt", i + 1, "queued successfully");
+
+        if (!wfString) {
+          const defaultWorkflow = (await import('../assets/default_workflow.json')).default;
+          wfString = JSON.stringify(defaultWorkflow);
+        }
+
+        for (let i = 0; i < batchCount; i++) {
+          const injectedWf = await comfyService.injectParameters(wfString, project);
+          if (!injectedWf) throw new Error("Failed to construct workflow JSON");
+
+          const res = await invoke<any>('queue_prompt_and_track', {
+            prompt: injectedWf,
+            comfyUrl: getComfyUrl(),
+            clientId: globalClientId,
+            jobId: jobs[i].id,
+            projectId: project.id,
+            projectTitle: project.title,
+            workflowId: workflowId || null,
+            seed: parseInt(project.seed) || null
+          });
+
+          if (res && res.prompt_id) {
+            set(state => {
+              const newJobs = [...state.jobs];
+              const jIdx = newJobs.findIndex(j => j.id === jobs[i].id);
+              if (jIdx !== -1) {
+                newJobs[jIdx] = { ...newJobs[jIdx], comfyPromptId: res.prompt_id };
+              }
+              return { jobs: newJobs };
+            });
+          }
+        }
+
+        const results = await Promise.all(jobPromises);
+        return results;
+      } catch (e: any) {
+        console.error("[Queue] addJob error:", e.message);
+        for (const id of jobIds) {
+          _jobResolvers.delete(id);
+        }
+        set(state => ({
+          jobs: state.jobs.map(j => jobs.some(bj => bj.id === j.id) ? { ...j, status: 'failed', error: e.message } : j)
+        }));
+        throw e;
       }
+    },
 
-      // Wait for all jobs to complete via WebSocket callbacks
-      console.log("[Queue] addJob: waiting for generation to complete...");
-      const results = await Promise.all(jobPromises);
-      console.log("[Queue] addJob: all jobs completed, images:", results.flat().length);
-      return results;
-    } catch (e: any) {
-      console.error("[Queue] addJob error:", e.message);
-      // Reject pending resolvers so they don't hang forever
-      for (const id of jobIds) {
-        _jobResolvers.delete(id);
+    removeJob: (id) => {
+      set(state => ({ jobs: state.jobs.filter(j => j.id !== id) }));
+    },
+
+    clearCompleted: () => {
+      set(state => ({ jobs: state.jobs.filter(j => j.status === 'pending' || j.status === 'generating') }));
+    },
+
+    dismissNotification: (id) => {
+      set(state => ({ completedNotifications: state.completedNotifications.filter(n => n.id !== id) }));
+    },
+
+    interruptJob: async () => {
+      try {
+        await comfyService.interrupt();
+      } catch (e) {
+        console.error("[Queue] Failed to interrupt job", e);
       }
-      set(state => ({
-        jobs: state.jobs.map(j => jobs.some(bj => bj.id === j.id) ? { ...j, status: 'failed', error: e.message } : j)
-      }));
-      throw e;
     }
-  },
-
-  removeJob: (id) => {
-    set(state => ({ jobs: state.jobs.filter(j => j.id !== id) }));
-  },
-
-  clearCompleted: () => {
-    set(state => ({ jobs: state.jobs.filter(j => j.status === 'pending' || j.status === 'generating') }));
-  },
-
-  dismissNotification: (id) => {
-    set(state => ({ completedNotifications: state.completedNotifications.filter(n => n.id !== id) }));
-  },
-
-  interruptJob: async () => {
-    try {
-      await comfyService.interrupt();
-    } catch (e) {
-      console.error("[Queue] Failed to interrupt job", e);
-    }
-  }
   };
 });
