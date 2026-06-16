@@ -82,6 +82,8 @@ pub async fn process_executed(app_clone: AppHandle, ctx: JobContext, images: Vec
         "images": local_paths
     }));
 
+    android_stop_service(&app_clone);
+
     let _ = app_clone.notification()
         .builder()
         .title("生成完成")
@@ -123,6 +125,12 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
 
                                 if msg_type == "progress" {
                                     emit_to_frontend(&app_clone, "comfy-progress", json.clone());
+                                    
+                                    let progress_val = data["value"].as_i64().unwrap_or(0);
+                                    let max_val = data["max"].as_i64().unwrap_or(1);
+                                    let percentage = if max_val > 0 { (progress_val as f64 / max_val as f64 * 100.0) as i32 } else { 0 };
+                                    android_update_progress(&app_clone, "云端渲染中", percentage);
+                                    
                                 } else if msg_type == "executed" {
                                     println!("[ComfyWS Backend] Executed for prompt {}", prompt_id);
                                     
@@ -145,6 +153,7 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
                                     }
                                 } else if msg_type == "execution_error" {
                                     emit_to_frontend(&app_clone, "comfy-error", json.clone());
+                                    android_stop_service(&app_clone);
                                     let _ = app_clone.notification()
                                         .builder()
                                         .title("生成失败")
@@ -204,6 +213,9 @@ pub async fn queue_prompt_and_track(
     }
 
     let res_json: Value = res.json().await.map_err(|e| e.to_string())?;
+    
+    // Start foreground service before storing context
+    android_start_service(&app, &format!("项目: {}", project_title));
     
     if let Some(prompt_id) = res_json["prompt_id"].as_str() {
         let prompt_id_str = prompt_id.to_string();
@@ -297,3 +309,70 @@ pub async fn queue_prompt_and_track(
 
     Ok(res_json)
 }
+
+#[cfg(target_os = "android")]
+pub fn android_start_service(_app: &tauri::AppHandle, title: &str) {
+    let title_string = title.to_string();
+    let ctx = ndk_context::android_context();
+    let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }.unwrap();
+    let mut env = vm.attach_current_thread().unwrap();
+    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
+    
+    if let Ok(title_jstr) = env.new_string(&title_string) {
+        if let Ok(service_class) = env.find_class("com/promptmuse/app/ComfyForegroundService") {
+            let _ = env.call_static_method(
+                service_class,
+                "startService",
+                "(Landroid/content/Context;Ljava/lang/String;)V",
+                &[(&activity).into(), (&title_jstr).into()]
+            );
+        }
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+pub fn android_start_service(_app: &tauri::AppHandle, _title: &str) {}
+
+#[cfg(target_os = "android")]
+pub fn android_update_progress(_app: &tauri::AppHandle, title: &str, progress: i32) {
+    let title_string = title.to_string();
+    let ctx = ndk_context::android_context();
+    let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }.unwrap();
+    let mut env = vm.attach_current_thread().unwrap();
+    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
+    
+    if let Ok(title_jstr) = env.new_string(&title_string) {
+        if let Ok(service_class) = env.find_class("com/promptmuse/app/ComfyForegroundService") {
+            let _ = env.call_static_method(
+                service_class,
+                "updateProgress",
+                "(Landroid/content/Context;Ljava/lang/String;I)V",
+                &[(&activity).into(), (&title_jstr).into(), jni::objects::JValueGen::Int(progress)]
+            );
+        }
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+pub fn android_update_progress(_app: &tauri::AppHandle, _title: &str, _progress: i32) {}
+
+#[cfg(target_os = "android")]
+pub fn android_stop_service(_app: &tauri::AppHandle) {
+    let ctx = ndk_context::android_context();
+    let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }.unwrap();
+    let mut env = vm.attach_current_thread().unwrap();
+    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
+    
+    if let Ok(service_class) = env.find_class("com/promptmuse/app/ComfyForegroundService") {
+        let _ = env.call_static_method(
+            service_class,
+            "stopService",
+            "(Landroid/content/Context;)V",
+            &[(&activity).into()]
+        );
+    }
+}
+
+#[cfg(not(target_os = "android"))]
+pub fn android_stop_service(_app: &tauri::AppHandle) {}
+
