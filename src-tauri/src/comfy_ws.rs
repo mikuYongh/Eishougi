@@ -313,8 +313,7 @@ pub async fn queue_prompt_and_track(
 #[cfg(target_os = "android")]
 pub fn android_start_service(_app: &tauri::AppHandle, title: &str) {
     let title_string = title.to_string();
-    let ctx = ndk_context::android_context();
-    let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }.unwrap();
+    let vm = unsafe { crate::jvm_plugin::JVM.as_ref().unwrap().clone() };
     
     let mut env = match vm.get_env() {
         Ok(env) => env,
@@ -324,18 +323,18 @@ pub fn android_start_service(_app: &tauri::AppHandle, title: &str) {
         }
     };
     
-    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
-    if let Ok(activity_class) = env.get_object_class(&activity) {
-        if let Ok(title_jstr) = env.new_string(&title_string) {
-            let _ = env.call_static_method(
-                activity_class,
-                "startComfyService",
-                "(Ljava/lang/String;)V",
-                &[(&title_jstr).into()]
-            );
-            if env.exception_check().unwrap_or(false) {
-                let _ = env.exception_clear();
-            }
+    let class_ref = unsafe { crate::jvm_plugin::MAIN_ACTIVITY_CLASS.as_ref().unwrap() };
+    let activity_class = class_ref.as_obj().into();
+    
+    if let Ok(title_jstr) = env.new_string(&title_string) {
+        let _ = env.call_static_method(
+            activity_class,
+            "startComfyService",
+            "(Ljava/lang/String;)V",
+            &[(&title_jstr).into()]
+        );
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
         }
     }
 }
@@ -346,8 +345,7 @@ pub fn android_start_service(_app: &tauri::AppHandle, _title: &str) {}
 #[cfg(target_os = "android")]
 pub fn android_update_progress(_app: &tauri::AppHandle, title: &str, progress: i32) {
     let title_string = title.to_string();
-    let ctx = ndk_context::android_context();
-    let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }.unwrap();
+    let vm = unsafe { crate::jvm_plugin::JVM.as_ref().unwrap().clone() };
     
     let mut env = match vm.get_env() {
         Ok(env) => env,
@@ -357,18 +355,18 @@ pub fn android_update_progress(_app: &tauri::AppHandle, title: &str, progress: i
         }
     };
     
-    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
-    if let Ok(activity_class) = env.get_object_class(&activity) {
-        if let Ok(title_jstr) = env.new_string(&title_string) {
-            let _ = env.call_static_method(
-                activity_class,
-                "updateComfyProgress",
-                "(Ljava/lang/String;I)V",
-                &[(&title_jstr).into(), jni::objects::JValueGen::Int(progress)]
-            );
-            if env.exception_check().unwrap_or(false) {
-                let _ = env.exception_clear();
-            }
+    let class_ref = unsafe { crate::jvm_plugin::MAIN_ACTIVITY_CLASS.as_ref().unwrap() };
+    let activity_class = class_ref.as_obj().into();
+    
+    if let Ok(title_jstr) = env.new_string(&title_string) {
+        let _ = env.call_static_method(
+            activity_class,
+            "updateComfyProgress",
+            "(Ljava/lang/String;I)V",
+            &[(&title_jstr).into(), jni::objects::JValueGen::Int(progress)]
+        );
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
         }
     }
 }
@@ -378,8 +376,7 @@ pub fn android_update_progress(_app: &tauri::AppHandle, _title: &str, _progress:
 
 #[cfg(target_os = "android")]
 pub fn android_stop_service(_app: &tauri::AppHandle) {
-    let ctx = ndk_context::android_context();
-    let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }.unwrap();
+    let vm = unsafe { crate::jvm_plugin::JVM.as_ref().unwrap().clone() };
     
     let mut env = match vm.get_env() {
         Ok(env) => env,
@@ -389,17 +386,17 @@ pub fn android_stop_service(_app: &tauri::AppHandle) {
         }
     };
     
-    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
-    if let Ok(activity_class) = env.get_object_class(&activity) {
-        let _ = env.call_static_method(
-            activity_class,
-            "stopComfyService",
-            "()V",
-            &[]
-        );
-        if env.exception_check().unwrap_or(false) {
-            let _ = env.exception_clear();
-        }
+    let class_ref = unsafe { crate::jvm_plugin::MAIN_ACTIVITY_CLASS.as_ref().unwrap() };
+    let activity_class: &jni::objects::JClass = &jni::objects::JClass::from(class_ref.as_obj());
+    
+    let _ = env.call_static_method(
+        activity_class,
+        "stopComfyService",
+        "()V",
+        &[]
+    );
+    if env.exception_check().unwrap_or(false) {
+        let _ = env.exception_clear();
     }
 }
 

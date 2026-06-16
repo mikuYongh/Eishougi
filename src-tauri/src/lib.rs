@@ -23,18 +23,48 @@ impl AppState {
     }
 }
 
+#[cfg(target_os = "android")]
+pub mod jvm_plugin {
+    pub static mut JVM: Option<jni::JavaVM> = None;
+    pub static mut MAIN_ACTIVITY_CLASS: Option<jni::objects::GlobalRef> = None;
+
+    pub fn init_jvm_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+        tauri::plugin::Builder::new("jvm_init")
+            .setup(|_app, api| {
+                let mut env = api.env();
+                let vm = env.get_java_vm().unwrap();
+                unsafe { JVM = Some(vm) };
+                
+                if let Ok(class) = env.find_class("com/promptmuse/app/MainActivity") {
+                    if let Ok(global_ref) = env.new_global_ref(class) {
+                        unsafe { MAIN_ACTIVITY_CLASS = Some(global_ref) };
+                    }
+                }
+                Ok(())
+            })
+            .build()
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_data_dir = get_app_data_dir();
     std::fs::create_dir_all(&app_data_dir).ok();
     let state = AppState::new(app_data_dir).expect("Failed to initialize app state");
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_dialog::init());
+
+    #[cfg(target_os = "android")]
+    {
+        builder = builder.plugin(jvm_plugin::init_jvm_plugin());
+    }
+
+    builder
         .manage(state)
         .manage(comfy_ws::ComfyState::new())
         .invoke_handler(tauri::generate_handler![
