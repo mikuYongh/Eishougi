@@ -204,10 +204,10 @@ export function WorkflowEdit() {
         </button>
       </div>
 
-      <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0 overflow-y-auto pb-[20vh] custom-scrollbar">
+      <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden pb-[20vh] xl:pb-0 custom-scrollbar">
         
         {/* Left Column - Metadata */}
-        <div className="w-full md:w-[380px] flex-shrink-0 flex flex-col gap-5">
+        <div className="w-full md:w-[380px] flex-shrink-0 flex flex-col gap-5 xl:overflow-y-auto xl:pr-2 custom-scrollbar">
           <div className="glass-panel p-5 space-y-5">
             <div>
               <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">工作流名称</label>
@@ -259,7 +259,7 @@ export function WorkflowEdit() {
         </div>
 
         {/* Right Column - Parameters / Editor */}
-        <div className="flex-1 flex flex-col min-w-0 glass-panel xl:overflow-hidden bg-[var(--bg-layer-1)] min-h-[500px]">
+        <div className="flex-1 flex flex-col min-w-0 glass-panel xl:overflow-hidden bg-[var(--bg-layer-1)] min-h-[500px] h-full">
           <div className="flex items-center justify-between p-4 border-b border-[var(--glass-border)]">
             <h3 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
               <Sliders size={18} className="text-yellow-400" /> 默认参数配置
@@ -289,7 +289,7 @@ export function WorkflowEdit() {
               </button>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            <div className="flex-1 xl:overflow-y-auto overflow-visible p-6 space-y-8">
               {/* Models */}
               <div className="space-y-4">
                 <h4 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
@@ -460,13 +460,24 @@ export function WorkflowEdit() {
       </div>
 
       <LoraPickerModal 
-        isOpen={isLoraPickerOpen}
+        isOpen={isLoraPickerOpen} 
         onClose={() => setIsLoraPickerOpen(false)}
-        onSelect={(loraName) => {
-          updateDraft('loraConfigs', [
-            ...draftParams.loraConfigs, 
-            { id: Date.now().toString(), name: loraName, strength: 1.0, enabled: true }
-          ]);
+        selectedLoras={draftParams.loraConfigs.map((l: any) => l.name).filter(Boolean)}
+        onToggle={(loraName) => {
+          const current = draftParams.loraConfigs;
+          const existsIdx = current.findIndex((l: any) => l.name === loraName);
+          if (existsIdx >= 0) {
+            // Remove it
+            const newList = [...current];
+            newList.splice(existsIdx, 1);
+            updateDraft('loraConfigs', newList);
+          } else {
+            // Add it
+            updateDraft('loraConfigs', [
+              ...current, 
+              { id: Date.now().toString(), name: loraName, strength: 1.0, enabled: true }
+            ]);
+          }
         }}
       />
     </div>

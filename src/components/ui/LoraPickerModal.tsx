@@ -5,10 +5,11 @@ import { useModelStore } from '../../stores/modelStore';
 interface LoraPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (loraName: string) => void;
+  selectedLoras: string[];
+  onToggle: (loraName: string) => void;
 }
 
-export function LoraPickerModal({ isOpen, onClose, onSelect }: LoraPickerModalProps) {
+export function LoraPickerModal({ isOpen, onClose, selectedLoras, onToggle }: LoraPickerModalProps) {
   const { loras } = useModelStore();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -27,7 +28,7 @@ export function LoraPickerModal({ isOpen, onClose, onSelect }: LoraPickerModalPr
         onClick={onClose}
       />
       
-      <div className="relative w-full max-w-2xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[70vh] max-h-[600px] animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full md:max-w-2xl bg-[var(--bg-layer-1)] md:border border-[var(--glass-border)] md:rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[100dvh] md:h-[70vh] max-h-none md:max-h-[600px] animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-[var(--glass-border)] bg-[var(--bg-layer-2)]">
@@ -68,28 +69,39 @@ export function LoraPickerModal({ isOpen, onClose, onSelect }: LoraPickerModalPr
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {filteredLoras.map(lora => (
-                <button
-                  key={lora}
-                  onClick={() => {
-                    onSelect(lora);
-                    onClose();
-                  }}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-transparent hover:bg-white/5 border border-transparent hover:border-white/10 transition-colors text-left cursor-pointer group"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-[var(--bg-layer-2)] border border-[var(--glass-border)] flex items-center justify-center group-hover:border-yellow-400/30 transition-colors flex-shrink-0">
-                    <Layers size={16} className="text-[var(--text-secondary)] group-hover:text-yellow-400 transition-colors" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-bold text-[var(--text-primary)] truncate" title={lora}>
-                      {lora.split('/').pop() || lora}
-                    </p>
-                    <p className="text-[10px] text-[var(--text-muted)] truncate" title={lora}>
-                      {lora}
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {filteredLoras.map(lora => {
+                const isSelected = selectedLoras.includes(lora);
+                return (
+                  <button
+                    key={lora}
+                    onClick={() => onToggle(lora)}
+                    className={`relative flex items-center gap-3 p-3 rounded-xl border transition-all text-left cursor-pointer group overflow-hidden ${
+                      isSelected 
+                        ? 'bg-yellow-500/10 border-yellow-500/50 shadow-[0_0_15px_rgba(255,213,79,0.15)]' 
+                        : 'bg-transparent hover:bg-white/5 border-[var(--glass-border)] hover:border-white/20'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                      isSelected ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-500/30' : 'bg-[var(--bg-layer-2)] border border-[var(--glass-border)] group-hover:border-yellow-400/30 text-[var(--text-secondary)] group-hover:text-yellow-400'
+                    }`}>
+                      <Layers size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1 relative z-10">
+                      <p className={`text-[13px] font-bold truncate ${isSelected ? 'text-yellow-400 drop-shadow-sm' : 'text-[var(--text-primary)]'}`} title={lora}>
+                        {lora.split('/').pop() || lora}
+                      </p>
+                      <p className="text-[10px] text-[var(--text-muted)] truncate" title={lora}>
+                        {lora}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-yellow-500/20 to-transparent flex items-center justify-end pr-4 opacity-100 transition-opacity">
+                        <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]"></div>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

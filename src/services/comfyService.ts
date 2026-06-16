@@ -238,25 +238,27 @@ export class ComfyService {
 
         // Check for LoRAs in Power Lora Loader (rgthree)
         if (node.class_type === "Power Lora Loader (rgthree)") {
-          for (let i = 1; i <= 20; i++) {
-            const loraKey = `lora_${i}`;
-            const loraSlot = node.inputs[loraKey];
-            if (loraSlot && loraSlot.lora && loraSlot.lora !== "None") {
-              result.loras.push({
-                name: loraSlot.lora,
-                strength: typeof loraSlot.strength === 'number' ? loraSlot.strength : 1.0,
-                enabled: typeof loraSlot.on === 'boolean' ? loraSlot.on : true
-              });
+          for (const key of Object.keys(node.inputs)) {
+            if (key.startsWith("lora_")) {
+              const loraSlot = node.inputs[key];
+              if (loraSlot && loraSlot.lora && loraSlot.lora !== "None") {
+                result.loras.push({
+                  name: loraSlot.lora,
+                  strength: typeof loraSlot.strength === 'number' ? loraSlot.strength : 1.0,
+                  enabled: typeof loraSlot.on === 'boolean' ? loraSlot.on : true
+                });
+              }
             }
           }
         }
         // General LoraLoader
         if (node.class_type === "LoraLoader") {
           if (node.inputs.lora_name) {
+            const str = typeof node.inputs.strength_model === 'number' ? node.inputs.strength_model : 1.0;
             result.loras.push({
               name: node.inputs.lora_name,
-              strength: typeof node.inputs.strength_model === 'number' ? node.inputs.strength_model : 1.0,
-              enabled: true
+              strength: str,
+              enabled: str !== 0
             });
           }
         }
@@ -385,32 +387,77 @@ export class ComfyService {
 
         // 6. Power Lora Loader (rgthree)
         if (node.class_type === "Power Lora Loader (rgthree)") {
-          if (loraConfigs && loraConfigs.length > 0) {
-            // Match LoRAs in slots by name and apply override configs
-            for (let i = 1; i <= 20; i++) {
-              const slotKey = `lora_${i}`;
-              const slot = node.inputs[slotKey];
-              if (slot && slot.lora && slot.lora !== "None") {
-                const config = loraConfigs.find((lc: any) => lc.name === slot.lora);
-                if (config) {
-                  slot.on = config.enabled;
-                  slot.strength = config.strength;
+          console.log("[comfyService] Processing Power Lora Loader (rgthree)", node.inputs);
+          if (loraConfigs && Array.isArray(loraConfigs)) {
+            console.log("[comfyService] loraConfigs to apply:", loraConfigs);
+            let configQueue = [...loraConfigs];
+            
+            // First pass: update existing slots or clear deleted ones
+            let maxSlotIdx = 0;
+            for (const key of Object.keys(node.inputs)) {
+              if (key.startsWith("lora_")) {
+                const num = parseInt(key.replace("lora_", ""));
+                if (!isNaN(num) && num > maxSlotIdx) {
+                  maxSlotIdx = num;
                 }
               }
             }
+            
+            for (let i = 1; i <= maxSlotIdx; i++) {
+              const slotKey = `lora_${i}`;
+              const slot = node.inputs[slotKey];
+              if (slot && slot.lora && slot.lora !== "None") {
+                const configIdx = configQueue.findIndex((lc: any) => lc.name === slot.lora);
+                if (configIdx !== -1) {
+                  const config = configQueue[configIdx];
+                  slot.on = config.enabled;
+                  slot.strength = config.strength;
+                  configQueue.splice(configIdx, 1);
+                } else {
+                  slot.lora = "None";
+                  slot.on = false;
+                }
+              }
+            }
+
+            // Second pass: insert newly added LoRAs into empty slots
+            let nextSlotIdx = 1;
+            while (configQueue.length > 0) {
+              const slotKey = `lora_${nextSlotIdx}`;
+              let slot = node.inputs[slotKey];
+              if (!slot || !slot.lora || slot.lora === "None") {
+                const config = configQueue.shift();
+                if (config) {
+                  node.inputs[slotKey] = {
+                    lora: config.name,
+                    strength: config.strength,
+                    on: config.enabled
+                  };
+                }
+              }
+              nextSlotIdx++;
+            }
           }
+          console.log("[comfyService] Power Lora Loader (rgthree) inputs after injection:", node.inputs);
         }
 
         // 7. General LoraLoader
         if (node.class_type === "LoraLoader") {
-          if (loraConfigs && loraConfigs.length > 0 && node.inputs.lora_name) {
-            const config = loraConfigs.find((lc: any) => lc.name === node.inputs.lora_name);
+          console.log("[comfyService] Processing LoraLoader", node.inputs);
+          if (node.inputs.lora_name) {
+            const config = loraConfigs ? (Array.isArray(loraConfigs) ? loraConfigs.find((lc: any) => lc.name === node.inputs.lora_name) : null) : null;
             if (config) {
-              // Note: Standard LoraLoader does not have an 'on' flag, but we can set model/clip strength to 0 if disabled
               const str = config.enabled ? config.strength : 0;
               if (node.inputs.strength_model !== undefined) node.inputs.strength_model = str;
               if (node.inputs.strength_clip !== undefined) node.inputs.strength_clip = str;
+            } else if (Array.isArray(loraConfigs)) {
+              // If we have an array of LoRAs and this one is NOT in it, it means user deleted it.
+              // Set strength to 0 to disable it.
+              console.log(`[comfyService] Disabling LoraLoader ${node.inputs.lora_name} as it was not found in loraConfigs`);
+              if (node.inputs.strength_model !== undefined) node.inputs.strength_model = 0;
+              if (node.inputs.strength_clip !== undefined) node.inputs.strength_clip = 0;
             }
+            console.log("[comfyService] LoraLoader inputs after injection:", node.inputs);
           }
         }
       }
