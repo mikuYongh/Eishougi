@@ -28,21 +28,49 @@ pub mod jvm_plugin {
     pub static mut JVM: Option<jni::JavaVM> = None;
     pub static mut MAIN_ACTIVITY_CLASS: Option<jni::objects::GlobalRef> = None;
 
-    pub fn init_jvm_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
-        tauri::plugin::Builder::new("jvm_init")
-            .setup(|_app, api| {
-                let mut env = api.env();
-                let vm = env.get_java_vm().unwrap();
-                unsafe { JVM = Some(vm) };
-                
-                if let Ok(class) = env.find_class("com/promptmuse/app/MainActivity") {
-                    if let Ok(global_ref) = env.new_global_ref(class) {
-                        unsafe { MAIN_ACTIVITY_CLASS = Some(global_ref) };
-                    }
+    pub fn save_image_to_gallery(source_path: &str, file_name: &str) -> Result<String, String> {
+        unsafe {
+            if let Some(vm) = &JVM {
+                let mut env = vm.attach_current_thread().map_err(|e| e.to_string())?;
+                if let Some(class) = &MAIN_ACTIVITY_CLASS {
+                    let source_path_j = env.new_string(source_path).map_err(|e| e.to_string())?;
+                    let file_name_j = env.new_string(file_name).map_err(|e| e.to_string())?;
+                    let result = env
+                        .call_static_method(
+                            class,
+                            "saveImageToGallery",
+                            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+                            &[
+                                jni::objects::JValue::from(&source_path_j),
+                                jni::objects::JValue::from(&file_name_j),
+                            ],
+                        )
+                        .map_err(|e| e.to_string())?;
+                    
+                    let res_string = result.l().unwrap();
+                    let rust_string: String = env.get_string((&res_string).into()).unwrap().into();
+                    return Ok(rust_string);
                 }
-                Ok(())
-            })
-            .build()
+                return Err("MAIN_ACTIVITY_CLASS not initialized".to_string());
+            }
+            Err("JVM not initialized".to_string())
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn Java_com_promptmuse_app_MainActivity_initJvmContext(
+    env: jni::JNIEnv,
+    class: jni::objects::JClass,
+) {
+    if let Ok(vm) = env.get_java_vm() {
+        unsafe {
+            crate::jvm_plugin::JVM = Some(vm);
+            if let Ok(global_ref) = env.new_global_ref(class) {
+                crate::jvm_plugin::MAIN_ACTIVITY_CLASS = Some(global_ref);
+            }
+        }
     }
 }
 
@@ -52,17 +80,12 @@ pub fn run() {
     std::fs::create_dir_all(&app_data_dir).ok();
     let state = AppState::new(app_data_dir).expect("Failed to initialize app state");
 
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init());
-
-    #[cfg(target_os = "android")]
-    {
-        builder = builder.plugin(jvm_plugin::init_jvm_plugin());
-    }
 
     builder
         .manage(state)

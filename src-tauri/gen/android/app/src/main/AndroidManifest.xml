@@ -19,6 +19,7 @@
             android:label="@string/main_activity_title"
             android:name=".MainActivity"
             android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

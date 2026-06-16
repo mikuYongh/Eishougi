@@ -40,65 +40,124 @@ pub async fn download_comfyui_image(app: AppHandle, url: String) -> Result<Strin
 
 #[tauri::command]
 pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<String, String> {
-    let download_dir = app
-        .path()
-        .download_dir()
-        .map_err(|e| format!("Failed to get download dir: {}", e))?;
-
-    let target_dir = download_dir.join("Eishougi").join("photo");
-    if !target_dir.exists() {
-        fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
-    }
-
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis();
-    let dest_path = target_dir.join(format!("eishougi_{}.png", timestamp));
-
-    let mut is_local = false;
-    let mut source_path = url.clone();
-
-    if source_path.starts_with("asset://localhost/") {
-        source_path = source_path.replace("asset://localhost/", "");
-        is_local = true;
-    } else if source_path.starts_with("asset://localhost") {
-        source_path = source_path.replace("asset://localhost", "");
-        is_local = true;
-    } else if source_path.starts_with("http://asset.localhost/") {
-        source_path = source_path.replace("http://asset.localhost/", "");
-        is_local = true;
-    } else if source_path.starts_with("https://asset.localhost/") {
-        source_path = source_path.replace("https://asset.localhost/", "");
-        is_local = true;
-    } else if source_path.starts_with("asset://") {
-        source_path = source_path.replace("asset://", "");
-        is_local = true;
-    }
-
-    if is_local {
-        source_path = percent_encoding::percent_decode_str(&source_path).decode_utf8_lossy().to_string();
+    #[cfg(target_os = "android")]
+    {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+        let tmp_dir = app_data_dir.join("tmp");
+        if !tmp_dir.exists() {
+            std::fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
+        }
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+        let file_name = format!("eishougi_{}.png", timestamp);
+        let dest_path = tmp_dir.join(&file_name);
         
-        #[cfg(target_os = "windows")]
-        if source_path.starts_with("/") {
-            source_path = source_path[1..].to_string();
+        let mut is_local = false;
+        let mut source_path = url.clone();
+        if source_path.starts_with("asset://localhost/") {
+            source_path = source_path.replace("asset://localhost/", "");
+            is_local = true;
+        } else if source_path.starts_with("asset://localhost") {
+            source_path = source_path.replace("asset://localhost", "");
+            is_local = true;
+        } else if source_path.starts_with("http://asset.localhost/") {
+            source_path = source_path.replace("http://asset.localhost/", "");
+            is_local = true;
+        } else if source_path.starts_with("https://asset.localhost/") {
+            source_path = source_path.replace("https://asset.localhost/", "");
+            is_local = true;
+        } else if source_path.starts_with("asset://") {
+            source_path = source_path.replace("asset://", "");
+            is_local = true;
         }
 
-        let path = std::path::PathBuf::from(&source_path);
-        std::fs::copy(&path, &dest_path)
-            .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
-    } else if url.starts_with("http") {
-        let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
-        let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-        std::fs::write(&dest_path, bytes).map_err(|e| e.to_string())?;
-    } else if url.starts_with("data:") {
-        return Err("Data URIs are not supported for export via backend".to_string());
-    } else {
-        // Fallback assuming it's a raw local path
-        let path = std::path::PathBuf::from(&url);
-        std::fs::copy(&path, &dest_path)
-            .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
+        if is_local {
+            source_path = percent_encoding::percent_decode_str(&source_path).decode_utf8_lossy().to_string();
+            let path = std::path::PathBuf::from(&source_path);
+            std::fs::copy(&path, &dest_path).map_err(|e| format!("Failed to copy: {}", e))?;
+        } else if url.starts_with("http") {
+            let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+            let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+            std::fs::write(&dest_path, bytes).map_err(|e| e.to_string())?;
+        } else if url.starts_with("data:") {
+            return Err("Data URIs are not supported for export via backend".to_string());
+        } else {
+            let path = std::path::PathBuf::from(&url);
+            std::fs::copy(&path, &dest_path).map_err(|e| format!("Failed to copy: {}", e))?;
+        }
+
+        let res = crate::jvm_plugin::save_image_to_gallery(&dest_path.to_string_lossy(), &file_name);
+        let _ = std::fs::remove_file(&dest_path);
+        
+        return match res {
+            Ok(msg) if msg.starts_with("Error") => Err(msg),
+            Ok(msg) => Ok(msg),
+            Err(e) => Err(e),
+        };
     }
 
-    Ok(dest_path.to_string_lossy().to_string())
+    #[cfg(not(target_os = "android"))]
+    {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let download_dir = app
+            .path()
+            .download_dir()
+            .map_err(|e| format!("Failed to get download dir: {}", e))?;
+
+        let target_dir = download_dir.join("Eishougi").join("photo");
+        if !target_dir.exists() {
+            fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
+        }
+
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let dest_path = target_dir.join(format!("eishougi_{}.png", timestamp));
+
+        let mut is_local = false;
+        let mut source_path = url.clone();
+
+        if source_path.starts_with("asset://localhost/") {
+            source_path = source_path.replace("asset://localhost/", "");
+            is_local = true;
+        } else if source_path.starts_with("asset://localhost") {
+            source_path = source_path.replace("asset://localhost", "");
+            is_local = true;
+        } else if source_path.starts_with("http://asset.localhost/") {
+            source_path = source_path.replace("http://asset.localhost/", "");
+            is_local = true;
+        } else if source_path.starts_with("https://asset.localhost/") {
+            source_path = source_path.replace("https://asset.localhost/", "");
+            is_local = true;
+        } else if source_path.starts_with("asset://") {
+            source_path = source_path.replace("asset://", "");
+            is_local = true;
+        }
+
+        if is_local {
+            source_path = percent_encoding::percent_decode_str(&source_path).decode_utf8_lossy().to_string();
+            
+            #[cfg(target_os = "windows")]
+            if source_path.starts_with("/") {
+                source_path = source_path[1..].to_string();
+            }
+
+            let path = std::path::PathBuf::from(&source_path);
+            std::fs::copy(&path, &dest_path)
+                .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
+        } else if url.starts_with("http") {
+            let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+            let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+            std::fs::write(&dest_path, bytes).map_err(|e| e.to_string())?;
+        } else if url.starts_with("data:") {
+            return Err("Data URIs are not supported for export via backend".to_string());
+        } else {
+            let path = std::path::PathBuf::from(&url);
+            std::fs::copy(&path, &dest_path)
+                .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
+        }
+
+        Ok(dest_path.to_string_lossy().to_string())
+    }
 }

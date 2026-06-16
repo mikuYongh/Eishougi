@@ -131,25 +131,38 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
                                     let percentage = if max_val > 0 { (progress_val as f64 / max_val as f64 * 100.0) as i32 } else { 0 };
                                     android_update_progress(&app_clone, "云端渲染中", percentage);
                                     
-                                } else if msg_type == "executed" {
-                                    println!("[ComfyWS Backend] Executed for prompt {}", prompt_id);
-                                    
-                                    let mut images_list = Vec::new();
-                                    if let Some(outputs) = data["output"]["images"].as_array() {
-                                        images_list = outputs.clone();
-                                    }
-
-                                    let mut locked_jobs = jobs_map.lock().await;
-                                    if let Some(ctx) = locked_jobs.remove(&prompt_id) {
-                                        drop(locked_jobs);
-                                        let app_c = app_clone.clone();
-                                        tokio::spawn(async move {
-                                            process_executed(app_c, ctx, images_list, prompt_id).await;
-                                        });
-                                    } else {
-                                        // Race condition: HTTP response hasn't returned yet, store for later
-                                        let mut orphans = orphans_map.lock().await;
-                                        orphans.insert(prompt_id.clone(), images_list);
+                                } else if msg_type == "executing" {
+                                    if data["node"].is_null() {
+                                        println!("[ComfyWS Backend] Prompt {} fully executed!", prompt_id);
+                                        
+                                        let mut locked_jobs = jobs_map.lock().await;
+                                        if let Some(ctx) = locked_jobs.remove(&prompt_id) {
+                                            drop(locked_jobs);
+                                            let app_c = app_clone.clone();
+                                            let p_id = prompt_id.clone();
+                                            tokio::spawn(async move {
+                                                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                                                let mut images_list = Vec::new();
+                                                let client = reqwest::Client::new();
+                                                if let Ok(res) = client.get(format!("{}/history/{}", ctx.comfy_url, p_id)).send().await {
+                                                    if let Ok(json) = res.json::<Value>().await {
+                                                        if let Some(history) = json.get(&p_id) {
+                                                            if let Some(outputs) = history.get("outputs").and_then(|o| o.as_object()) {
+                                                                for (_, node_output) in outputs {
+                                                                    if let Some(imgs) = node_output.get("images").and_then(|i| i.as_array()) {
+                                                                        images_list.extend(imgs.clone());
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                process_executed(app_c, ctx, images_list, p_id).await;
+                                            });
+                                        } else {
+                                            let mut orphans = orphans_map.lock().await;
+                                            orphans.insert(prompt_id.clone(), Vec::new());
+                                        }
                                     }
                                 } else if msg_type == "execution_error" {
                                     emit_to_frontend(&app_clone, "comfy-error", json.clone());
@@ -231,13 +244,30 @@ pub async fn queue_prompt_and_track(
         let mut jobs = state.active_jobs.lock().await;
         let mut orphans = state.orphan_executed.lock().await;
 
-        if let Some(images_list) = orphans.remove(&prompt_id_str) {
+        if let Some(_) = orphans.remove(&prompt_id_str) {
             // Already finished execution before this HTTP response returned
             drop(orphans);
             drop(jobs);
             
             let app_clone = app.clone();
             tokio::spawn(async move {
+                // Fetch history
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                let mut images_list = Vec::new();
+                let client = reqwest::Client::new();
+                if let Ok(res) = client.get(format!("{}/history/{}", ctx.comfy_url, prompt_id_str)).send().await {
+                    if let Ok(json) = res.json::<Value>().await {
+                        if let Some(history) = json.get(&prompt_id_str) {
+                            if let Some(outputs) = history.get("outputs").and_then(|o| o.as_object()) {
+                                for (_, node_output) in outputs {
+                                    if let Some(imgs) = node_output.get("images").and_then(|i| i.as_array()) {
+                                        images_list.extend(imgs.clone());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 process_executed(app_clone, ctx, images_list, prompt_id_str).await;
             });
         } else {
@@ -313,7 +343,9 @@ pub async fn queue_prompt_and_track(
 #[cfg(target_os = "android")]
 pub fn android_start_service(_app: &tauri::AppHandle, title: &str) {
     let title_string = title.to_string();
-    let vm = unsafe { crate::jvm_plugin::JVM.as_ref().unwrap().clone() };
+    let vm_opt = unsafe { crate::jvm_plugin::JVM.as_ref() };
+    if vm_opt.is_none() { return; }
+    let vm = vm_opt.unwrap();
     
     let mut env = match vm.get_env() {
         Ok(env) => env,
@@ -324,7 +356,7 @@ pub fn android_start_service(_app: &tauri::AppHandle, title: &str) {
     };
     
     let class_ref = unsafe { crate::jvm_plugin::MAIN_ACTIVITY_CLASS.as_ref().unwrap() };
-    let activity_class = class_ref.as_obj().into();
+    let activity_class: &jni::objects::JClass = <&jni::objects::JClass>::from(class_ref.as_obj());
     
     if let Ok(title_jstr) = env.new_string(&title_string) {
         let _ = env.call_static_method(
@@ -345,7 +377,9 @@ pub fn android_start_service(_app: &tauri::AppHandle, _title: &str) {}
 #[cfg(target_os = "android")]
 pub fn android_update_progress(_app: &tauri::AppHandle, title: &str, progress: i32) {
     let title_string = title.to_string();
-    let vm = unsafe { crate::jvm_plugin::JVM.as_ref().unwrap().clone() };
+    let vm_opt = unsafe { crate::jvm_plugin::JVM.as_ref() };
+    if vm_opt.is_none() { return; }
+    let vm = vm_opt.unwrap();
     
     let mut env = match vm.get_env() {
         Ok(env) => env,
@@ -356,7 +390,7 @@ pub fn android_update_progress(_app: &tauri::AppHandle, title: &str, progress: i
     };
     
     let class_ref = unsafe { crate::jvm_plugin::MAIN_ACTIVITY_CLASS.as_ref().unwrap() };
-    let activity_class = class_ref.as_obj().into();
+    let activity_class: &jni::objects::JClass = <&jni::objects::JClass>::from(class_ref.as_obj());
     
     if let Ok(title_jstr) = env.new_string(&title_string) {
         let _ = env.call_static_method(
@@ -376,7 +410,9 @@ pub fn android_update_progress(_app: &tauri::AppHandle, _title: &str, _progress:
 
 #[cfg(target_os = "android")]
 pub fn android_stop_service(_app: &tauri::AppHandle) {
-    let vm = unsafe { crate::jvm_plugin::JVM.as_ref().unwrap().clone() };
+    let vm_opt = unsafe { crate::jvm_plugin::JVM.as_ref() };
+    if vm_opt.is_none() { return; }
+    let vm = vm_opt.unwrap();
     
     let mut env = match vm.get_env() {
         Ok(env) => env,
@@ -387,7 +423,7 @@ pub fn android_stop_service(_app: &tauri::AppHandle) {
     };
     
     let class_ref = unsafe { crate::jvm_plugin::MAIN_ACTIVITY_CLASS.as_ref().unwrap() };
-    let activity_class: &jni::objects::JClass = &jni::objects::JClass::from(class_ref.as_obj());
+    let activity_class: &jni::objects::JClass = <&jni::objects::JClass>::from(class_ref.as_obj());
     
     let _ = env.call_static_method(
         activity_class,
