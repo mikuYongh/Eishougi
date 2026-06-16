@@ -130,37 +130,35 @@ export function Generate() {
         
         // Prioritize project's saved parameters if this is the project's selected workflow,
         // otherwise default to workflow defaults.
-        const isProjectWf = project && project.workflowId === selectedWorkflowId;
-
-        if (isProjectWf && project.baseModel) {
+        if (project && project.baseModel) {
           setOverrideBaseModel(project.baseModel);
         } else if (analysis.baseModel) {
           setOverrideBaseModel(analysis.baseModel);
-        } else if (project?.baseModel) {
-          setOverrideBaseModel(project.baseModel);
         } else {
           setOverrideBaseModel("");
         }
 
-        if (isProjectWf && project.vaeModel) {
+        if (project && project.vaeModel) {
           setOverrideVaeModel(project.vaeModel);
         } else if (analysis.vaeModel) {
           setOverrideVaeModel(analysis.vaeModel);
+        } else {
+          setOverrideVaeModel("auto");
         }
 
-        if (isProjectWf && project.sampler) {
+        if (project && project.sampler) {
           setOverrideSampler(project.sampler);
         } else if (analysis.samplerName) {
           setOverrideSampler(analysis.samplerName);
         }
 
-        if (isProjectWf && project.scheduler) {
+        if (project && project.scheduler) {
           setOverrideScheduler(project.scheduler);
         } else if (analysis.scheduler) {
           setOverrideScheduler(analysis.scheduler);
         }
 
-        if (isProjectWf && project.loraConfigs && project.loraConfigs.length > 0) {
+        if (project && project.loraConfigs && project.loraConfigs.length > 0) {
           setOverrideLoras(JSON.parse(JSON.stringify(project.loraConfigs)));
         } else {
           setOverrideLoras(analysis.loras);

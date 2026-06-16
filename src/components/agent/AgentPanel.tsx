@@ -31,13 +31,25 @@ function ChatImage({ src }: { src: string }) {
   );
 }
 
+import React from 'react';
+
+const AgentFooter = React.forwardRef<HTMLDivElement, { context?: { isGenerating: boolean } }>(({ context }, ref) => {
+  return context?.isGenerating ? (
+    <div ref={ref} className="px-6 py-3 flex items-start animate-in fade-in duration-300">
+      <div className="bg-[var(--glass-bg)] border border-[var(--accent-1)]/20 p-4 rounded-2xl rounded-tl-sm flex gap-3 items-center backdrop-blur-md shadow-[0_0_15px_rgba(var(--accent-1-rgb), 10)]">
+        <Loader2 size={16} className="text-[var(--accent-1)] animate-spin" />
+        <span className="text-xs font-mono text-[var(--accent-1)] tracking-widest uppercase animate-pulse">Processing...</span>
+      </div>
+    </div>
+  ) : <div ref={ref} className="h-4" />;
+});
+
 export function AgentPanel() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
   const [inputValue, setInputValue] = useState("");
   const [selectedImages, setSelectedImages] = useState<{ path: string, previewUrl: string }[]>([]);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   
   const { messages, isGenerating, sendMessage, stopGenerating } = useAgent();
@@ -609,7 +621,21 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                 data={messages}
                 initialTopMostItemIndex={messages.length > 0 ? messages.length - 1 : 0}
                 followOutput="smooth"
-                atBottomStateChange={(atBottom) => setShowScrollBottom(!atBottom)}
+                context={{ isGenerating }}
+                atBottomStateChange={(atBottom) => {
+                  const btn = document.getElementById('agent-scroll-bottom-btn');
+                  if (btn) {
+                    if (!atBottom) {
+                      btn.style.opacity = '1';
+                      btn.style.pointerEvents = 'auto';
+                      btn.style.transform = 'translateY(0)';
+                    } else {
+                      btn.style.opacity = '0';
+                      btn.style.pointerEvents = 'none';
+                      btn.style.transform = 'translateY(10px)';
+                    }
+                  }
+                }}
                 itemContent={(index, msg) => (
                   <div className="px-6 py-3">
                     <div 
@@ -638,27 +664,19 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                   </div>
                 )}
                 components={{
-                  Footer: () => isGenerating ? (
-                    <div className="px-6 py-3 flex items-start animate-in fade-in duration-300">
-                      <div className="bg-[var(--glass-bg)] border border-[var(--accent-1)]/20 p-4 rounded-2xl rounded-tl-sm flex gap-3 items-center backdrop-blur-md shadow-[0_0_15px_rgba(var(--accent-1-rgb), 10)]">
-                        <Loader2 size={16} className="text-[var(--accent-1)] animate-spin" />
-                        <span className="text-xs font-mono text-[var(--accent-1)] tracking-widest uppercase animate-pulse">Processing...</span>
-                      </div>
-                    </div>
-                  ) : <div className="h-4" />
+                  Footer: AgentFooter
                 }}
               />
             )}
 
             {/* Scroll to bottom button */}
-            {showScrollBottom && messages.length > 0 && (
-              <button
-                onClick={() => virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'smooth' })}
-                className="absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full bg-[var(--accent-1)] text-white flex items-center justify-center hover:bg-[var(--accent-1)]/80 shadow-[0_4px_15px_rgba(var(--accent-1-rgb),0.5)] transition-all animate-in fade-in slide-in-from-bottom-2"
-              >
-                <ArrowDown size={18} />
-              </button>
-            )}
+            <button
+              id="agent-scroll-bottom-btn"
+              onClick={() => virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'smooth' })}
+              className="absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full bg-[var(--accent-1)] text-white flex items-center justify-center hover:bg-[var(--accent-1)]/80 shadow-[0_4px_15px_rgba(var(--accent-1-rgb),0.5)] transition-all duration-300 opacity-0 pointer-events-none translate-y-[10px]"
+            >
+              <ArrowDown size={18} />
+            </button>
           </div>
 
         {/* Input */}

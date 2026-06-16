@@ -90,32 +90,45 @@ function toRustPrompt(p: PromptProject): any {
 // Mapper from Rust
 function fromRustPrompt(r: any): PromptProject {
   let loras = [];
-  try { loras = JSON.parse(r.loraConfigs || '[]'); } catch(e) {}
+  try { 
+    let loraRaw = r.loraConfigs ?? r.lora_configs ?? '[]';
+    if (typeof loraRaw === 'string') {
+      loras = JSON.parse(loraRaw);
+      // Handle potential double stringification
+      if (typeof loras === 'string') {
+        loras = JSON.parse(loras);
+      }
+    } else if (Array.isArray(loraRaw)) {
+      loras = loraRaw;
+    }
+  } catch(e) {
+    console.warn("Failed to parse loras:", e);
+  }
   return {
     id: r.id,
     title: r.title,
     description: r.description,
-    positivePrompt: r.positivePrompt,
-    negativePrompt: r.negativePrompt,
-    artistPrompt: r.artistPrompt,
-    promptSyntax: r.promptSyntax || 'danbooru',
+    positivePrompt: r.positivePrompt || r.positive_prompt || '',
+    negativePrompt: r.negativePrompt || r.negative_prompt || '',
+    artistPrompt: r.artistPrompt || r.artist_prompt || '',
+    promptSyntax: r.promptSyntax || r.prompt_syntax || 'danbooru',
     width: r.width,
     height: r.height,
     steps: r.steps,
-    cfgScale: r.cfgScale,
+    cfgScale: r.cfgScale ?? r.cfg_scale ?? 5.0,
     seed: r.seed,
-    sampler: r.samplerName,
+    sampler: r.samplerName || r.sampler_name,
     scheduler: r.scheduler,
-    baseModel: r.baseModel || '',
-    vaeModel: r.vaeModel || '',
+    baseModel: r.baseModel || r.base_model || '',
+    vaeModel: r.vaeModel || r.vae_model || '',
     resolution: r.resolution || undefined,
-    workflowId: r.workflowId || undefined,
+    workflowId: r.workflowId || r.workflow_id || undefined,
     loraConfigs: loras,
     tags: (r.tags || []).map((t: any) => t.name),
-    isFavorite: r.isFavorite,
-    createdAt: r.createdAt,
-    updatedAt: r.updatedAt,
-    instanceImages: (r.images || []).map((img: any) => img.filePath)
+    isFavorite: r.isFavorite ?? r.is_favorite ?? false,
+    createdAt: r.createdAt || r.created_at,
+    updatedAt: r.updatedAt || r.updated_at,
+    instanceImages: (r.images || []).map((img: any) => img.filePath || img.file_path)
   };
 }
 

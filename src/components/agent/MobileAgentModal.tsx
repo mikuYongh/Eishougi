@@ -40,14 +40,24 @@ export function MobileAgentModal() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
     // Show if we're not at the bottom (allow 50px threshold)
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
-    setShowScrollBottom(!isAtBottom);
+    const btn = document.getElementById('mobile-scroll-bottom-btn');
+    if (btn) {
+      if (!isAtBottom) {
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+        btn.style.transform = 'translateY(0)';
+      } else {
+        btn.style.opacity = '0';
+        btn.style.pointerEvents = 'none';
+        btn.style.transform = 'translateY(10px)';
+      }
+    }
   };
 
   // Auto scroll to bottom
@@ -258,18 +268,17 @@ export function MobileAgentModal() {
             </div>
 
             {/* Scroll to bottom button */}
-            {showScrollBottom && session?.messages && session.messages.length > 0 && (
-              <button
-                onClick={() => {
-                  if (scrollContainerRef.current) {
-                    scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
-                  }
-                }}
-                className="absolute bottom-28 right-4 z-20 w-10 h-10 rounded-full bg-[var(--accent-1)] text-white flex items-center justify-center shadow-[0_4px_15px_rgba(var(--accent-1-rgb),0.5)] transition-all animate-in fade-in slide-in-from-bottom-2"
-              >
-                <ArrowDown size={18} />
-              </button>
-            )}
+            <button
+              id="mobile-scroll-bottom-btn"
+              onClick={() => {
+                if (scrollContainerRef.current) {
+                  scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
+                }
+              }}
+              className="absolute bottom-28 right-4 z-20 w-10 h-10 rounded-full bg-[var(--accent-1)] text-white flex items-center justify-center shadow-lg hover:bg-[var(--accent-1)]/80 transition-all duration-300 opacity-0 pointer-events-none translate-y-[10px]"
+            >
+              <ArrowDown size={18} />
+            </button>
 
             {/* Input Area */}
             <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[var(--bg-base)] via-[var(--bg-base)]/90 to-transparent flex flex-col gap-2 pointer-events-none">

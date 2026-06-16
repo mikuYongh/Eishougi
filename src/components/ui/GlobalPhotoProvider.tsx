@@ -2,11 +2,40 @@ import { PhotoProvider } from 'react-photo-view';
 import 'react-photo-view/dist/react-photo-view.css';
 import { Download, Share2 } from 'lucide-react';
 import { downloadImage } from '../../utils/download';
+import { useEffect, useRef } from 'react';
 
 export function GlobalPhotoProvider({ children }: { children: React.ReactNode }) {
+  const isVisibleRef = useRef(false);
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (isVisibleRef.current) {
+        // Find the close button and click it to ensure clean closure
+        const closeBtn = document.querySelector('.PhotoView-Slider__toolbarIcon:last-child') as HTMLElement;
+        if (closeBtn) closeBtn.click();
+        
+        // Alternative fallback:
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   return (
     <PhotoProvider
       maskOpacity={0.9}
+      onVisibleChange={(visible) => {
+        if (visible) {
+          window.history.pushState({ photoViewOpen: true }, '');
+          isVisibleRef.current = true;
+        } else {
+          if (window.history.state?.photoViewOpen) {
+            window.history.back();
+          }
+          isVisibleRef.current = false;
+        }
+      }}
       toolbarRender={({ onScale, scale, rotate, onRotate, index, images }) => {
         const item = images[index];
         return (
