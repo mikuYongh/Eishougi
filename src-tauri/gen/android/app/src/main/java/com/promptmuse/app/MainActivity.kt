@@ -11,6 +11,21 @@ import androidx.core.view.WindowInsetsControllerCompat
 class MainActivity : TauriActivity() {
   companion object {
       var appContext: Context? = null
+      
+      @JvmStatic
+      fun startComfyService(title: String) {
+          appContext?.let { ComfyForegroundService.startService(it, title) }
+      }
+      
+      @JvmStatic
+      fun updateComfyProgress(title: String, progress: Int) {
+          appContext?.let { ComfyForegroundService.updateProgress(it, title, progress) }
+      }
+      
+      @JvmStatic
+      fun stopComfyService() {
+          appContext?.let { ComfyForegroundService.stopService(it) }
+      }
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {

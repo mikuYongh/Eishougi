@@ -315,17 +315,27 @@ pub fn android_start_service(_app: &tauri::AppHandle, title: &str) {
     let title_string = title.to_string();
     let ctx = ndk_context::android_context();
     let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }.unwrap();
-    let mut env = vm.attach_current_thread().unwrap();
-    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
     
-    if let Ok(title_jstr) = env.new_string(&title_string) {
-        if let Ok(service_class) = env.find_class("com/promptmuse/app/ComfyForegroundService") {
+    let mut env = match vm.get_env() {
+        Ok(env) => env,
+        Err(_) => match vm.attach_current_thread_permanently() {
+            Ok(e) => e,
+            Err(_) => return,
+        }
+    };
+    
+    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
+    if let Ok(activity_class) = env.get_object_class(&activity) {
+        if let Ok(title_jstr) = env.new_string(&title_string) {
             let _ = env.call_static_method(
-                service_class,
-                "startService",
-                "(Landroid/content/Context;Ljava/lang/String;)V",
-                &[(&activity).into(), (&title_jstr).into()]
+                activity_class,
+                "startComfyService",
+                "(Ljava/lang/String;)V",
+                &[(&title_jstr).into()]
             );
+            if env.exception_check().unwrap_or(false) {
+                let _ = env.exception_clear();
+            }
         }
     }
 }
@@ -338,17 +348,27 @@ pub fn android_update_progress(_app: &tauri::AppHandle, title: &str, progress: i
     let title_string = title.to_string();
     let ctx = ndk_context::android_context();
     let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }.unwrap();
-    let mut env = vm.attach_current_thread().unwrap();
-    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
     
-    if let Ok(title_jstr) = env.new_string(&title_string) {
-        if let Ok(service_class) = env.find_class("com/promptmuse/app/ComfyForegroundService") {
+    let mut env = match vm.get_env() {
+        Ok(env) => env,
+        Err(_) => match vm.attach_current_thread_permanently() {
+            Ok(e) => e,
+            Err(_) => return,
+        }
+    };
+    
+    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
+    if let Ok(activity_class) = env.get_object_class(&activity) {
+        if let Ok(title_jstr) = env.new_string(&title_string) {
             let _ = env.call_static_method(
-                service_class,
-                "updateProgress",
-                "(Landroid/content/Context;Ljava/lang/String;I)V",
-                &[(&activity).into(), (&title_jstr).into(), jni::objects::JValueGen::Int(progress)]
+                activity_class,
+                "updateComfyProgress",
+                "(Ljava/lang/String;I)V",
+                &[(&title_jstr).into(), jni::objects::JValueGen::Int(progress)]
             );
+            if env.exception_check().unwrap_or(false) {
+                let _ = env.exception_clear();
+            }
         }
     }
 }
@@ -360,16 +380,26 @@ pub fn android_update_progress(_app: &tauri::AppHandle, _title: &str, _progress:
 pub fn android_stop_service(_app: &tauri::AppHandle) {
     let ctx = ndk_context::android_context();
     let vm = unsafe { jni::JavaVM::from_raw(ctx.vm().cast()) }.unwrap();
-    let mut env = vm.attach_current_thread().unwrap();
-    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
     
-    if let Ok(service_class) = env.find_class("com/promptmuse/app/ComfyForegroundService") {
+    let mut env = match vm.get_env() {
+        Ok(env) => env,
+        Err(_) => match vm.attach_current_thread_permanently() {
+            Ok(e) => e,
+            Err(_) => return,
+        }
+    };
+    
+    let activity = unsafe { jni::objects::JObject::from_raw(ctx.context().cast()) };
+    if let Ok(activity_class) = env.get_object_class(&activity) {
         let _ = env.call_static_method(
-            service_class,
-            "stopService",
-            "(Landroid/content/Context;)V",
-            &[(&activity).into()]
+            activity_class,
+            "stopComfyService",
+            "()V",
+            &[]
         );
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
+        }
     }
 }
 
