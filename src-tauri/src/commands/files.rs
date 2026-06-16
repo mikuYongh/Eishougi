@@ -1,7 +1,6 @@
 use crate::AppState;
 use base64::{engine::general_purpose, Engine as _};
 use std::fs;
-use std::path::PathBuf;
 use tauri::State;
 use uuid::Uuid;
 

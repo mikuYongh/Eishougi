@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager};
 
@@ -57,27 +56,47 @@ pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<St
         .as_millis();
     let dest_path = target_dir.join(format!("eishougi_{}.png", timestamp));
 
-    if url.starts_with("http") {
+    let mut is_local = false;
+    let mut source_path = url.clone();
+
+    if source_path.starts_with("asset://localhost/") {
+        source_path = source_path.replace("asset://localhost/", "");
+        is_local = true;
+    } else if source_path.starts_with("asset://localhost") {
+        source_path = source_path.replace("asset://localhost", "");
+        is_local = true;
+    } else if source_path.starts_with("http://asset.localhost/") {
+        source_path = source_path.replace("http://asset.localhost/", "");
+        is_local = true;
+    } else if source_path.starts_with("https://asset.localhost/") {
+        source_path = source_path.replace("https://asset.localhost/", "");
+        is_local = true;
+    } else if source_path.starts_with("asset://") {
+        source_path = source_path.replace("asset://", "");
+        is_local = true;
+    }
+
+    if is_local {
+        source_path = percent_encoding::percent_decode_str(&source_path).decode_utf8_lossy().to_string();
+        
+        #[cfg(target_os = "windows")]
+        if source_path.starts_with("/") {
+            source_path = source_path[1..].to_string();
+        }
+
+        let path = std::path::PathBuf::from(&source_path);
+        std::fs::copy(&path, &dest_path)
+            .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
+    } else if url.starts_with("http") {
         let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
         let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-        fs::write(&dest_path, bytes).map_err(|e| e.to_string())?;
+        std::fs::write(&dest_path, bytes).map_err(|e| e.to_string())?;
     } else if url.starts_with("data:") {
         return Err("Data URIs are not supported for export via backend".to_string());
     } else {
-        // Local path
-        #[cfg(target_os = "windows")]
-        let mut source_path = url.replace("asset://localhost/", "").replace("%20", " ");
-
-        #[cfg(not(target_os = "windows"))]
-        let mut source_path = url.replace("asset://localhost", "").replace("%20", " ");
-
-        // Handle tauri convertFileSrc path formatting
-        if source_path.starts_with("asset://") {
-            source_path = source_path.replace("asset://", "");
-        }
-
-        let path = PathBuf::from(&source_path);
-        fs::copy(&path, &dest_path)
+        // Fallback assuming it's a raw local path
+        let path = std::path::PathBuf::from(&url);
+        std::fs::copy(&path, &dest_path)
             .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
     }
 
