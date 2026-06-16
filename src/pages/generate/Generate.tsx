@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders, Zap } from "lucide-react";
 import { PhotoView } from 'react-photo-view';
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { usePromptStore, type LoraConfig } from "../../stores/promptStore";
 import { useQueueStore, type QueueJob } from "../../stores/queueStore";
 import { downloadImage } from "../../utils/download";
@@ -219,6 +220,16 @@ export function Generate() {
   const handleGenerate = async () => {
     if (!project) return;
     
+    try {
+      let permissionGranted = await isPermissionGranted();
+      if (!permissionGranted) {
+        const permission = await requestPermission();
+        permissionGranted = permission === 'granted';
+      }
+    } catch (e) {
+      console.warn("Could not request notification permission", e);
+    }
+
     // Determine final parameters
 
     const mergedProject = {

@@ -4,7 +4,7 @@ import { Search, Star, Heart, Flame } from "lucide-react";
 import { VirtuosoGrid } from "react-virtuoso";
 
 import { ItemDetailModal } from "../../components/library/ItemDetailModal";
-import { Character } from "../../stores/libraryStore";
+import type { Character } from "../../stores/libraryStore";
 
 export function CharacterLibrary() {
   const [selectedItem, setSelectedItem] = useState<Character | null>(null);

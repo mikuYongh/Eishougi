@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Copy, Check, Flame, Heart } from 'lucide-react';
-import { Character, Artist } from '../../stores/libraryStore';
+import type { Character, Artist } from '../../stores/libraryStore';
 
 type ItemType = Character | Artist;
 
