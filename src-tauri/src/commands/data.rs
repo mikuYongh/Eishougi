@@ -111,7 +111,9 @@ fn collect_all_image_paths(rows: &[serde_json::Value], field: &str) -> Vec<Strin
 }
 
 /// Export all data as a zip archive (Vec<u8>).
-/// Structure: data.json + images/* (local image files bundled in)
+///
+/// Writes to a temp file first to avoid OOM on large datasets (300+ images
+/// in memory causes Windows stack overflow / exit code 0xe0000008).
 #[tauri::command]
 pub async fn export_all_data(
     state: State<'_, AppState>,
@@ -137,6 +139,7 @@ pub async fn export_all_data(
         favorite_prompts: dump_table(&db.conn, "favorite_prompts")?,
         custom_styles: dump_table(&db.conn, "custom_styles")?,
     };
+    drop(db); // release DB lock early
 
     // 2. Collect all image paths/URLs from relevant tables
     let mut image_paths: Vec<String> = Vec::new();
@@ -150,7 +153,23 @@ pub async fn export_all_data(
     let mut seen = HashSet::new();
     image_paths.retain(|p| seen.insert(p.clone()));
 
-    let total_images = image_paths.len();
+    // Filter out obviously invalid paths early (from other devices, etc.)
+    let valid_paths: Vec<&String> = image_paths
+        .iter()
+        .filter(|p| {
+            // Skip Android paths from other apps
+            if p.starts_with("/data/user/0/com.") && !p.starts_with("/data/user/0/com.promptmuse") {
+                return false;
+            }
+            // Skip empty
+            if p.trim().is_empty() {
+                return false;
+            }
+            true
+        })
+        .collect();
+
+    let total_images = valid_paths.len();
     let _ = app.emit(
         "export-progress",
         serde_json::json!({
@@ -161,44 +180,41 @@ pub async fn export_all_data(
         }),
     );
 
-    // 3. Build zip in memory
-    let buf = std::io::Cursor::new(Vec::new());
-    let mut zip = zip::ZipWriter::new(buf);
+    // 3. Build zip in a TEMP FILE (not memory) to avoid OOM
+    let tmp_dir = std::env::temp_dir();
+    let tmp_path = tmp_dir.join(format!("eishougi_export_{}.zip", now()));
+    let file = std::fs::File::create(&tmp_path)
+        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+    let mut zip = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
 
     // Write data.json
-    let json_str = serde_json::to_string_pretty(&data)
+    let json_str = serde_json::to_string(&data)
         .map_err(|e| format!("Failed to serialize data: {}", e))?;
     zip.start_file("data.json", options)
         .map_err(|e| format!("Zip write error: {}", e))?;
     zip.write_all(json_str.as_bytes())
         .map_err(|e| format!("Zip write error: {}", e))?;
 
-    // Bundle image files (local files + HTTP downloads)
+    // Bundle image files
     let mut bundled = 0u32;
     let mut skipped = 0u32;
     let mut used_names: HashSet<String> = HashSet::new();
 
-    // Prepare (final_name, bytes) pairs — download in parallel for HTTP URLs
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(10))
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-    // Collect download tasks
-    let mut download_tasks: Vec<(
-        String,
-        std::pin::Pin<Box<dyn std::future::Future<Output = Option<Vec<u8>>> + Send>>,
-    )> = Vec::new();
-    let mut local_tasks: Vec<(String, Option<Vec<u8>>)> = Vec::new();
-
-    for path in &image_paths {
+    for (idx, path) in valid_paths.iter().enumerate() {
+        let path = *path;
         let is_http = path.starts_with("http://") || path.starts_with("https://");
+
+        // Generate unique filename in zip
         let file_name = if is_http {
-            if let Some(idx) = path.find("filename=") {
-                let start = idx + 9;
-                let rest = &path[start..];
+            if let Some(qidx) = path.find("filename=") {
+                let rest = &path[qidx + 9..];
                 let end = rest.find('&').unwrap_or(rest.len());
                 rest[..end].to_string()
             } else {
@@ -214,106 +230,76 @@ pub async fn export_all_data(
 
         let mut final_name = format!("images/{}", file_name);
         if used_names.contains(&final_name) {
-            let mut idx = 1u32;
+            let mut i = 1u32;
             loop {
-                let candidate = format!("images/{}_{}", idx, file_name);
+                let candidate = format!("images/{}_{}", i, file_name);
                 if !used_names.contains(&candidate) {
                     final_name = candidate;
                     break;
                 }
-                idx += 1;
+                i += 1;
             }
         }
         used_names.insert(final_name.clone());
 
-        if is_http {
-            let url = path.clone();
-            let c = client.clone();
-            let fut = Box::pin(async move {
-                match c.get(&url).send().await {
-                    Ok(resp) if resp.status().is_success() => {
-                        resp.bytes().await.ok().map(|b| b.to_vec())
-                    }
-                    Ok(resp) => {
-                        eprintln!("[Export] HTTP {} for {}", resp.status(), url);
-                        None
-                    }
-                    Err(e) => {
-                        eprintln!("[Export] HTTP download failed for {}: {}", url, e);
-                        None
-                    }
+        // Get image bytes
+        let image_bytes: Option<Vec<u8>> = if is_http {
+            match client.get(path).send().await {
+                Ok(resp) if resp.status().is_success() => {
+                    resp.bytes().await.ok().map(|b| b.to_vec())
                 }
-            });
-            download_tasks.push((final_name, fut));
-        } else {
-            let bytes = std::fs::read(path).ok();
-            if bytes.is_none() {
-                eprintln!("[Export] Local file not found: {}", path);
+                _ => None,
             }
-            local_tasks.push((final_name, bytes));
-        }
-    }
+        } else {
+            std::fs::read(path).ok()
+        };
 
-    // Write local files immediately
-    let mut processed: usize = 0;
-    for (name, bytes) in &local_tasks {
-        if let Some(bytes) = bytes {
-            zip.start_file(name, options)
+        if let Some(bytes) = image_bytes {
+            zip.start_file(&final_name, options)
                 .map_err(|e| format!("Zip write error: {}", e))?;
-            zip.write_all(bytes)
+            zip.write_all(&bytes)
                 .map_err(|e| format!("Zip write error: {}", e))?;
             bundled += 1;
         } else {
             skipped += 1;
         }
-        processed += 1;
-        let _ = app.emit(
-            "export-progress",
-            serde_json::json!({
-                "stage": "downloading",
-                "message": format!("打包本地图片 {}/{}", processed, total_images),
-                "current": processed,
-                "total": total_images
-            }),
-        );
-    }
 
-    // Download HTTP images (sequentially to show progress)
-    for (name, fut) in download_tasks {
-        match fut.await {
-            Some(bytes) => {
-                zip.start_file(&name, options)
-                    .map_err(|e| format!("Zip write error: {}", e))?;
-                zip.write_all(&bytes)
-                    .map_err(|e| format!("Zip write error: {}", e))?;
-                bundled += 1;
-            }
-            None => {
-                skipped += 1;
-            }
+        // Emit progress every 10 images (not every single one) to avoid UI lag
+        if idx % 10 == 0 || idx == total_images - 1 {
+            let _ = app.emit(
+                "export-progress",
+                serde_json::json!({
+                    "stage": "bundling",
+                    "message": format!("打包图片 {}/{}", idx + 1, total_images),
+                    "current": idx + 1,
+                    "total": total_images
+                }),
+            );
         }
-        processed += 1;
-        let _ = app.emit(
-            "export-progress",
-            serde_json::json!({
-                "stage": "downloading",
-                "message": format!("下载图片 {}/{}", processed, total_images),
-                "current": processed,
-                "total": total_images
-            }),
-        );
     }
 
-    let result = zip
-        .finish()
+    zip.finish()
         .map_err(|e| format!("Zip finalize error: {}", e))?;
 
     eprintln!(
-        "[Export] Bundled {} images, skipped {} (not found on disk)",
+        "[Export] Bundled {} images, skipped {} (not found)",
         bundled, skipped
     );
 
-    Ok(result.into_inner())
+    // 4. Read the temp file back into Vec<u8>
+    let result = std::fs::read(&tmp_path)
+        .map_err(|e| format!("Failed to read temp zip: {}", e))?;
+    let _ = std::fs::remove_file(&tmp_path);
+
+    let _ = app.emit(
+        "export-progress",
+        serde_json::json!({
+            "stage": "done",
+            "message": format!("导出完成：{} 张图片", bundled),
+        }),
+    );
+
+    Ok(result)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -330,6 +316,73 @@ pub struct ImportPayload {
     pub custom_styles: Vec<serde_json::Value>,
 }
 
+/// Like insert_table but uses INSERT OR IGNORE to skip rows that already exist
+/// (matched by primary key), preserving existing data during import.
+fn insert_table_ignore(
+    conn: &rusqlite::Connection,
+    table: &str,
+    rows: &[serde_json::Value],
+) -> Result<usize, String> {
+    if rows.is_empty() {
+        return Ok(0);
+    }
+
+    let first = rows[0]
+        .as_object()
+        .ok_or_else(|| format!("Row in {} is not an object", table))?;
+    let camel_cols: Vec<String> = first.keys().cloned().collect();
+    let snake_cols: Vec<String> = camel_cols.iter().map(|c| from_camel_case(c)).collect();
+
+    let placeholders: Vec<String> = (1..=snake_cols.len()).map(|i| format!("?{}", i)).collect();
+    let sql = format!(
+        "INSERT OR IGNORE INTO {} ({}) VALUES ({})",
+        table,
+        snake_cols.join(", "),
+        placeholders.join(", ")
+    );
+
+    let mut count = 0;
+    for row in rows {
+        let obj = row
+            .as_object()
+            .ok_or_else(|| format!("Row in {} is not an object", table))?;
+
+        let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+        for camel_key in &camel_cols {
+            let val = obj.get(camel_key).unwrap_or(&serde_json::Value::Null);
+            match val {
+                serde_json::Value::Null => param_values.push(Box::new(Option::<String>::None)),
+                serde_json::Value::Bool(b) => {
+                    param_values.push(Box::new(if *b { 1i32 } else { 0i32 }))
+                }
+                serde_json::Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        param_values.push(Box::new(i as i32));
+                    } else if let Some(f) = n.as_f64() {
+                        param_values.push(Box::new(f));
+                    } else {
+                        param_values.push(Box::new(n.to_string()));
+                    }
+                }
+                serde_json::Value::String(s) => param_values.push(Box::new(s.clone())),
+                _ => param_values.push(Box::new(val.to_string())),
+            }
+        }
+
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            param_values.iter().map(|p| p.as_ref()).collect();
+        match conn.execute(&sql, param_refs.as_slice()) {
+            Ok(c) if c > 0 => count += 1,
+            Ok(_) => {} // ignored (duplicate PK)
+            Err(e) => {
+                eprintln!("[Import] Failed to insert row into {}: {}", table, e);
+            }
+        }
+    }
+    Ok(count)
+}
+
+/// Like insert_table_ignore but for INSERT OR REPLACE (overwrites existing).
 fn insert_table(
     conn: &rusqlite::Connection,
     table: &str,
@@ -484,36 +537,20 @@ pub async fn import_all_data(
     fix_path(&mut data.prompt_images, "filePath");
     fix_path(&mut data.generated_images, "outputPath");
 
-    // 4. Import into database
+    // 4. Import into database — use INSERT OR IGNORE to skip existing rows
+    // (keeps existing data, only adds new records)
     let db = state.db.lock().await;
 
-    let tables = [
-        "prompt_tag_cross",
-        "prompt_images",
-        "generated_images",
-        "chat_messages",
-        "favorite_prompts",
-        "custom_styles",
-        "prompts",
-        "tags",
-        "workflows",
-    ];
-    for t in &tables {
-        db.conn
-            .execute(&format!("DELETE FROM {}", t), [])
-            .map_err(|e| format!("Failed to clear {}: {}", t, e))?;
-    }
-
     let mut total = 0;
-    total += insert_table(&db.conn, "tags", &data.tags)?;
-    total += insert_table(&db.conn, "prompts", &data.prompts)?;
-    total += insert_table(&db.conn, "prompt_tag_cross", &data.prompt_tag_cross)?;
-    total += insert_table(&db.conn, "prompt_images", &data.prompt_images)?;
-    total += insert_table(&db.conn, "workflows", &data.workflows)?;
-    total += insert_table(&db.conn, "generated_images", &data.generated_images)?;
-    total += insert_table(&db.conn, "chat_messages", &data.chat_messages)?;
-    total += insert_table(&db.conn, "favorite_prompts", &data.favorite_prompts)?;
-    total += insert_table(&db.conn, "custom_styles", &data.custom_styles)?;
+    total += insert_table_ignore(&db.conn, "tags", &data.tags)?;
+    total += insert_table_ignore(&db.conn, "prompts", &data.prompts)?;
+    total += insert_table_ignore(&db.conn, "prompt_tag_cross", &data.prompt_tag_cross)?;
+    total += insert_table_ignore(&db.conn, "prompt_images", &data.prompt_images)?;
+    total += insert_table_ignore(&db.conn, "workflows", &data.workflows)?;
+    total += insert_table_ignore(&db.conn, "generated_images", &data.generated_images)?;
+    total += insert_table_ignore(&db.conn, "chat_messages", &data.chat_messages)?;
+    total += insert_table_ignore(&db.conn, "favorite_prompts", &data.favorite_prompts)?;
+    total += insert_table_ignore(&db.conn, "custom_styles", &data.custom_styles)?;
 
     Ok(format!(
         "导入完成：{} 条数据库记录，{} 张图片已还原。",
