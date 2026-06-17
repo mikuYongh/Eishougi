@@ -4,9 +4,6 @@ use std::fs;
 use tauri::State;
 use uuid::Uuid;
 
-#[cfg(target_os = "android")]
-extern crate ndk_context;
-
 #[tauri::command]
 pub async fn save_base64_image(
     state: State<'_, AppState>,
