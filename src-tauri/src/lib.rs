@@ -4,6 +4,7 @@ mod comfy_ws;
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use tauri::Manager;
 use tokio::sync::Mutex;
 
 use db::connection::Database;
@@ -46,7 +47,7 @@ pub mod jvm_plugin {
                             ],
                         )
                         .map_err(|e| e.to_string())?;
-                    
+
                     let res_string = result.l().unwrap();
                     let rust_string: String = env.get_string((&res_string).into()).unwrap().into();
                     return Ok(rust_string);
@@ -55,6 +56,102 @@ pub mod jvm_plugin {
             }
             Err("JVM not initialized".to_string())
         }
+    }
+
+    /// Reads a packaged asset file (from src/main/assets/) as a UTF-8 string.
+    ///
+    /// This uses `ndk_context` to obtain the native Activity instance, then
+    /// invokes `Activity.getAssets().open(name)` via JNI — standard Android
+    /// Context APIs that are always present, so we do NOT need to add a custom
+    /// Kotlin method (which previously caused `NoSuchMethodError` because the
+    /// Gradle build sometimes fails to recompile Kotlin sources).
+    ///
+    /// Returns None if JVM is not ready, the asset is missing, or any JNI call fails.
+    pub fn read_asset_to_string(name: &str) -> Option<String> {
+        // ndk_context gives us the JNI Environment + the global Activity reference
+        // that Tauri registers at startup.
+        let context = ndk_context::android_context();
+        let vm = context.vm()?;
+        let mut env = vm.attach_current_thread().ok()?;
+        let activity_obj = context.activity()?;
+
+        // activity.getAssets() -> AssetManager
+        let asset_manager = env
+            .call_method(
+                activity_obj,
+                "getAssets",
+                "()Landroid/content/res/AssetManager;",
+                &[],
+            )
+            .ok()?
+            .l()
+            .ok()?;
+
+        // assetManager.open(name) -> InputStream
+        let jname = env.new_string(name).ok()?;
+        let input_stream = env
+            .call_method(
+                &asset_manager,
+                "open",
+                "(Ljava/lang/String;)Ljava/io/InputStream;",
+                &[jni::objects::JValue::from(&jname)],
+            )
+            .ok()?
+            .l()
+            .ok()?;
+
+        if input_stream.is_null() {
+            return None;
+        }
+
+        // Read all bytes via a ByteArrayOutputStream.
+        let baos_class = env.find_class("java/io/ByteArrayOutputStream").ok()?;
+        let baos = env.new_object(&baos_class, "()V", &[]).ok()?;
+
+        let buf = env.new_byte_array(8192).ok()?;
+        loop {
+            let n = env
+                .call_method(
+                    &input_stream,
+                    "read",
+                    "([B)I",
+                    &[jni::objects::JValue::from(&buf)],
+                )
+                .ok()?
+                .i()
+                .ok()?;
+            if n < 0 {
+                break;
+            }
+            env.call_method(
+                &baos,
+                "write",
+                "([BII)V",
+                &[
+                    jni::objects::JValue::from(&buf),
+                    jni::objects::JValue::Int(0),
+                    jni::objects::JValue::Int(n),
+                ],
+            )
+            .ok()?;
+        }
+
+        let bytes = env
+            .call_method(&baos, "toByteArray", "()[B", &[])
+            .ok()?
+            .l()
+            .ok()?;
+        let bytes_array: jni::objects::JByteArray = bytes.into();
+        let len = env.get_array_length(&bytes_array).ok()?;
+        let mut data = vec![0i8; len as usize];
+        env.get_byte_array_region(&bytes_array, 0, &mut data).ok()?;
+
+        // Close the input stream to release the asset handle.
+        let _ = env.call_method(&input_stream, "close", "()V", &[]);
+
+        // Convert i8 bytes to u8; JSON is ASCII-safe so this is lossless.
+        let data: Vec<u8> = data.into_iter().map(|b| b as u8).collect();
+        String::from_utf8(data).ok().filter(|s| !s.is_empty())
     }
 }
 
@@ -109,6 +206,7 @@ pub fn run() {
             commands::history::delete_generated_image,
             commands::history::toggle_save_image,
             commands::files::save_base64_image,
+            commands::files::save_base64_file,
             commands::files::read_image_base64,
             commands::files::read_text_file,
             commands::files::write_bytes_to_file,
@@ -131,6 +229,17 @@ pub fn run() {
             commands::library::toggle_favorite_artist,
             comfy_ws::queue_prompt_and_track,
         ])
+        .setup(|app| {
+            // Initialize library data (characters / artists) AFTER Tauri runtime
+            // is ready. On Android this is critical: reading APK assets requires
+            // the JNI/ndk_context that Tauri registers during startup.
+            let state = app.state::<AppState>();
+            let db = state.db.blocking_lock();
+            if let Err(e) = db::init::init_library_data(&db.conn, &state.app_data_dir) {
+                log::warn!("Failed to initialize library data: {}", e);
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

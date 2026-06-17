@@ -51,44 +51,12 @@ pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<St
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
         let file_name = format!("eishougi_{}.png", timestamp);
         let dest_path = tmp_dir.join(&file_name);
-        
-        let mut is_local = false;
-        let mut source_path = url.clone();
-        if source_path.starts_with("asset://localhost/") {
-            source_path = source_path.replace("asset://localhost/", "");
-            is_local = true;
-        } else if source_path.starts_with("asset://localhost") {
-            source_path = source_path.replace("asset://localhost", "");
-            is_local = true;
-        } else if source_path.starts_with("http://asset.localhost/") {
-            source_path = source_path.replace("http://asset.localhost/", "");
-            is_local = true;
-        } else if source_path.starts_with("https://asset.localhost/") {
-            source_path = source_path.replace("https://asset.localhost/", "");
-            is_local = true;
-        } else if source_path.starts_with("asset://") {
-            source_path = source_path.replace("asset://", "");
-            is_local = true;
-        }
 
-        if is_local {
-            source_path = percent_encoding::percent_decode_str(&source_path).decode_utf8_lossy().to_string();
-            let path = std::path::PathBuf::from(&source_path);
-            std::fs::copy(&path, &dest_path).map_err(|e| format!("Failed to copy: {}", e))?;
-        } else if url.starts_with("http") {
-            let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
-            let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-            std::fs::write(&dest_path, bytes).map_err(|e| e.to_string())?;
-        } else if url.starts_with("data:") {
-            return Err("Data URIs are not supported for export via backend".to_string());
-        } else {
-            let path = std::path::PathBuf::from(&url);
-            std::fs::copy(&path, &dest_path).map_err(|e| format!("Failed to copy: {}", e))?;
-        }
+        write_image_bytes(&url, &dest_path).await?;
 
         let res = crate::jvm_plugin::save_image_to_gallery(&dest_path.to_string_lossy(), &file_name);
         let _ = std::fs::remove_file(&dest_path);
-        
+
         return match res {
             Ok(msg) if msg.starts_with("Error") => Err(msg),
             Ok(msg) => Ok(msg),
@@ -115,49 +83,86 @@ pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<St
             .as_millis();
         let dest_path = target_dir.join(format!("eishougi_{}.png", timestamp));
 
-        let mut is_local = false;
-        let mut source_path = url.clone();
-
-        if source_path.starts_with("asset://localhost/") {
-            source_path = source_path.replace("asset://localhost/", "");
-            is_local = true;
-        } else if source_path.starts_with("asset://localhost") {
-            source_path = source_path.replace("asset://localhost", "");
-            is_local = true;
-        } else if source_path.starts_with("http://asset.localhost/") {
-            source_path = source_path.replace("http://asset.localhost/", "");
-            is_local = true;
-        } else if source_path.starts_with("https://asset.localhost/") {
-            source_path = source_path.replace("https://asset.localhost/", "");
-            is_local = true;
-        } else if source_path.starts_with("asset://") {
-            source_path = source_path.replace("asset://", "");
-            is_local = true;
-        }
-
-        if is_local {
-            source_path = percent_encoding::percent_decode_str(&source_path).decode_utf8_lossy().to_string();
-            
-            #[cfg(target_os = "windows")]
-            if source_path.starts_with("/") {
-                source_path = source_path[1..].to_string();
-            }
-
-            let path = std::path::PathBuf::from(&source_path);
-            std::fs::copy(&path, &dest_path)
-                .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
-        } else if url.starts_with("http") {
-            let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
-            let bytes = response.bytes().await.map_err(|e| e.to_string())?;
-            std::fs::write(&dest_path, bytes).map_err(|e| e.to_string())?;
-        } else if url.starts_with("data:") {
-            return Err("Data URIs are not supported for export via backend".to_string());
-        } else {
-            let path = std::path::PathBuf::from(&url);
-            std::fs::copy(&path, &dest_path)
-                .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest_path, e))?;
-        }
+        write_image_bytes(&url, &dest_path).await?;
 
         Ok(dest_path.to_string_lossy().to_string())
+    }
+}
+
+/// Decode any supported URL/path scheme into image bytes and write to `dest`.
+/// Supports: asset://, asset.localhost, http(s)://, data: (base64), and raw filesystem paths.
+async fn write_image_bytes(url: &str, dest: &std::path::Path) -> Result<(), String> {
+    // Strip Tauri asset:// protocol variants (both localhost forms on desktop + mobile)
+    let mut source_path = url.to_string();
+    let mut is_local = false;
+    for prefix in [
+        "asset://localhost/",
+        "asset://localhost",
+        "http://asset.localhost/",
+        "https://asset.localhost/",
+        "asset://",
+    ] {
+        if source_path.starts_with(prefix) {
+            source_path = source_path.replace(prefix, "");
+            is_local = true;
+            break;
+        }
+    }
+
+    if is_local {
+        source_path = percent_encoding::percent_decode_str(&source_path)
+            .decode_utf8_lossy()
+            .to_string();
+
+        #[cfg(target_os = "windows")]
+        if source_path.starts_with('/') {
+            source_path = source_path[1..].to_string();
+        }
+
+        let path = std::path::PathBuf::from(&source_path);
+        std::fs::copy(&path, dest)
+            .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest, e))?;
+        return Ok(());
+    }
+
+    if url.starts_with("http://") || url.starts_with("https://") {
+        let response = reqwest::get(url).await.map_err(|e| e.to_string())?;
+        let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+        std::fs::write(dest, bytes).map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    if url.starts_with("data:") {
+        let bytes = decode_data_uri(url)?;
+        std::fs::write(dest, bytes).map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    // Fallback: treat as raw filesystem path
+    let path = std::path::PathBuf::from(url);
+    std::fs::copy(&path, dest)
+        .map_err(|e| format!("Failed to copy from {:?} to {:?}: {}", path, dest, e))?;
+    Ok(())
+}
+
+/// Decode a `data:[<mediatype>][;base64],<data>` URI into raw bytes.
+/// Supports both base64 and URL-encoded payloads.
+fn decode_data_uri(uri: &str) -> Result<Vec<u8>, String> {
+    use base64::{engine::general_purpose, Engine as _};
+
+    let comma = uri.find(',').ok_or("Invalid data URI: no comma")?;
+    let header = &uri[..comma];
+    let payload = &uri[comma + 1..];
+
+    if header.contains("base64") {
+        general_purpose::STANDARD
+            .decode(payload)
+            .map_err(|e| format!("Invalid base64 in data URI: {}", e))
+    } else {
+        // URL-encoded payload (percent encoded) - decode to UTF-8 bytes
+        let decoded = percent_encoding::percent_decode_str(payload)
+            .decode_utf8_lossy()
+            .into_owned();
+        Ok(decoded.into_bytes())
     }
 }
