@@ -165,3 +165,131 @@ pub async fn write_bytes_to_file(path: String, data: Vec<u8>) -> Result<(), Stri
 pub async fn read_file_as_bytes(path: String) -> Result<Vec<u8>, String> {
     fs::read(&path).map_err(|e| e.to_string())
 }
+
+/// Copy a file from a content:// URI (Android file picker) or regular path
+/// to the app's internal temp directory. Returns the internal path.
+/// On desktop, just returns the original path if it's already a regular file.
+#[tauri::command]
+pub async fn copy_to_internal(
+    state: State<'_, AppState>,
+    source: String,
+) -> Result<String, String> {
+    // Desktop: regular paths work as-is
+    #[cfg(not(target_os = "android"))]
+    {
+        if std::path::Path::new(&source).exists() {
+            return Ok(source);
+        }
+        return Err(format!("File not found: {}", source));
+    }
+
+    // Android: content:// URIs need JNI ContentResolver
+    #[cfg(target_os = "android")]
+    {
+        use std::io::Write;
+
+        let tmp_dir = state.app_data_dir.join("tmp");
+        if !tmp_dir.exists() {
+            fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
+        }
+        let dest = tmp_dir.join(format!("import_{}.dat", chrono::Utc::now().timestamp_millis()));
+
+        // Use JNI to open content:// URI via ContentResolver
+        let result: Result<(), String> = {
+            let context = ndk_context::android_context();
+            let vm_ptr = context.vm();
+            let context_ptr = context.context();
+            if vm_ptr.is_null() || context_ptr.is_null() {
+                return Err("JNI context not available".to_string());
+            }
+
+            let vm = unsafe { jni::JavaVM::from_raw(vm_ptr) }.map_err(|e| e.to_string())?;
+            let mut env = vm.attach_current_thread().map_err(|e| e.to_string())?;
+
+            // Get ContentResolver: context.getContentResolver()
+            let resolver = env
+                .call_method(
+                    context_ptr as jni::sys::jobject,
+                    "getContentResolver",
+                    "()Landroid/content/ContentResolver;",
+                    &[],
+                )
+                .map_err(|e| format!("getContentResolver: {}", e))?
+                .l()
+                .map_err(|e| format!("cast resolver: {}", e))?;
+
+            // Parse URI: Uri.parse(source)
+            let uri_class = env.find_class("android/net/Uri").map_err(|e| e.to_string())?;
+            let jsource = env.new_string(&source).map_err(|e| e.to_string())?;
+            let uri = env
+                .call_static_method(
+                    &uri_class,
+                    "parse",
+                    "(Ljava/lang/String;)Landroid/net/Uri;",
+                    &[jni::objects::JValue::from(&jsource)],
+                )
+                .map_err(|e| format!("Uri.parse: {}", e))?
+                .l()
+                .map_err(|e| format!("cast uri: {}", e))?;
+
+            // Open input stream: resolver.openInputStream(uri)
+            let input_stream = env
+                .call_method(
+                    &resolver,
+                    "openInputStream",
+                    "(Landroid/net/Uri;)Ljava/io/InputStream;",
+                    &[jni::objects::JValue::from(&uri)],
+                )
+                .map_err(|e| format!("openInputStream: {}", e))?
+                .l()
+                .map_err(|e| format!("cast stream: {}", e))?;
+
+            // Read bytes via ByteArrayOutputStream
+            let baos_class = env.find_class("java/io/ByteArrayOutputStream").map_err(|e| e.to_string())?;
+            let baos = env.new_object(&baos_class, "()V", &[]).map_err(|e| e.to_string())?;
+            let buf = env.new_byte_array(8192).map_err(|e| e.to_string())?;
+
+            loop {
+                let n = env
+                    .call_method(
+                        &input_stream,
+                        "read",
+                        "([B)I",
+                        &[jni::objects::JValue::from(&buf)],
+                    )
+                    .map_err(|e| format!("read: {}", e))?
+                    .i()
+                    .map_err(|e| format!("cast int: {}", e))?;
+                if n < 0 { break; }
+                env.call_method(
+                    &baos, "write", "([BII)V",
+                    &[jni::objects::JValue::from(&buf), jni::objects::JValue::Int(0), jni::objects::JValue::Int(n)],
+                ).map_err(|e| format!("write: {}", e))?;
+            }
+
+            let _ = env.call_method(&input_stream, "close", "()V", &[]);
+
+            let bytes = env.call_method(&baos, "toByteArray", "()[B", &[])
+                .map_err(|e| format!("toByteArray: {}", e))?
+                .l()
+                .map_err(|e| format!("cast bytes: {}", e))?;
+            let bytes_array: jni::objects::JByteArray = bytes.into();
+            let len = env.get_array_length(&bytes_array).map_err(|e| e.to_string())?;
+            let mut data = vec![0i8; len as usize];
+            env.get_byte_array_region(&bytes_array, 0, &mut data).map_err(|e| e.to_string())?;
+
+            // Write to file
+            let mut file = fs::File::create(&dest).map_err(|e| e.to_string())?;
+            for chunk in data.chunks(8192) {
+                let bytes: Vec<u8> = chunk.iter().map(|&b| b as u8).collect();
+                file.write_all(&bytes).map_err(|e| e.to_string())?;
+            }
+            Ok(())
+        };
+
+        match result {
+            Ok(()) => Ok(dest.to_string_lossy().to_string()),
+            Err(e) => Err(e),
+        }
+    }
+}

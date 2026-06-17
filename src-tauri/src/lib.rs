@@ -287,6 +287,7 @@ pub fn run() {
             commands::files::read_text_file,
             commands::files::write_bytes_to_file,
             commands::files::read_file_as_bytes,
+            commands::files::copy_to_internal,
             commands::favorites::get_favorite_prompts,
             commands::favorites::add_favorite_prompt,
             commands::images::download_comfyui_image,

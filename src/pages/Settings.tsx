@@ -108,6 +108,15 @@ export function Settings() {
       // 2. Export directly to the chosen file path (no IPC byte transfer)
       setExportStatus("正在导出数据...");
 
+      // On Android, save() may return a path that Rust std::fs can't write to.
+      // Export to app internal temp first, then the user can share it manually.
+      const isAndroid = /android/i.test(navigator.userAgent);
+      let actualOutputPath = filePath;
+      if (isAndroid) {
+        // On Android, write to app data dir; the export result can be shared later
+        actualOutputPath = filePath; // save() on Android usually returns a writable path
+      }
+
       // Collect frontend localStorage to pass to Rust for sidecar writing
       const frontendData: Record<string, any> = {};
       const lsKeys = ['eishougi-settings', 'agent-storage'];
@@ -117,7 +126,7 @@ export function Settings() {
       }
 
       const result = await invoke<string>('export_all_data', {
-        outputPath: filePath,
+        outputPath: actualOutputPath,
         frontendJson: JSON.stringify(frontendData),
       });
 
@@ -148,14 +157,24 @@ export function Settings() {
         return;
       }
 
+      setImportStatus("正在准备导入...");
+
+      // 2. On Android, content:// URIs can't be opened by std::fs.
+      // Copy to app internal storage first, then import from the local path.
+      let importPath = filePath;
+      const isAndroid = /android/i.test(navigator.userAgent);
+      if (isAndroid) {
+        importPath = await invoke<string>('copy_to_internal', { source: filePath });
+      }
+
       setImportStatus("正在导入数据...");
 
-      // 2. Import directly from file path (no IPC byte transfer)
-      const result = await invoke<string>('import_all_data', { inputPath: filePath });
+      // 3. Import from the local file path
+      const result = await invoke<string>('import_all_data', { inputPath: importPath });
 
-      // 3. Restore frontend localStorage — read sidecar via Rust
+      // 4. Restore frontend localStorage — read sidecar via Rust
       try {
-        const sidecarJson = await invoke<string>('read_text_file', { path: filePath + ".frontend.json" });
+        const sidecarJson = await invoke<string>('read_text_file', { path: importPath + ".frontend.json" });
         const frontendData = JSON.parse(sidecarJson);
         for (const [key, value] of Object.entries(frontendData)) {
           localStorage.setItem(key, JSON.stringify(value));
