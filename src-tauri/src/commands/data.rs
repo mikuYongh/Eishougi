@@ -503,9 +503,10 @@ pub async fn import_all_data(
                                         path.rsplit('/').next().unwrap_or("unknown").to_string()
                                     }
                                 } else {
-                                    std::path::Path::new(path)
-                                        .file_name()
-                                        .and_then(|n| n.to_str())
+                                    let normalized = path.replace('\\', "/");
+                                    normalized
+                                        .rsplit('/')
+                                        .next()
                                         .unwrap_or("unknown")
                                         .to_string()
                                 };
@@ -534,9 +535,9 @@ pub async fn import_all_data(
     total += insert_table_ignore(&db.conn, "tags", &data.tags)?;
     total += insert_table_ignore(&db.conn, "prompts", &data.prompts)?;
     total += insert_table_ignore(&db.conn, "prompt_tag_cross", &data.prompt_tag_cross)?;
-    total += insert_table_ignore(&db.conn, "prompt_images", &data.prompt_images)?;
+    total += insert_table(&db.conn, "prompt_images", &data.prompt_images)?;
     total += insert_table_ignore(&db.conn, "workflows", &data.workflows)?;
-    total += insert_table_ignore(&db.conn, "generated_images", &data.generated_images)?;
+    total += insert_table(&db.conn, "generated_images", &data.generated_images)?;
     total += insert_table_ignore(&db.conn, "chat_messages", &data.chat_messages)?;
     total += insert_table_ignore(&db.conn, "favorite_prompts", &data.favorite_prompts)?;
     total += insert_table_ignore(&db.conn, "custom_styles", &data.custom_styles)?;
