@@ -12,6 +12,15 @@ export const getComfyUrl = () => {
   return url.endsWith('/') ? url.slice(0, -1) : url;
 };
 
+export const getVideoComfyUrl = () => {
+  let url = useSettingsStore.getState().settings.videoComfyUrl || 'http://127.0.0.1:8188';
+  url = url.trim();
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'http://' + url;
+  }
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+};
+
 export const getWsUrl = () => {
   const httpUrl = getComfyUrl();
   return httpUrl.replace('http://', 'ws://').replace('https://', 'wss://');
@@ -158,19 +167,75 @@ export class ComfyService {
     try {
       const comfyUrl = getComfyUrl();
       const response = await fetch(`${comfyUrl}/object_info`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
+        method: 'GET'
+      });
+      if (!response.ok) throw new Error("Failed to fetch object info");
+      return await response.json();
+    } catch (e) {
+      console.error(e);
+      return {};
+    }
+  }
+
+  async uploadImage(file: File | Blob, filename: string): Promise<string> {
+    try {
+      const comfyUrl = getVideoComfyUrl();
+      const formData = new FormData();
+      formData.append('image', file, filename);
+      formData.append('type', 'input');
+      formData.append('overwrite', 'true');
+
+      const response = await fetch(`${comfyUrl}/upload/image`, {
+        method: 'POST',
+        body: formData
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch object info: ${response.statusText}`);
+        throw new Error(`Upload failed: ${response.statusText}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      return result.name || filename;
     } catch (e: any) {
-      console.error(`Failed to fetch ComfyUI object info: ${e.message}`);
-      return null;
+      throw new Error(`Failed to upload image: ${e.message}`);
     }
+  }
+
+  injectVideoParameters(
+    workflow: any,
+    imageFilename: string,
+    prompt: string,
+    fps: number,
+    duration: number,
+    width: number,
+    height: number
+  ) {
+    const finalJson = JSON.parse(JSON.stringify(workflow));
+
+    for (const key in finalJson) {
+      const node = finalJson[key];
+      if (!node.inputs) continue;
+
+      const classType = node.class_type;
+      const title = node._meta?.title || '';
+
+      if (classType === "LoadImage" && node.inputs.image !== undefined) {
+        node.inputs.image = imageFilename;
+      }
+      
+      if (classType === "Simple String" && title === "Simple String" && node.inputs.string !== undefined && prompt) {
+        node.inputs.string = prompt;
+      }
+
+      if (classType === "PrimitiveInt" && node.inputs.value !== undefined) {
+        if (title === "Width") node.inputs.value = width;
+        if (title === "Height") node.inputs.value = height;
+        if (title === "Frame Rate") node.inputs.value = fps;
+        if (title === "Duration") node.inputs.value = duration;
+      }
+    }
+
+    return finalJson;
   }
 
   // Analyze a workflow to extract its settings (model, LoRAs, whether it uses size picker, etc.)
@@ -272,9 +337,17 @@ export class ComfyService {
   private cachedObjectInfo: any = null;
 
   async getObjectInfo() {
-    if (this.cachedObjectInfo) return this.cachedObjectInfo;
-    this.cachedObjectInfo = await this.fetchObjectInfo();
-    return this.cachedObjectInfo;
+    // Don't cache empty results — if the first fetch fails (e.g. ComfyUI not yet
+    // connected at app startup), we want subsequent calls to retry so injection
+    // can pick up the real node schema later.
+    if (this.cachedObjectInfo && Object.keys(this.cachedObjectInfo).length > 0) {
+      return this.cachedObjectInfo;
+    }
+    const result = await this.fetchObjectInfo();
+    if (result && Object.keys(result).length > 0) {
+      this.cachedObjectInfo = result;
+    }
+    return result;
   }
 
   // Inject user PromptProject parameters into a raw ComfyUI JSON workflow
@@ -363,18 +436,55 @@ export class ComfyService {
         // 5. Resolution / Empty Latent
         if (node.class_type === "SDXLEmptyLatentSizePicker+") {
           if (project.width !== undefined && project.height !== undefined && project.width > 0 && project.height > 0) {
-            let customStr = "custom ⚠️";
+            // Try to find the valid "custom" option from the node's actual schema.
+            // The exact string varies across versions of the custom node (e.g. "custom", "Custom", "custom ⚠️").
+            // We must NEVER write a hardcoded fallback that is not in the valid list, or ComfyUI will reject
+            // the prompt with "Value not in list" and silently drop the output.
+            let customStr: string | null = null;
             if (objectInfo && objectInfo["SDXLEmptyLatentSizePicker+"]?.input?.required?.resolution?.[0]) {
-              const resList = objectInfo["SDXLEmptyLatentSizePicker+"].input.required.resolution[0];
-              const found = resList.find((r: string) => r.toLowerCase().includes("custom"));
-              if (found) customStr = found;
-              else if (resList.length > 0) customStr = resList[resList.length - 1];
+              const resList: string[] = objectInfo["SDXLEmptyLatentSizePicker+"].input.required.resolution[0];
+              if (Array.isArray(resList)) {
+                // Prefer any option literally containing "custom" (case-insensitive)
+                const found = resList.find((r: string) => typeof r === 'string' && r.toLowerCase().includes("custom"));
+                if (found) {
+                  customStr = found;
+                } else {
+                  // If there is no "custom" option, the node likely does not support
+                  // arbitrary sizes via resolution + width/height override.
+                  // Fallback: pick a standard resolution from the list closest to the
+                  // project's aspect ratio. This is still a valid value so ComfyUI won't reject it.
+                  const targetAspect = project.width / project.height;
+                  let best = resList[0];
+                  let bestDiff = Infinity;
+                  for (const r of resList) {
+                    // Parse "1024x1024" or "1024 x 1024" style strings
+                    const m = r.match(/(\d+)\s*[x×]\s*(\d+)/);
+                    if (m) {
+                      const w = parseInt(m[1]);
+                      const h = parseInt(m[2]);
+                      if (w > 0 && h > 0) {
+                        const diff = Math.abs((w / h) - targetAspect);
+                        if (diff < bestDiff) {
+                          bestDiff = diff;
+                          best = r;
+                        }
+                      }
+                    }
+                  }
+                  customStr = best;
+                }
+              }
             }
-            node.inputs.resolution = customStr;
-            node.inputs.empty_latent_width = project.width;
-            node.inputs.width_override = project.width;
-            node.inputs.empty_latent_height = project.height;
-            node.inputs.height_override = project.height;
+
+            if (customStr) {
+              node.inputs.resolution = customStr;
+            }
+            // Always set width/height overrides — these are what actually determine
+            // the latent dimensions when resolution is "custom" or compatible.
+            if (node.inputs.empty_latent_width !== undefined) node.inputs.empty_latent_width = project.width;
+            if (node.inputs.width_override !== undefined) node.inputs.width_override = project.width;
+            if (node.inputs.empty_latent_height !== undefined) node.inputs.empty_latent_height = project.height;
+            if (node.inputs.height_override !== undefined) node.inputs.height_override = project.height;
           } else if (project.resolution !== undefined && project.resolution !== null) {
             node.inputs.resolution = project.resolution;
           }
