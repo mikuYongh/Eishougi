@@ -384,13 +384,22 @@ export function Generate() {
           <div className="glass-panel p-5 rounded-2xl flex-1 flex flex-col gap-5">
             <div className="flex items-center justify-between border-b border-[var(--glass-border)] pb-3">
               <h3 className="text-[13px] font-bold text-[var(--text-primary)]">项目参数概览</h3>
-              <button 
-                onClick={handleResetToWorkflowDefaults}
-                className="flex items-center gap-1.5 px-2 py-1 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-md text-[10px] text-[var(--text-primary)] transition-colors"
-                title="重新从当前工作流加载默认参数"
-              >
-                <Layers size={10} className="text-[var(--accent-1)]" /> 同步工作流参数
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => fetchModels()}
+                  className="flex items-center justify-center w-6 h-6 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-md text-[var(--text-primary)] transition-colors cursor-pointer"
+                  title="刷新模型列表"
+                >
+                  <RefreshCw size={12} className="text-[var(--accent-1)]" />
+                </button>
+                <button 
+                  onClick={handleResetToWorkflowDefaults}
+                  className="flex items-center gap-1.5 px-2 py-1 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-md text-[10px] text-[var(--text-primary)] transition-colors cursor-pointer"
+                  title="重新从当前工作流加载默认参数"
+                >
+                  <Layers size={10} className="text-[var(--accent-1)]" /> 同步工作流参数
+                </button>
+              </div>
             </div>
             
             <div className="space-y-4">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X, History, FileText } from "lucide-react";
+import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X, History, FileText, RefreshCw } from "lucide-react";
 import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
 import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -468,9 +468,18 @@ export function PromptEdit() {
           {/* Model Configuration */}
           <div className="flex-1 flex flex-col gap-4">
             <div className="glass-panel p-5 space-y-4">
-              <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2 mb-2">
-                <Cpu size={16} className="text-[var(--accent-1)]" /> 模型配置
-              </h3>
+              <div className="flex items-center justify-between mb-2 border-b border-[var(--glass-border)] pb-2">
+                <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <Cpu size={16} className="text-[var(--accent-1)]" /> 模型配置
+                </h3>
+                <button 
+                  onClick={() => fetchModels()}
+                  className="flex items-center gap-1.5 px-2 py-1 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-md text-[10px] text-[var(--text-primary)] transition-colors cursor-pointer"
+                  title="刷新模型列表"
+                >
+                  <RefreshCw size={10} className="text-[var(--accent-1)]" /> 刷新列表
+                </button>
+              </div>
               
               <div>
                 <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block">
