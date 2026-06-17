@@ -5,7 +5,6 @@ import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIco
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { save, open } from "@tauri-apps/plugin-dialog";
-import { writeFile, readFile } from "@tauri-apps/plugin-fs";
 import { GlassDropdown } from "../components/ui/GlassDropdown";
 
 const SETTINGS_TABS = [
@@ -108,19 +107,19 @@ export function Settings() {
 
       // 2. Export directly to the chosen file path (no IPC byte transfer)
       setExportStatus("正在导出数据...");
-      const result = await invoke<string>('export_all_data', { outputPath: filePath });
 
-      // 3. Save frontend localStorage into a sidecar JSON
+      // Collect frontend localStorage to pass to Rust for sidecar writing
       const frontendData: Record<string, any> = {};
       const lsKeys = ['eishougi-settings', 'agent-storage'];
       for (const key of lsKeys) {
         const val = localStorage.getItem(key);
         if (val) frontendData[key] = JSON.parse(val);
       }
-      const encoder = new TextEncoder();
-      const frontendBytes = encoder.encode(JSON.stringify(frontendData));
-      const frontendPath = filePath + ".frontend.json";
-      await writeFile(frontendPath, frontendBytes);
+
+      const result = await invoke<string>('export_all_data', {
+        outputPath: filePath,
+        frontendJson: JSON.stringify(frontendData),
+      });
 
       setExportStatus(result || "导出成功！");
       setTimeout(() => setExportStatus(null), 5000);
@@ -154,18 +153,15 @@ export function Settings() {
       // 2. Import directly from file path (no IPC byte transfer)
       const result = await invoke<string>('import_all_data', { inputPath: filePath });
 
-      // 3. Restore frontend localStorage from sidecar if present
-      const frontendPath = filePath + ".frontend.json";
+      // 3. Restore frontend localStorage — read sidecar via Rust
       try {
-        const frontendBytes = await readFile(frontendPath);
-        const decoder = new TextDecoder();
-        const jsonStr = decoder.decode(frontendBytes);
-        const frontendData = JSON.parse(jsonStr);
+        const sidecarJson = await invoke<string>('read_text_file', { path: filePath + ".frontend.json" });
+        const frontendData = JSON.parse(sidecarJson);
         for (const [key, value] of Object.entries(frontendData)) {
           localStorage.setItem(key, JSON.stringify(value));
         }
       } catch {
-        // Sidecar not found is fine — older backups may not have it
+        // Sidecar not found is fine
       }
 
       setImportStatus(`${result} 请重启应用以加载所有数据。`);

@@ -118,6 +118,7 @@ pub async fn export_all_data(
     state: State<'_, AppState>,
     app: AppHandle,
     output_path: String,
+    frontend_json: Option<String>,
 ) -> Result<String, String> {
     let _ = app.emit(
         "export-progress",
@@ -267,6 +268,16 @@ pub async fn export_all_data(
 
     zip.finish()
         .map_err(|e| format!("Zip finalize error: {}", e))?;
+
+    // Write frontend localStorage sidecar JSON next to the backup file
+    if let Some(json) = &frontend_json {
+        if !json.is_empty() {
+            let sidecar_path = format!("{}.frontend.json", output_path);
+            if let Err(e) = std::fs::write(&sidecar_path, json.as_bytes()) {
+                eprintln!("[Export] Failed to write sidecar: {}", e);
+            }
+        }
+    }
 
     let msg = format!("导出完成：打包 {} 张图片，跳过 {}", bundled, skipped);
     let _ = app.emit(
