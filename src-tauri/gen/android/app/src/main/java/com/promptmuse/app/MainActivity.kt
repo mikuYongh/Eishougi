@@ -12,6 +12,12 @@ class MainActivity : TauriActivity() {
       var appContext: Context? = null
       
       @JvmStatic
+      fun getContext(): Context? = appContext
+      
+      @JvmStatic
+      external fun storeActivityInstance(activity: android.app.Activity)
+
+      @JvmStatic
       fun startComfyService(title: String) {
           appContext?.let { ComfyForegroundService.startService(it, title) }
       }
@@ -85,6 +91,11 @@ class MainActivity : TauriActivity() {
     
     try {
         initJvmContext()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    try {
+        storeActivityInstance(this)
     } catch (e: Exception) {
         e.printStackTrace()
     }

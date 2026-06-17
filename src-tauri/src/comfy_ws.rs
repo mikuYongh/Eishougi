@@ -354,6 +354,9 @@ pub fn android_start_service(_app: &tauri::AppHandle, title: &str) {
             Err(_) => return,
         }
     };
+    // Safety: clear any stale JNI exception (from a prior failed JNI call that
+    // was missed) to prevent ART abort on the next JNI invocation.
+    let _ = env.exception_clear();
     
     let class_ref = unsafe { crate::jvm_plugin::MAIN_ACTIVITY_CLASS.as_ref().unwrap() };
     let activity_class: &jni::objects::JClass = <&jni::objects::JClass>::from(class_ref.as_obj());
@@ -388,6 +391,7 @@ pub fn android_update_progress(_app: &tauri::AppHandle, title: &str, progress: i
             Err(_) => return,
         }
     };
+    let _ = env.exception_clear();
     
     let class_ref = unsafe { crate::jvm_plugin::MAIN_ACTIVITY_CLASS.as_ref().unwrap() };
     let activity_class: &jni::objects::JClass = <&jni::objects::JClass>::from(class_ref.as_obj());
@@ -421,6 +425,7 @@ pub fn android_stop_service(_app: &tauri::AppHandle) {
             Err(_) => return,
         }
     };
+    let _ = env.exception_clear();
     
     let class_ref = unsafe { crate::jvm_plugin::MAIN_ACTIVITY_CLASS.as_ref().unwrap() };
     let activity_class: &jni::objects::JClass = <&jni::objects::JClass>::from(class_ref.as_obj());
