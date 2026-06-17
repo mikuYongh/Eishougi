@@ -20,6 +20,7 @@ import {
 import { CharacterLibrary } from "./pages/library/CharacterLibrary";
 import { ArtistLibrary } from "./pages/library/ArtistLibrary";
 import { Vault } from "./pages/vault/Vault";
+import { MobileMenu } from "./pages/MobileMenu";
 import { usePromptStore } from "./stores/promptStore";
 import { useWorkflowStore } from "./stores/workflowStore";
 import { useDevice } from "./hooks/useDevice";
@@ -114,6 +115,7 @@ function AppRoutes() {
       <Route path="/artists" element={<ArtistLibrary />} />
       <Route path="/history" element={<History />} />
       <Route path="/vault" element={<Vault />} />
+      <Route path="/menu" element={<MobileMenu />} />
       <Route path="/settings" element={<Settings />} />
     </Routes>
   );

@@ -468,7 +468,7 @@ export function Settings() {
 
                 <div className="max-w-2xl space-y-4">
                   <div>
-                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">ComfyUI 服务器地址</label>
+                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">ComfyUI 服务器地址 (图生图/文生图)</label>
                     <input
                       type="text"
                       value={settings.comfyUrl}
@@ -478,8 +478,18 @@ export function Settings() {
                         qs.disconnect();
                         qs.connect();
                       }}
-                      className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                      className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono mb-4"
                       placeholder="http://192.168.1.100:8188"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">图生视频 服务器地址 (Video ComfyUI URL)</label>
+                    <input
+                      type="text"
+                      value={settings.videoComfyUrl || ''}
+                      onChange={(e) => updateSettings({ videoComfyUrl: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                      placeholder="http://127.0.0.1:8188"
                     />
                   </div>
                 </div>

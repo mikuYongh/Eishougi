@@ -1,5 +1,5 @@
 import { useLocation, Link } from "react-router-dom";
-import { LayoutDashboard, Sparkles, FolderHeart, Clock, Bot, Loader2 } from "lucide-react";
+import { LayoutDashboard, Sparkles, FolderHeart, Clock, Bot, Loader2, Menu } from "lucide-react";
 import { useAgentStore } from "../../stores/agentStore";
 import { useQueueStore } from "../../stores/queueStore";
 
@@ -59,9 +59,9 @@ export function MobileBottomNav() {
             <Clock size={18} />
             <span className="text-[8px] font-bold">历史</span>
           </Link>
-          <Link to="/vault" className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${isActive('/vault') ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
-            <FolderHeart size={18} />
-            <span className="text-[8px] font-bold">典藏库</span>
+          <Link to="/menu" className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${isActive('/menu') ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+            <Menu size={18} />
+            <span className="text-[8px] font-bold">更多</span>
           </Link>
         </div>
       </div>

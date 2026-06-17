@@ -9,6 +9,8 @@ export interface McpServerConfig {
 
 export interface AppSettings {
   comfyUrl: string;
+  videoComfyUrl: string;
+  autoSave: boolean;
   llm: {
     provider: 'openai' | 'anthropic' | 'ollama' | 'agnes';
     apiKey: string;
@@ -47,6 +49,8 @@ interface SettingsState {
 
 const defaultSettings: AppSettings = {
   comfyUrl: import.meta.env.VITE_COMFY_URL || 'http://127.0.0.1:8188',
+  videoComfyUrl: 'http://127.0.0.1:8188',
+  autoSave: true,
   llm: {
     provider: 'agnes',
     apiKey: import.meta.env.VITE_LLM_API_KEY || '',

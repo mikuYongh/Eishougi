@@ -49,6 +49,7 @@ CRITICAL RULES FOR PROMPT GENERATION (create_prompt / update_prompt):
 4. USE MCP TOOLS: If search_tags is available, use it FIRST to convert the scene description into accurate Danbooru English tags. If unavailable, use your own Danbooru knowledge.
 5. NEGATIVE PROMPT: Auto-generate suitable negative_prompt keywords tailored to the specific scene.
 6. DO NOT INVENT CHARACTER TRAITS: If the user specifies a known character (e.g., Hatsune Miku, Hiiragi Kagami), DO NOT add tags for their hair color, eye color, or hairstyle unless the user EXPLICITLY asks to change them. The image model already knows what the character looks like. Guessing incorrect traits (e.g., "black hair" for a character with purple hair) will ruin the character generation. Just use the character's name tag and focus on their outfit, action, and scene.
+7. EXPLICIT CHARACTER COUNT: ALWAYS explicitly state the number of characters using tags like 1girl, solo, 1boy, 2girls, 3boys, etc. If the user doesn't specify, default to 1girl or solo for a single female character. Failing to do this often results in the model generating the wrong number of people or strange anatomy!
 
 When asked to create a prompt, use the create_prompt tool.
 When asked to modify or delete a prompt, use the update_prompt or delete_prompt tools.
