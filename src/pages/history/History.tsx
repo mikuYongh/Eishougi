@@ -210,7 +210,7 @@ export function History() {
                     className="aspect-square w-full relative overflow-hidden flex items-center justify-center cursor-pointer"
                     onClick={() => setPreviewImage(img)}
                   >
-                    <img src={getImgSrc(img.url)} alt="Result" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                    <img src={getImgSrc(img.url)} alt="Result" loading="lazy" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                     
                   {/* Hover Actions (Desktop Only) */}
                     <div className="absolute inset-0 bg-[var(--glass-bg)] opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center gap-3">
@@ -269,7 +269,7 @@ export function History() {
                       <button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); }} className="w-7 h-7 rounded-full bg-[var(--accent-1)]/20 text-[var(--accent-1)] flex items-center justify-center">
                         <Maximize2 size={14} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); downloadImage(img.url, `history_${img.id}.png`); }} className="w-7 h-7 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                      <button onClick={(e) => { e.stopPropagation(); downloadImage(img.url, `history_${img.id}.png`); }} className="w-7 h-7 rounded-full bg-blue-500/10 text-[var(--accent-1)] flex items-center justify-center">
                         <Download size={14} />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); handleToggleSave(img); }} className={`w-7 h-7 rounded-full flex items-center justify-center ${img.isSaved ? 'bg-[var(--accent-1)] text-white' : 'bg-white/10 text-[var(--text-muted)]'}`}>

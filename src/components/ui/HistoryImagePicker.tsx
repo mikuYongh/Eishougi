@@ -22,7 +22,7 @@ export function HistoryImagePicker({ onSelect, onClose, title = "选择生成历
 
   useEffect(() => {
     invoke<any[]>('list_generated_images').then(data => {
-       setHistory(data.filter(d => d.status === 'completed' && d.outputPath));
+       setHistory(data.filter(d => d.status === 'completed' && d.outputPath).slice(0, 100));
        setLoading(false);
     });
   }, []);
@@ -87,6 +87,7 @@ export function HistoryImagePicker({ onSelect, onClose, title = "选择生成历
                   <img 
                     src={getImgSrc(h.outputPath)} 
                     alt="Generation History"
+                    loading="lazy"
                     className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`}
                   />
                   
