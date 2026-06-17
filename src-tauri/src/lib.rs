@@ -28,6 +28,7 @@ impl AppState {
 pub mod jvm_plugin {
     pub static mut JVM: Option<jni::JavaVM> = None;
     pub static mut MAIN_ACTIVITY_CLASS: Option<jni::objects::GlobalRef> = None;
+    pub static mut MAIN_CONTEXT: Option<jni::objects::GlobalRef> = None;
 
     pub fn save_image_to_gallery(source_path: &str, file_name: &str) -> Result<String, String> {
         unsafe {
@@ -60,104 +61,126 @@ pub mod jvm_plugin {
 
     /// Reads a packaged asset file (from src/main/assets/) as a UTF-8 string.
     ///
-    /// Uses `ndk_context` to obtain the JavaVM and Activity/Context pointer,
-    /// then calls `Context.getAssets().open(name)` via JNI — standard Android
-    /// APIs that are always present, so we do NOT need a custom Kotlin method.
-    ///
-    /// Must be called after Tauri runtime has started (setup hook), because
-    /// ndk_context is only initialized by then.
+    /// Uses our saved JavaVM and Activity instance (from `storeActivityInstance`)
+    /// to call `context.getAssets().open(name)` via JNI — standard Android APIs.
+    /// We avoid `ndk_context` here because it is not reliably initialised by the
+    /// time the Tauri setup hook fires on some device / Android versions.
     pub fn read_asset_to_string(name: &str) -> Option<String> {
-        let context = ndk_context::android_context();
-        let vm_ptr = context.vm();
-        if vm_ptr.is_null() {
-            return None;
-        }
-        let context_ptr = context.context();
-        if context_ptr.is_null() {
-            return None;
-        }
-
-        // Safety: vm_ptr is a valid JavaVM* set by Tauri/ndk-glue at startup.
-        let vm = unsafe { jni::JavaVM::from_raw(vm_ptr) }.ok()?;
+        let vm = unsafe { crate::jvm_plugin::JVM.as_ref()? };
         let mut env = vm.attach_current_thread().ok()?;
+        let _ = env.exception_clear();
+        let context_obj: &jni::objects::JObject =
+            unsafe { crate::jvm_plugin::MAIN_CONTEXT.as_ref()? }.as_ref();
 
         // context.getAssets() -> AssetManager
         let asset_manager = env
-            .call_method(
-                context_ptr as jni::sys::jobject,
-                "getAssets",
-                "()Landroid/content/res/AssetManager;",
-                &[],
-            )
-            .ok()?
-            .l()
-            .ok()?;
+            .call_method(context_obj, "getAssets", "()Landroid/content/res/AssetManager;", &[])
+            .ok()?.l().ok()?;
 
         // assetManager.open(name) -> InputStream
         let jname = env.new_string(name).ok()?;
         let input_stream = env
-            .call_method(
-                &asset_manager,
-                "open",
-                "(Ljava/lang/String;)Ljava/io/InputStream;",
-                &[jni::objects::JValue::from(&jname)],
-            )
-            .ok()?
-            .l()
-            .ok()?;
+            .call_method(&asset_manager, "open", "(Ljava/lang/String;)Ljava/io/InputStream;",
+                &[jni::objects::JValue::from(&jname)])
+            .ok()?.l().ok()?;
+        if input_stream.is_null() { return None; }
 
-        if input_stream.is_null() {
-            return None;
-        }
-
-        // Read all bytes via a ByteArrayOutputStream.
         let baos_class = env.find_class("java/io/ByteArrayOutputStream").ok()?;
         let baos = env.new_object(&baos_class, "()V", &[]).ok()?;
-
         let buf = env.new_byte_array(8192).ok()?;
         loop {
-            let n = env
-                .call_method(
-                    &input_stream,
-                    "read",
-                    "([B)I",
-                    &[jni::objects::JValue::from(&buf)],
-                )
-                .ok()?
-                .i()
+            let n = env.call_method(&input_stream, "read", "([B)I",
+                &[jni::objects::JValue::from(&buf)]).ok()?.i().ok()?;
+            if n < 0 { break; }
+            env.call_method(&baos, "write", "([BII)V",
+                &[jni::objects::JValue::from(&buf), jni::objects::JValue::Int(0), jni::objects::JValue::Int(n)])
                 .ok()?;
-            if n < 0 {
-                break;
-            }
-            env.call_method(
-                &baos,
-                "write",
-                "([BII)V",
-                &[
-                    jni::objects::JValue::from(&buf),
-                    jni::objects::JValue::Int(0),
-                    jni::objects::JValue::Int(n),
-                ],
-            )
-            .ok()?;
         }
-
-        let bytes = env
-            .call_method(&baos, "toByteArray", "()[B", &[])
-            .ok()?
-            .l()
-            .ok()?;
+        let bytes = env.call_method(&baos, "toByteArray", "()[B", &[]).ok()?.l().ok()?;
         let bytes_array: jni::objects::JByteArray = bytes.into();
         let len = env.get_array_length(&bytes_array).ok()?;
         let mut data = vec![0i8; len as usize];
         env.get_byte_array_region(&bytes_array, 0, &mut data).ok()?;
-
-        // Close the input stream to release the asset handle.
         let _ = env.call_method(&input_stream, "close", "()V", &[]);
-
-        // Convert i8 bytes to u8; JSON is ASCII-safe so this is lossless.
         let data: Vec<u8> = data.into_iter().map(|b| b as u8).collect();
         String::from_utf8(data).ok().filter(|s| !s.is_empty())
+    }
+
+    /// Backup the SQLite database file to app-specific external storage
+    /// (`/sdcard/Android/data/com.promptmuse.app/files/backups/`). This
+    /// survives `pm clear` and app data resets because it lives outside
+    /// `/data/data/`. Keeps the last 7 backups and prunes older ones.
+    pub fn backup_database(db_path: &std::path::Path) {
+        let vm = match unsafe { crate::jvm_plugin::JVM.as_ref() } {
+            Some(v) => v,
+            None => return,
+        };
+        let mut env = match vm.attach_current_thread() {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+        let _ = env.exception_clear();
+        let context_obj: &jni::objects::JObject =
+            match unsafe { crate::jvm_plugin::MAIN_CONTEXT.as_ref() } {
+                Some(c) => c.as_ref(),
+                None => return,
+            };
+
+        // context.getExternalFilesDir(null) -> File? (app-specific external dir)
+        let external_dir = match env.call_method(
+            context_obj,
+            "getExternalFilesDir",
+            "(Ljava/lang/String;)Ljava/io/File;",
+            &[jni::objects::JValue::Object(&jni::objects::JObject::null())],
+        ) {
+            Ok(v) => match v.l() { Ok(f) => f, Err(_) => return },
+            Err(_) => return,
+        };
+        if external_dir.is_null() { return; }
+
+        // file.getAbsolutePath() -> String
+        let path_obj = match env.call_method(
+            &external_dir, "getAbsolutePath", "()Ljava/lang/String;", &[],
+        ) {
+            Ok(v) => match v.l() { Ok(p) => p, Err(_) => return },
+            Err(_) => return,
+        };
+        if path_obj.is_null() { return; }
+
+        let backup_root: String = match env.get_string(&jni::objects::JString::from(path_obj)) {
+            Ok(s) => s.into(),
+            Err(_) => return,
+        };
+
+        let backup_dir = std::path::Path::new(&backup_root).join("backups");
+        if std::fs::create_dir_all(&backup_dir).is_err() {
+            return;
+        }
+
+        // Copy DB with epoch-seconds timestamp.
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let backup_file = backup_dir.join(format!("prompt-muse-{ts}.db"));
+        if backup_file.exists() {
+            return; // Already backed up this second.
+        }
+        if std::fs::copy(db_path, &backup_file).is_err() {
+            return;
+        }
+
+        // Prune old backups: keep the 7 most recent.
+        let mut entries: Vec<_> = match std::fs::read_dir(&backup_dir) {
+            Ok(e) => e.filter_map(|e| e.ok()).filter(|e| {
+                e.file_name().to_string_lossy().starts_with("prompt-muse-")
+            }).collect(),
+            Err(_) => return,
+        };
+        entries.sort_by_key(|e| std::cmp::Reverse(e.file_name()));
+        for old in entries.into_iter().skip(7) {
+            let _ = std::fs::remove_file(old.path());
+        }
     }
 }
 
@@ -177,11 +200,58 @@ pub extern "C" fn Java_com_promptmuse_app_MainActivity_initJvmContext(
     }
 }
 
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_com_promptmuse_app_MainActivity_storeActivityInstance(
+    env: jni::JNIEnv,
+    _class: jni::objects::JClass,
+    activity: jni::objects::JObject,
+) {
+    // Store a GlobalRef to the Activity instance so we can use it
+    // later to read APK assets (via context.getAssets()) without
+    // relying on ndk_context which might not be initialized yet.
+    if let Ok(global_ref) = env.new_global_ref(activity) {
+        unsafe {
+            crate::jvm_plugin::MAIN_CONTEXT = Some(global_ref);
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Install a panic hook that forwards the panic message to Android logcat
+    // (tag: "RustPanic"). Without this, Rust panics on Android write to stderr
+    // which goes to /dev/null, making debugging impossible.
+    #[cfg(target_os = "android")]
+    {
+        unsafe extern "C" {
+            fn __android_log_write(prio: i32, tag: *const u8, text: *const u8) -> i32;
+        }
+        let default_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let location = info
+                .location()
+                .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+                .unwrap_or_else(|| "<unknown>".to_string());
+            let payload = info
+                .payload()
+                .downcast_ref::<&str>()
+                .copied()
+                .or_else(|| info.payload().downcast_ref::<String>().map(|s| s.as_str()))
+                .unwrap_or("<non-string panic payload>");
+            let tag = b"RustPanic\0";
+            let text_c = std::ffi::CString::new(format!(
+                "RUST PANIC at {}\nmsg: {}",
+                location, payload,
+            )).unwrap_or_default();
+            unsafe { __android_log_write(6, tag.as_ptr(), text_c.as_ptr() as *const u8) };
+            default_hook(info);
+        }));
+    }
+
     let app_data_dir = get_app_data_dir();
     std::fs::create_dir_all(&app_data_dir).ok();
-    let state = AppState::new(app_data_dir).expect("Failed to initialize app state");
+    let state = AppState::new(app_data_dir.clone()).expect("Failed to initialize app state");
 
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
@@ -190,7 +260,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init());
 
-    builder
+    let app = builder
         .manage(state)
         .manage(comfy_ws::ComfyState::new())
         .invoke_handler(tauri::generate_handler![
@@ -244,12 +314,47 @@ pub fn run() {
             if let Err(e) = db::init::init_library_data(&db.conn, &state.app_data_dir) {
                 log::warn!("Failed to initialize library data: {}", e);
             }
+            drop(db);
+            // Auto-backup DB to external storage (survives pm clear).
+            #[cfg(target_os = "android")]
+            crate::jvm_plugin::backup_database(&state.app_data_dir.join("prompt-muse.db"));
             Ok(())
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
-}
+        });
 
+    #[cfg(target_os = "android")]
+    {
+        // The outer stop_unwind (from tauri's mobile_entry_point) will abort
+        // on any panic, obscuring the real error. Catch panics here so we log
+        // them before they reach stop_unwind.
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            app.run(tauri::generate_context!())
+        }));
+        if let Err(e) = &result {
+            // Try to log the panic payload. We've already installed a panic
+            // hook that writes to logcat, so this is a second chance to
+            // capture the message before the thread exits.
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                format!("app.run() panicked: {}", s)
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                format!("app.run() panicked: {}", s)
+            } else {
+                "app.run() panicked (non-string payload)".to_string()
+            };
+            let _ = std::fs::write(
+                "/data/data/com.promptmuse.app/files/panic_log.txt",
+                &msg,
+            );
+        }
+        // Ignore the result to avoid re-panicking into the outer stop_unwind.
+        let _ = result;
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        app.run(tauri::generate_context!())
+            .expect("error while running tauri application");
+    }
+}
 fn get_app_data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
@@ -288,3 +393,4 @@ fn get_app_data_dir() -> PathBuf {
         PathBuf::from("/data/data/com.promptmuse.app/files")
     }
 }
+
