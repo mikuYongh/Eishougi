@@ -74,3 +74,23 @@ pub async fn delete_custom_style(state: State<'_, AppState>, id: String) -> Resu
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn update_custom_style(
+    state: State<'_, AppState>,
+    id: String,
+    name: String,
+    trigger: String,
+    category: String,
+    preview: Option<String>,
+) -> Result<(), String> {
+    let db = state.db.lock().await;
+    db.conn
+        .execute(
+            "UPDATE custom_styles SET name = ?1, trigger = ?2, category = ?3, preview = ?4 WHERE id = ?5",
+            params![name, trigger, category, preview, id],
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+

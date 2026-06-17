@@ -296,6 +296,7 @@ pub fn run() {
             commands::styles::get_custom_styles,
             commands::styles::add_custom_style,
             commands::styles::delete_custom_style,
+            commands::styles::update_custom_style,
             commands::mcp::list_mcp_tools,
             commands::mcp::call_mcp_tool,
             commands::data::export_all_data,

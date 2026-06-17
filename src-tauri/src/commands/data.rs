@@ -149,6 +149,7 @@ pub async fn export_all_data(
         &data.generated_images,
         "outputPath",
     ));
+    image_paths.extend(collect_all_image_paths(&data.custom_styles, "preview"));
 
     // Deduplicate + filter out invalid paths
     let mut seen = HashSet::new();
@@ -526,8 +527,9 @@ pub async fn import_all_data(
     let mut data = data;
     fix_path(&mut data.prompt_images, "filePath");
     fix_path(&mut data.generated_images, "outputPath");
+    fix_path(&mut data.custom_styles, "preview");
 
-    // 4. Import into database — use INSERT OR IGNORE to skip existing rows
+    // 4. Import into database
     // (keeps existing data, only adds new records)
     let db = state.db.lock().await;
 
@@ -540,7 +542,7 @@ pub async fn import_all_data(
     total += insert_table(&db.conn, "generated_images", &data.generated_images)?;
     total += insert_table_ignore(&db.conn, "chat_messages", &data.chat_messages)?;
     total += insert_table_ignore(&db.conn, "favorite_prompts", &data.favorite_prompts)?;
-    total += insert_table_ignore(&db.conn, "custom_styles", &data.custom_styles)?;
+    total += insert_table(&db.conn, "custom_styles", &data.custom_styles)?;
 
     Ok(format!(
         "导入完成：{} 条数据库记录，{} 张图片已还原。",
