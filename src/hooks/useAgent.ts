@@ -12,9 +12,17 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   images?: string[];
+  files?: ChatAttachment[];
   tool_calls?: any[];
   tool_call_id?: string;
   name?: string;
+}
+
+export interface ChatAttachment {
+  path: string;       // Saved local path (from save_base64_file)
+  name: string;       // Original filename
+  mime: string;       // Mime type
+  isImage: boolean;   // Convenience flag (legacy images[] still used for image-only viewers)
 }
 
 export function useAgent() {
@@ -255,6 +263,24 @@ export function useAgent() {
             batch_count: { type: "number", description: "Number of images to generate (default 1)" }
           },
           required: ["prompt_id"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "generate_video_from_image",
+        description: "Generate a video from a source image using the default img2video workflow. Use this tool when the user asks to animate or make a video from an image. You must analyze the image and generate a suitable English prompt describing the scene.",
+        parameters: {
+          type: "object",
+          properties: {
+            image_path: { type: "string", description: "The URL or path of the source image" },
+            prompt: { type: "string", description: "English prompt describing the desired video scene and motion" },
+            duration: { type: "number", description: "Video duration in frames/seconds (default 10)" },
+            fps: { type: "number", description: "Frames per second (default 25)" },
+            workflow_id: { type: "string", description: "Optional. The ID of the img2video workflow to use." }
+          },
+          required: ["image_path", "prompt"]
         }
       }
     },
@@ -560,24 +586,48 @@ export function useAgent() {
       let done = false;
       let toolCallState: any = null;
 
+      // Throttle re-renders during streaming: accumulate deltas into the
+      // assistantMessage object and flush to the store at most once per frame.
+      // Without this, every SSE chunk triggers a full messages array clone +
+      // re-render, which makes long responses janky.
+      let rafScheduled = false;
+      let rafId: number | null = null;
+      const flushRender = () => {
+        rafScheduled = false;
+        rafId = null;
+        setMessages([...baseMessages, { ...assistantMessage }]);
+      };
+      const scheduleRender = () => {
+        if (!rafScheduled) {
+          rafScheduled = true;
+          // requestAnimationFrame fires ~60Hz; fall back to setTimeout(0) if
+          // rAF is unavailable (older Android WebViews / SSR).
+          if (typeof requestAnimationFrame === 'function') {
+            rafId = requestAnimationFrame(flushRender);
+          } else {
+            rafId = setTimeout(flushRender, 16) as unknown as number;
+          }
+        }
+      };
+
       while (!done && reader) {
         const { value, done: readerDone } = await reader.read();
         done = readerDone;
         if (value) {
           const chunk = decoder.decode(value, { stream: true });
           const lines = chunk.split('\n').filter(line => line.trim() !== '');
-          
+
           for (const line of lines) {
             if (line === 'data: [DONE]') break;
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6));
                 const delta = data.choices[0].delta;
-                
+
                 if (delta.content) {
                   assistantMessage.content += delta.content;
                 }
-                
+
                 if (delta.tool_calls) {
                   for (const toolCall of delta.tool_calls) {
                     if (toolCall.id) {
@@ -597,7 +647,7 @@ export function useAgent() {
                   }
                 }
 
-                setMessages([...baseMessages, { ...assistantMessage }]);
+                scheduleRender();
               } catch (e) {
                 // Ignore parse errors on partial chunks
               }
@@ -605,6 +655,19 @@ export function useAgent() {
           }
         }
       }
+
+      // Final flush: ensure the last batch of deltas is committed even if no
+      // further rAF tick happens (e.g. reader closed mid-frame).
+      if (rafId !== null) {
+        if (typeof cancelAnimationFrame === 'function' && rafScheduled) {
+          cancelAnimationFrame(rafId);
+        } else if (typeof clearTimeout === 'function' && rafScheduled) {
+          clearTimeout(rafId);
+        }
+        rafId = null;
+        rafScheduled = false;
+      }
+      setMessages([...baseMessages, { ...assistantMessage }]);
 
       if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
         const newMessages = [...currentMessages, assistantMessage];
@@ -621,6 +684,12 @@ export function useAgent() {
             try {
               const fnName = call.function.name;
               if (fnName === 'create_prompt') {
+                // Default base model: use the first local checkpoint if available,
+                // otherwise fall back to a sensible default.
+                const localCheckpoints = useModelStore.getState().checkpoints || [];
+                const defaultBaseModel = parsedArgs.base_model
+                  || localCheckpoints[0]
+                  || "sd_xl_base_1.0.safetensors";
                 const newPrompt = {
                   id: "p_" + Date.now().toString(),
                   title: parsedArgs.title || parsedArgs.tags?.[0] || "Agent Generated",
@@ -636,7 +705,7 @@ export function useAgent() {
                   seed: parsedArgs.seed || "-1",
                   samplerName: parsedArgs.sampler_name || "euler",
                   scheduler: parsedArgs.scheduler || "beta57",
-                  baseModel: parsedArgs.base_model || "sd_xl_base_1.0.safetensors",
+                  baseModel: defaultBaseModel,
                   vaeModel: parsedArgs.vae_model || "auto",
                   loraConfigs: parsedArgs.lora_configs ? JSON.stringify(parsedArgs.lora_configs) : null,
                   tags: (parsedArgs.tags || []).map((t: string, i: number) => ({
@@ -744,6 +813,76 @@ export function useAgent() {
                   status: "completed",
                   images: allImages,
                   message: `Successfully generated ${allImages.length} image(s).`
+                };
+              } else if (fnName === 'generate_video_from_image') {
+                const imagePath = typeof parsedArgs.image_path === 'string' ? parsedArgs.image_path : '';
+                if (!imagePath) throw new Error("image_path must be a valid string URL/path");
+                const { ComfyService } = await import('../services/comfyService');
+                const workflows = useWorkflowStore.getState().workflows;
+                let img2videoWorkflow = workflows.find((w: any) => w.id === parsedArgs.workflow_id);
+                if (!img2videoWorkflow) {
+                  img2videoWorkflow = workflows.find((w: any) => w.type === 'img2video' && w.isDefault) || workflows.find((w: any) => w.type === 'img2video');
+                }
+                if (!img2videoWorkflow || !img2videoWorkflow.jsonContent) {
+                  throw new Error("No 'img2video' workflow found in system. Please create one first.");
+                }
+
+                addMessage({
+                  id: "sys_" + Date.now(),
+                  role: "assistant",
+                  content: `我正在尝试将该图片转换为视频...\n\n**提示词**: ${parsedArgs.prompt}\n**时长**: ${parsedArgs.duration || 10} 帧/秒\n**FPS**: ${parsedArgs.fps || 25}`
+                });
+
+                const comfyService = new ComfyService();
+                const imageSrc = imagePath.startsWith('http') || imagePath.startsWith('data:') 
+                  ? imagePath 
+                  : (window as any).__TAURI__ ? await import('@tauri-apps/api/core').then(m => m.convertFileSrc(imagePath)) : imagePath;
+                
+                // 1. Read dimensions
+                const imgObj = new Image();
+                imgObj.src = imageSrc;
+                await new Promise((resolve, reject) => {
+                  imgObj.onload = resolve;
+                  imgObj.onerror = reject;
+                });
+                const imgW = imgObj.naturalWidth || 832;
+                const imgH = imgObj.naturalHeight || 1216;
+
+                const imgResponse = await fetch(imageSrc);
+                const imgBlob = await imgResponse.blob();
+                const filename = `img2video_agent_${Date.now()}.png`;
+
+                const uploadedFilename = await comfyService.uploadImage(imgBlob, filename);
+                
+                const workflowJson = JSON.parse(img2videoWorkflow.jsonContent);
+                const injectedWorkflow = comfyService.injectVideoParameters(
+                  workflowJson,
+                  uploadedFilename,
+                  parsedArgs.prompt,
+                  parsedArgs.fps || 25,
+                  parsedArgs.duration || 10,
+                  imgW, imgH
+                );
+
+                const generatedVideos = await new Promise<string[]>((resolve, reject) => {
+                  comfyService.connect(
+                    () => {}, 
+                    (images) => {
+                      comfyService.disconnect();
+                      resolve(images);
+                    },
+                    (err) => {
+                      comfyService.disconnect();
+                      reject(err);
+                    }
+                  );
+                  comfyService.queuePrompt(injectedWorkflow).catch(reject);
+                });
+
+                res = {
+                  status: "completed",
+                  videos: generatedVideos,
+                  message: "Video generation completed."
                 };
               } else if (fnName === 'auto_tag_all_prompts') {
             const { aiService } = await import('../services/aiService');
@@ -926,7 +1065,9 @@ export function useAgent() {
 
           let toolImages: string[] | undefined = undefined;
           if (res && res.images && Array.isArray(res.images)) {
-            toolImages = res.images;
+            toolImages = res.images
+              .map((img: any) => typeof img === 'string' ? img : (img.url || img.filePath || img.outputPath || img.path))
+              .filter((s: any) => typeof s === 'string' && s.length > 0);
           } else if (Array.isArray(res) && res.length > 0 && res[0].url) {
             toolImages = res.map((item: any) => item.url).filter(Boolean);
           }
@@ -957,20 +1098,62 @@ export function useAgent() {
     }
   };
 
-  const sendMessage = async (text: string, images?: string[]) => {
-    if (!text.trim() && (!images || images.length === 0)) return;
-    
+  const sendMessage = async (text: string, imagesOrAttachments?: string[] | ChatAttachment[]) => {
+    // Normalize: callers may pass either plain path strings (legacy images)
+    // or fully-described ChatAttachment objects (file uploads).
+    const attachments: ChatAttachment[] = [];
+    if (imagesOrAttachments && imagesOrAttachments.length > 0) {
+      for (const item of imagesOrAttachments) {
+        if (typeof item === 'string') {
+          attachments.push({ path: item, name: 'image', mime: '', isImage: true });
+        } else {
+          attachments.push(item);
+        }
+      }
+    }
+
+    if (!text.trim() && attachments.length === 0) return;
+
+    // Text files: inline their content so the LLM can read them directly.
+    // Binary files: just give the LLM a description of what was attached.
+    const inlineTextExtensions = ['txt', 'md', 'json', 'yaml', 'yml', 'csv', 'html', 'css', 'js', 'ts', 'tsx', 'jsx', 'py', 'rs', 'java', 'c', 'cpp', 'h', 'sh', 'xml', 'svg', 'log'];
+    let finalContent = text;
+    const imagePaths: string[] = [];
+
+    for (const att of attachments) {
+      if (att.isImage) {
+        imagePaths.push(att.path);
+        continue;
+      }
+      const ext = att.name.split('.').pop()?.toLowerCase() || '';
+      if (inlineTextExtensions.includes(ext)) {
+        try {
+          const fileContent = await invoke<string>('read_text_file', { path: att.path });
+          // Truncate very large files to avoid blowing up the context window.
+          const truncated = fileContent.length > 20000
+            ? fileContent.substring(0, 20000) + `\n... [truncated, ${fileContent.length - 20000} more chars]`
+            : fileContent;
+          finalContent += `\n\n--- ${att.name} ---\n\`\`\`\n${truncated}\n\`\`\`\n`;
+        } catch (e) {
+          finalContent += `\n\n[Attachment ${att.name} could not be read: ${String(e)}]`;
+        }
+      } else {
+        finalContent += `\n\n[Attached file: ${att.name} (binary, ${att.mime || ext})]`;
+      }
+    }
+
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: text,
-      images: images && images.length > 0 ? images : undefined
+      content: finalContent,
+      images: imagePaths.length > 0 ? imagePaths : undefined,
+      files: attachments.filter(a => !a.isImage).length > 0 ? attachments.filter(a => !a.isImage) : undefined,
     };
-    
+
     addMessage(userMsg);
     const newMessages = [...messages, userMsg];
     setIsGenerating(true);
-    
+
     try {
       await callLLM(newMessages);
     } finally {

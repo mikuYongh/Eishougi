@@ -1,9 +1,10 @@
-import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X, ArrowDown } from "lucide-react";
-import { useState, useRef, useEffect, type KeyboardEvent } from "react";
+import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X, ArrowDown, Paperclip, FileText } from "lucide-react";
+import React, { useState, useRef, useEffect, memo, type KeyboardEvent } from "react";
 import { useAgent } from "../../hooks/useAgent";
 import { useAgentStore } from "../../stores/agentStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import type { McpServerConfig } from "../../stores/settingsStore";
+import type { ChatAttachment } from "../../hooks/useAgent";
 import { invoke } from "@tauri-apps/api/core";
 import type { ChatMessage } from "../../hooks/useAgent";
 import ReactMarkdown from 'react-markdown';
@@ -31,7 +32,43 @@ function ChatImage({ src }: { src: string }) {
   );
 }
 
-import React from 'react';
+/**
+ * Markdown renderer extracted into a memoized component.
+ *
+ * Why: during streaming, `messages` updates ~60 times per second (rAF throttled).
+ * Each update re-renders every prior assistant message. ReactMarkdown is
+ * expensive (parses + walks AST). memo() bails out when `content` is unchanged,
+ * so only the currently-streaming message pays the markdown cost.
+ */
+const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p: ({node, ...props}) => <div className="mb-2 last:mb-0" {...props} />,
+        strong: ({node, ...props}) => <strong className="text-[var(--accent-1)] font-bold" {...props} />,
+        a: ({node, ...props}) => <a className="text-[var(--accent-2)] underline hover:text-[var(--accent-1)] transition-colors" target="_blank" {...props} />,
+        code: ({node, inline, className, children, ...props}: any) =>
+          inline
+            ? <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--accent-1)]/20 text-[var(--accent-1)] font-mono text-[12px]" {...props}>{children}</code>
+            : <pre className="p-3 rounded-xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] overflow-x-auto text-[12px] font-mono text-[var(--text-secondary)] mt-2 mb-2 custom-scrollbar"><code {...props}>{children}</code></pre>,
+        ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+        ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+        h1: ({node, ...props}) => <h1 className="text-lg font-bold text-[var(--text-primary)] mt-4 mb-2" {...props} />,
+        h2: ({node, ...props}) => <h2 className="text-md font-bold text-[var(--text-primary)] mt-3 mb-2" {...props} />,
+        h3: ({node, ...props}) => <h3 className="text-sm font-bold text-[var(--text-primary)] mt-2 mb-1" {...props} />,
+        blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-[var(--accent-1)]/30 pl-3 py-1 text-[var(--text-muted)] italic my-2" {...props} />,
+        img: ({node, ...props}) => (
+          <PhotoView src={getImgSrc(props.src)}>
+            <img {...props} src={getImgSrc(props.src)} className="max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in" />
+          </PhotoView>
+        )
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
+});
 
 const AgentFooter = React.forwardRef<HTMLDivElement, { context?: { isGenerating: boolean } }>(({ context }, ref) => {
   return context?.isGenerating ? (
@@ -49,6 +86,7 @@ export function AgentPanel() {
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
   const [inputValue, setInputValue] = useState("");
   const [selectedImages, setSelectedImages] = useState<{ path: string, previewUrl: string }[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<ChatAttachment[]>([]);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   
@@ -158,25 +196,45 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
 
 
   const handleSend = () => {
-    if ((inputValue.trim() || selectedImages.length > 0) && !isGenerating) {
-      sendMessage(inputValue, selectedImages.map(img => img.path));
+    const attachments: ChatAttachment[] = [
+      ...selectedImages.map(img => ({ path: img.path, name: 'image', mime: '', isImage: true })),
+      ...selectedFiles,
+    ];
+    if ((inputValue.trim() || attachments.length > 0) && !isGenerating) {
+      sendMessage(inputValue, attachments);
       setInputValue("");
       setSelectedImages([]);
+      setSelectedFiles([]);
     }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64Data = reader.result as string;
+      const isImage = file.type.startsWith('image/');
       try {
-        const savedPath = await invoke<string>('save_base64_image', { base64Data });
-        setSelectedImages(prev => [...prev, { path: savedPath, previewUrl: base64Data }]);
+        if (isImage) {
+          const savedPath = await invoke<string>('save_base64_image', { base64Data });
+          setSelectedImages(prev => [...prev, { path: savedPath, previewUrl: base64Data }]);
+        } else {
+          const savedPath = await invoke<string>('save_base64_file', {
+            base64Data,
+            originalName: file.name,
+          });
+          setSelectedFiles(prev => [...prev, {
+            path: savedPath,
+            name: file.name,
+            mime: file.type || '',
+            isImage: false,
+          }]);
+        }
       } catch (err) {
-        console.error("Failed to save image", err);
+        console.error("Failed to save uploaded file", err);
+        alert("上传失败: " + String(err));
       }
     };
     reader.readAsDataURL(file);
@@ -223,39 +281,17 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
           <div className="whitespace-pre-wrap">{msg.content}</div>
         ) : msg.content ? (
           <div className="text-[14px]">
-            <ReactMarkdown 
-              remarkPlugins={[remarkGfm]}
-              components={{
-                p: ({node, ...props}) => <div className="mb-2 last:mb-0" {...props} />,
-                strong: ({node, ...props}) => <strong className="text-[var(--accent-1)] font-bold" {...props} />,
-                a: ({node, ...props}) => <a className="text-[var(--accent-2)] underline hover:text-[var(--accent-1)] transition-colors" target="_blank" {...props} />,
-                code: ({node, inline, className, children, ...props}: any) => 
-                  inline 
-                    ? <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--accent-1)]/20 text-[var(--accent-1)] font-mono text-[12px]" {...props}>{children}</code>
-                    : <pre className="p-3 rounded-xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] overflow-x-auto text-[12px] font-mono text-[var(--text-secondary)] mt-2 mb-2 custom-scrollbar"><code {...props}>{children}</code></pre>,
-                ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
-                ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
-                h1: ({node, ...props}) => <h1 className="text-lg font-bold text-[var(--text-primary)] mt-4 mb-2" {...props} />,
-                h2: ({node, ...props}) => <h2 className="text-md font-bold text-[var(--text-primary)] mt-3 mb-2" {...props} />,
-                h3: ({node, ...props}) => <h3 className="text-sm font-bold text-[var(--text-primary)] mt-2 mb-1" {...props} />,
-                blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-[var(--accent-1)]/30 pl-3 py-1 text-[var(--text-muted)] italic my-2" {...props} />,
-                img: ({node, ...props}) => (
-                  <PhotoView src={getImgSrc(props.src)}>
-                    <img {...props} src={getImgSrc(props.src)} className="max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in" />
-                  </PhotoView>
-                )
-              }}
-            >
-              {msg.content}
-            </ReactMarkdown>
+            <MarkdownContent content={msg.content} />
           </div>
         ) : null}
         
         {msg.images && msg.images.length > 0 && (
           <div className="flex gap-2 flex-wrap mt-2">
-            {msg.images.map((img, i) => (
-              <ChatImage key={i} src={img} />
-            ))}
+            {msg.images.map((img, i) => {
+              const o = img as any;
+              const src = typeof o === 'string' ? o : (o?.url || o?.filePath || o?.outputPath || o?.path || '');
+              return src ? <ChatImage key={i} src={src} /> : null;
+            })}
           </div>
         )}
         
@@ -687,11 +723,27 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                 {selectedImages.map((img, i) => (
                   <div key={i} className="relative w-16 h-16 rounded-md overflow-hidden border border-[var(--accent-1)]/30 flex-shrink-0 group">
                     <img src={getImgSrc(img.previewUrl)} alt="preview" className={`w-full h-full object-cover transition-all duration-300 ${privacyMode ? 'blur-md group-hover:blur-none' : ''}`} />
-                    <button 
+                    <button
                       onClick={() => setSelectedImages(prev => prev.filter((_, idx) => idx !== i))}
                       className="absolute top-0 right-0 p-1 bg-[var(--bg-layer-0)] text-[var(--text-primary)] hover:text-red-400"
                     >
                       <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {selectedFiles.length > 0 && (
+              <div className="flex gap-2 px-2 pt-2 overflow-x-auto custom-scrollbar">
+                {selectedFiles.map((f, i) => (
+                  <div key={i} className="relative flex items-center gap-2 px-3 h-10 rounded-md border border-[var(--accent-2)]/30 bg-[var(--bg-layer-1)] flex-shrink-0 group max-w-[200px]">
+                    <FileText size={14} className="text-[var(--accent-2)] flex-shrink-0" />
+                    <span className="text-[11px] text-[var(--text-primary)] truncate font-mono">{f.name}</span>
+                    <button
+                      onClick={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white"
+                    >
+                      <X size={10} />
                     </button>
                   </div>
                 ))}
@@ -710,11 +762,15 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
             />
             <div className="flex justify-between items-center px-2 pb-1">
               <div className="flex items-center gap-3">
-                <label className="text-[var(--accent-1)] hover:text-[var(--accent-2)] cursor-pointer transition-colors p-1">
+                <label className="text-[var(--accent-1)] hover:text-[var(--accent-2)] cursor-pointer transition-colors p-1" title="上传图片">
                   <ImagePlus size={18} />
                   <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
                 </label>
-                <button 
+                <label className="text-[var(--accent-1)] hover:text-[var(--accent-2)] cursor-pointer transition-colors p-1" title="上传文件">
+                  <Paperclip size={18} />
+                  <input type="file" className="hidden" onChange={handleFileUpload} />
+                </label>
+                <button
                   onClick={() => setShowHistoryPicker(true)}
                   className="text-[var(--accent-1)] hover:text-[var(--accent-2)] cursor-pointer transition-colors p-1"
                   title="从历史记录选择图片"
@@ -740,15 +796,15 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
               ) : (
                 <button
                   onClick={handleSend}
-                  disabled={!inputValue.trim() && selectedImages.length === 0}
+                  disabled={!inputValue.trim() && selectedImages.length === 0 && selectedFiles.length === 0}
                   className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer flex-shrink-0 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none hover:scale-105 hover:shadow-[0_0_15px_rgba(var(--accent-1-rgb), 0.5)]"
                   style={{
-                    background: (!inputValue.trim() && selectedImages.length === 0) ? "rgba(255,255,255,0.1)" : "linear-gradient(135deg, #d946ef, #9333ea)",
-                    color: (!inputValue.trim() && selectedImages.length === 0) ? "rgba(255,255,255,0.3)" : "#fff",
+                    background: (!inputValue.trim() && selectedImages.length === 0 && selectedFiles.length === 0) ? "rgba(255,255,255,0.1)" : "linear-gradient(135deg, #d946ef, #9333ea)",
+                    color: (!inputValue.trim() && selectedImages.length === 0 && selectedFiles.length === 0) ? "rgba(255,255,255,0.3)" : "#fff",
                   }}
                   title="发送"
                 >
-                  <Send size={16} className={(inputValue.trim() || selectedImages.length > 0) ? "ml-0.5" : ""} />
+                  <Send size={16} className={(inputValue.trim() || selectedImages.length > 0 || selectedFiles.length > 0) ? "ml-0.5" : ""} />
                 </button>
               )}
             </div>

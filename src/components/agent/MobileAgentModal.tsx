@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
-import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X, Menu, ArrowDown } from "lucide-react";
+import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X, Menu, ArrowDown, Paperclip, FileText } from "lucide-react";
 import { useAgentStore } from "../../stores/agentStore";
-import { useAgent, type ChatMessage } from "../../hooks/useAgent";
+import { useAgent, type ChatMessage, type ChatAttachment } from "../../hooks/useAgent";
 import { useSettingsStore, type McpServerConfig } from "../../stores/settingsStore";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
@@ -11,7 +11,175 @@ import { HistoryImagePicker } from "../ui/HistoryImagePicker";
 import { cn } from "../../lib/utils";
 import { getImgSrc } from "../../utils/imageUtils";
 
+interface InputAreaProps {
+  isGenerating: boolean;
+  stopGenerating: () => void;
+  onSend: (text: string, attachments: ChatAttachment[]) => void;
+}
 
+function MobileAgentInputArea({ isGenerating, stopGenerating, onSend }: InputAreaProps) {
+  const [input, setInput] = useState("");
+  const [selectedImages, setSelectedImages] = useState<{path: string, previewUrl: string}[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<ChatAttachment[]>([]);
+  const [showHistoryPicker, setShowHistoryPicker] = useState(false);
+
+  const handleSend = () => {
+    const attachments: ChatAttachment[] = [
+      ...selectedImages.map(img => ({ path: img.path, name: 'image', mime: '', isImage: true })),
+      ...selectedFiles,
+    ];
+    if ((input.trim() || attachments.length > 0) && !isGenerating) {
+      onSend(input, attachments);
+      setInput("");
+      setSelectedImages([]);
+      setSelectedFiles([]);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Data = reader.result as string;
+      const isImage = file.type.startsWith('image/');
+      try {
+        if ('__TAURI_INTERNALS__' in window || '__TAURI_IPC__' in window) {
+          if (isImage) {
+            const savedPath = await invoke<string>('save_base64_image', { base64Data });
+            setSelectedImages(prev => [...prev, { path: savedPath, previewUrl: base64Data }]);
+          } else {
+            const savedPath = await invoke<string>('save_base64_file', { base64Data, originalName: file.name });
+            setSelectedFiles(prev => [...prev, { path: savedPath, name: file.name, mime: file.type || '', isImage: false }]);
+          }
+        } else {
+          // Browser fallback
+          if (isImage) {
+            setSelectedImages(prev => [...prev, { path: base64Data, previewUrl: base64Data }]);
+          } else {
+            setSelectedFiles(prev => [...prev, { path: base64Data, name: file.name, mime: file.type || '', isImage: false }]);
+          }
+        }
+      } catch (err) {
+        console.warn("Tauri invoke failed, falling back:", err);
+        if (isImage) {
+          setSelectedImages(prev => [...prev, { path: base64Data, previewUrl: base64Data }]);
+        } else {
+          setSelectedFiles(prev => [...prev, { path: base64Data, name: file.name, mime: file.type || '', isImage: false }]);
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFocus = () => {
+    setTimeout(() => {
+      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
+  };
+
+  const hasAttachments = selectedImages.length > 0 || selectedFiles.length > 0;
+
+  return (
+    <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[var(--bg-base)] via-[var(--bg-base)]/90 to-transparent flex flex-col gap-2 pointer-events-none z-30">
+      {hasAttachments && (
+        <div className="flex items-center gap-3 px-2 pointer-events-auto overflow-x-auto hide-scrollbar-on-mobile pb-2">
+          {selectedImages.map((img, i) => (
+            <div key={`img-${i}`} className="relative w-16 h-16 rounded-xl border-2 border-[var(--accent-1)] shadow-lg overflow-hidden flex-shrink-0 group">
+              <img src={img.previewUrl} className="w-full h-full object-cover" />
+              <button
+                onClick={() => setSelectedImages(prev => prev.filter((_, idx) => idx !== i))}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          {selectedFiles.map((f, i) => (
+            <div key={`file-${i}`} className="relative flex items-center gap-2 px-3 h-16 rounded-xl border-2 border-[var(--accent-2)] shadow-lg bg-[var(--bg-layer-1)] flex-shrink-0 group max-w-[180px]">
+              <FileText size={20} className="text-[var(--accent-2)] flex-shrink-0" />
+              <span className="text-[11px] text-[var(--text-primary)] truncate font-mono">{f.name}</span>
+              <button
+                onClick={() => setSelectedFiles(prev => prev.filter((_, idx) => idx !== i))}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-1.5 bg-[var(--glass-bg)] backdrop-blur-2xl border border-[var(--glass-border)] p-1.5 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.4)] focus-within:border-[var(--accent-1)]/50 focus-within:shadow-[0_8px_32px_rgba(var(--accent-1-rgb),0.15)] transition-all pointer-events-auto">
+        <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors cursor-pointer" title="图片">
+          <ImagePlus size={20} />
+          <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+        </label>
+        <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors cursor-pointer" title="文件">
+          <Paperclip size={20} />
+          <input type="file" className="hidden" onChange={handleFileUpload} />
+        </label>
+        <button
+          onClick={() => setShowHistoryPicker(true)}
+          className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <History size={20} />
+        </button>
+
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
+          placeholder="输入指令..."
+          className="flex-1 min-w-0 bg-transparent border-none text-[var(--text-primary)] px-2 py-2 outline-none text-sm placeholder:text-[var(--text-muted)] font-medium"
+        />
+
+        {isGenerating ? (
+          <button
+            onClick={stopGenerating}
+            className="w-10 h-10 rounded-full bg-red-500/80 text-white flex items-center justify-center transition-all hover:bg-red-500 flex-shrink-0 shadow-lg"
+          >
+            <div className="w-3.5 h-3.5 bg-white rounded-sm"></div>
+          </button>
+        ) : (
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() && !hasAttachments}
+            className="w-10 h-10 rounded-full bg-[var(--accent-1)] text-[var(--bg-base)] flex items-center justify-center disabled:opacity-50 disabled:bg-[var(--glass-border)] disabled:text-[var(--text-muted)] disabled:shadow-none transition-all active:scale-95 shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.4)] flex-shrink-0"
+          >
+            <Send size={16} className="ml-0.5" />
+          </button>
+        )}
+      </div>
+
+      {showHistoryPicker && (
+        <div className="pointer-events-auto">
+          <HistoryImagePicker
+            onSelect={(url) => {
+              setSelectedImages(prev => [...prev, { path: url, previewUrl: getImgSrc(url) }]);
+              setShowHistoryPicker(false);
+            }}
+            onClose={() => setShowHistoryPicker(false)}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 type ViewMode = 'chat' | 'history' | 'settings';
 
@@ -25,27 +193,44 @@ function ChatImage({ src }: { src: string }) {
 }
 
 export function MobileAgentModal() {
-  const { isMobileAgentOpen, toggleMobileAgent, sessions, activeSessionId, createSession, switchSession, deleteSession, settings, updateSettings } = useAgentStore();
+  const { 
+    isMobileAgentOpen, toggleMobileAgent, 
+    sessions, activeSessionId, createSession, switchSession, deleteSession, 
+    settings, updateSettings 
+  } = useAgentStore();
+  
   const session = sessions.find(s => s.id === activeSessionId);
   const { messages, isGenerating, sendMessage, stopGenerating } = useAgent();
   
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
-  const [input, setInput] = useState("");
-  const [selectedImages, setSelectedImages] = useState<{ path: string, previewUrl: string }[]>([]);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   const mcp = useSettingsStore(state => state.settings.mcpServers || []);
 
   const [tempSystemPrompt, setTempSystemPrompt] = useState(settings.systemPrompt);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleScroll = () => {
-    if (!scrollContainerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
-    // Show if we're not at the bottom (allow 50px threshold)
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+  useEffect(() => {
+    if (isMobileAgentOpen && !activeSessionId && sessions.length === 0) {
+      createSession();
+    }
+  }, [isMobileAgentOpen, activeSessionId, sessions.length, createSession]);
+
+  useEffect(() => {
+    if (isMobileAgentOpen && viewMode === 'chat') {
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        }
+      }, 100);
+    }
+  }, [isMobileAgentOpen, viewMode]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLDivElement;
+    const isAtBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 50;
     const btn = document.getElementById('mobile-scroll-bottom-btn');
     if (btn) {
       if (!isAtBottom) {
@@ -79,45 +264,6 @@ export function MobileAgentModal() {
   }, [session?.messages?.length, isGenerating, viewMode, isMobileAgentOpen]);
 
   if (!isMobileAgentOpen) return null;
-
-  const handleSend = () => {
-    if ((input.trim() || selectedImages.length > 0) && !isGenerating) {
-      sendMessage(input, selectedImages.map(img => img.path));
-      setInput("");
-      setSelectedImages([]);
-    }
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64Data = reader.result as string;
-      try {
-        if ('__TAURI_INTERNALS__' in window || '__TAURI_IPC__' in window) {
-          const savedPath = await invoke<string>('save_base64_image', { base64Data });
-          setSelectedImages(prev => [...prev, { path: savedPath, previewUrl: base64Data }]);
-        } else {
-          // Browser fallback
-          setSelectedImages(prev => [...prev, { path: base64Data, previewUrl: base64Data }]);
-        }
-      } catch (err) {
-        console.warn("Tauri invoke failed, falling back:", err);
-        setSelectedImages(prev => [...prev, { path: base64Data, previewUrl: base64Data }]);
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-[var(--bg-base)]/80 backdrop-blur-3xl animate-in slide-in-from-bottom-full duration-300 pb-[env(safe-area-inset-bottom)]">
@@ -206,7 +352,11 @@ export function MobileAgentModal() {
                       
                       {msg.images && msg.images.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {msg.images.map((img, idx) => <ChatImage key={idx} src={img} />)}
+                          {msg.images.map((img, idx) => {
+                            const o = img as any;
+                            const src = typeof o === 'string' ? o : (o?.url || o?.filePath || o?.outputPath || o?.path || '');
+                            return src ? <ChatImage key={idx} src={src} /> : null;
+                          })}
                         </div>
                       )}
 
@@ -280,65 +430,13 @@ export function MobileAgentModal() {
               <ArrowDown size={18} />
             </button>
 
-            {/* Input Area */}
-            <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[var(--bg-base)] via-[var(--bg-base)]/90 to-transparent flex flex-col gap-2 pointer-events-none">
-              
-              {/* Selected Images Preview */}
-              {selectedImages.length > 0 && (
-                <div className="flex items-center gap-3 px-2 pointer-events-auto overflow-x-auto hide-scrollbar-on-mobile pb-2">
-                  {selectedImages.map((img, i) => (
-                    <div key={i} className="relative w-16 h-16 rounded-xl border-2 border-[var(--accent-1)] shadow-lg overflow-hidden flex-shrink-0 group">
-                      <img src={img.previewUrl} className="w-full h-full object-cover" />
-                      <button 
-                        onClick={() => setSelectedImages(prev => prev.filter((_, idx) => idx !== i))}
-                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center gap-1.5 bg-[var(--glass-bg)] backdrop-blur-2xl border border-[var(--glass-border)] p-1.5 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.4)] focus-within:border-[var(--accent-1)]/50 focus-within:shadow-[0_8px_32px_rgba(var(--accent-1-rgb),0.15)] transition-all pointer-events-auto">
-                <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors cursor-pointer">
-                  <ImagePlus size={20} />
-                  <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-                </label>
-                <button 
-                  onClick={() => setShowHistoryPicker(true)}
-                  className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors"
-                >
-                  <History size={20} />
-                </button>
-
-                <input 
-                  type="text" 
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="输入指令..."
-                  className="flex-1 min-w-0 bg-transparent border-none text-[var(--text-primary)] px-2 py-2 outline-none text-sm placeholder:text-[var(--text-muted)] font-medium"
-                />
-                
-                {isGenerating ? (
-                  <button 
-                    onClick={stopGenerating}
-                    className="w-10 h-10 rounded-full bg-red-500/80 text-white flex items-center justify-center transition-all hover:bg-red-500 flex-shrink-0 shadow-lg"
-                  >
-                    <div className="w-3.5 h-3.5 bg-white rounded-sm"></div>
-                  </button>
-                ) : (
-                  <button 
-                    onClick={handleSend}
-                    disabled={!input.trim() && selectedImages.length === 0}
-                    className="w-10 h-10 rounded-full bg-[var(--accent-1)] text-[var(--bg-base)] flex items-center justify-center disabled:opacity-50 disabled:bg-[var(--glass-border)] disabled:text-[var(--text-muted)] disabled:shadow-none transition-all active:scale-95 shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.4)] flex-shrink-0"
-                  >
-                    <Send size={16} className="ml-0.5" />
-                  </button>
-                )}
-              </div>
-            </div>
+            <MobileAgentInputArea 
+              isGenerating={isGenerating}
+              stopGenerating={stopGenerating}
+              onSend={(text, imgs) => {
+                sendMessage(text, imgs);
+              }}
+            />
           </>
         )}
 
@@ -438,16 +536,6 @@ export function MobileAgentModal() {
         )}
 
       </div>
-      
-      {showHistoryPicker && (
-        <HistoryImagePicker 
-          onSelect={(url) => {
-            setSelectedImages(prev => [...prev, { path: url, previewUrl: getImgSrc(url) }]);
-            setShowHistoryPicker(false);
-          }}
-          onClose={() => setShowHistoryPicker(false)}
-        />
-      )}
     </div>
   );
 }
