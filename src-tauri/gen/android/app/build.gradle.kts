@@ -16,6 +16,9 @@ val tauriProperties = Properties().apply {
 android {
     compileSdk = 36
     namespace = "com.promptmuse.app"
+    androidResources {
+        noCompress.add("json")
+    }
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.promptmuse.app"
