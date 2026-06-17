@@ -60,25 +60,31 @@ pub mod jvm_plugin {
 
     /// Reads a packaged asset file (from src/main/assets/) as a UTF-8 string.
     ///
-    /// This uses `ndk_context` to obtain the native Activity instance, then
-    /// invokes `Activity.getAssets().open(name)` via JNI — standard Android
-    /// Context APIs that are always present, so we do NOT need to add a custom
-    /// Kotlin method (which previously caused `NoSuchMethodError` because the
-    /// Gradle build sometimes fails to recompile Kotlin sources).
+    /// Uses `ndk_context` to obtain the JavaVM and Activity/Context pointer,
+    /// then calls `Context.getAssets().open(name)` via JNI — standard Android
+    /// APIs that are always present, so we do NOT need a custom Kotlin method.
     ///
-    /// Returns None if JVM is not ready, the asset is missing, or any JNI call fails.
+    /// Must be called after Tauri runtime has started (setup hook), because
+    /// ndk_context is only initialized by then.
     pub fn read_asset_to_string(name: &str) -> Option<String> {
-        // ndk_context gives us the JNI Environment + the global Activity reference
-        // that Tauri registers at startup.
         let context = ndk_context::android_context();
-        let vm = context.vm()?;
-        let mut env = vm.attach_current_thread().ok()?;
-        let activity_obj = context.activity()?;
+        let vm_ptr = context.vm();
+        if vm_ptr.is_null() {
+            return None;
+        }
+        let context_ptr = context.context();
+        if context_ptr.is_null() {
+            return None;
+        }
 
-        // activity.getAssets() -> AssetManager
+        // Safety: vm_ptr is a valid JavaVM* set by Tauri/ndk-glue at startup.
+        let vm = unsafe { jni::JavaVM::from_raw(vm_ptr) }.ok()?;
+        let mut env = vm.attach_current_thread().ok()?;
+
+        // context.getAssets() -> AssetManager
         let asset_manager = env
             .call_method(
-                activity_obj,
+                context_ptr as jni::sys::jobject,
                 "getAssets",
                 "()Landroid/content/res/AssetManager;",
                 &[],
