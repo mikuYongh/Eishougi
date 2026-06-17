@@ -14,6 +14,8 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 
 
 import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
+import { ArtistSelector } from "../../components/prompt/ArtistSelector";
+import { LoraSelectorUI } from "../../components/prompt/LoraSelectorUI";
 import { getImgSrc } from "../../utils/imageUtils";
 
 export function PromptEdit() {
@@ -176,7 +178,7 @@ export function PromptEdit() {
                 className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-2 min-h-[46px] flex flex-wrap gap-2 focus-within:border-[var(--accent-2)]/50 transition-colors relative"
               >
                 {project.tags?.map(tag => (
-                  <span key={tag} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--accent-2)]/20 text-blue-400 border border-[var(--accent-2)]/30 text-[11px] font-bold">
+                  <span key={tag} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--accent-2)]/20 text-[var(--accent-1)] border border-[var(--accent-2)]/30 text-[11px] font-bold">
                     {tag}
                     <button onClick={() => removeTag(tag)} className="hover:text-red-400 transition-colors cursor-pointer"><X size={12}/></button>
                   </span>
@@ -217,7 +219,7 @@ export function PromptEdit() {
                               setTagInput("");
                               setShowTagDropdown(false);
                             }}
-                            className="w-full text-left px-3 py-2 rounded-lg text-[12px] transition-colors cursor-pointer text-blue-400 hover:bg-blue-500/20 font-bold flex items-center gap-2"
+                            className="w-full text-left px-3 py-2 rounded-lg text-[12px] transition-colors cursor-pointer text-[var(--accent-1)] hover:bg-[var(--accent-1)]/20 font-bold flex items-center gap-2"
                           >
                             <Plus size={14} /> 添加新标签: "{tagInput}"
                           </button>
@@ -280,26 +282,26 @@ export function PromptEdit() {
                 <div className="flex flex-col h-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-2xl overflow-hidden p-4 shadow-lg relative group">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent pointer-events-none" />
                   <label className="text-[12px] font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2 relative z-10">
-                    <FileText size={16} className="text-blue-400" />
+                    <FileText size={16} className="text-[var(--accent-1)]" />
                     正向提示词 ({project.promptSyntax === 'xml' ? 'XML Structure' : 'Natural Language'})
                   </label>
                   <textarea
                     value={project.positivePrompt || ""}
                     onChange={e => updateField('positivePrompt', e.target.value)}
-                    className="flex-1 w-full bg-black/30 border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-blue-500/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
+                    className="flex-1 w-full bg-black/30 border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-[var(--accent-1)]/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
                     placeholder={project.promptSyntax === 'xml' ? "<character>\n  <name>Hatsune Miku</name>\n</character>\n<caption>...</caption>" : "A beautifully detailed cinematic wide shot of..."}
                   />
                 </div>
                 <div className="flex flex-col h-48 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-2xl overflow-hidden p-4 shadow-lg relative group">
                   <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-transparent pointer-events-none" />
                   <label className="text-[12px] font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2 relative z-10">
-                    <FileText size={16} className="text-pink-400" />
+                    <FileText size={16} className="text-[var(--accent-2)]" />
                     负向提示词
                   </label>
                   <textarea
                     value={project.negativePrompt || ""}
                     onChange={e => updateField('negativePrompt', e.target.value)}
-                    className="flex-1 w-full bg-black/30 border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-pink-500/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
+                    className="flex-1 w-full bg-black/30 border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-[var(--accent-2)]/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
                     placeholder="low quality, bad anatomy, worst quality..."
                   />
                 </div>
@@ -317,6 +319,10 @@ export function PromptEdit() {
                   value={project.negativePrompt || ""}
                   onChange={v => updateField('negativePrompt', v)}
                   type="negative"
+                />
+                <ArtistSelector
+                  selectedTriggers={project.artistPrompt || ""}
+                  onChange={v => updateField('artistPrompt', v)}
                 />
               </>
             )}
@@ -392,10 +398,10 @@ export function PromptEdit() {
           {/* Cover Image Uploader */}
           <div className="glass-panel p-5">
             <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-              <ImageIcon size={16} className="text-blue-400" /> 示范预览图
+              <ImageIcon size={16} className="text-[var(--accent-1)]" /> 示范预览图
             </h3>
             <div 
-              className="h-48 w-full rounded-xl border-2 border-dashed border-[var(--glass-border)] hover:border-blue-400/50 bg-[var(--glass-bg-hover)] flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer transition-colors"
+              className="h-48 w-full rounded-xl border-2 border-dashed border-[var(--glass-border)] hover:border-[var(--accent-1)]/50 bg-[var(--glass-bg-hover)] flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer transition-colors"
               onClick={() => fileInputRef.current?.click()}
             >
               {project.coverImage ? (
@@ -408,7 +414,7 @@ export function PromptEdit() {
               ) : (
                 <>
                   <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                    <UploadCloud size={20} className="text-[var(--text-muted)] group-hover:text-blue-400 transition-colors" />
+                    <UploadCloud size={20} className="text-[var(--text-muted)] group-hover:text-[var(--accent-1)] transition-colors" />
                   </div>
                   <span className="text-[11px] font-bold text-[var(--text-muted)]">点击或拖拽上传封面</span>
                 </>
@@ -427,12 +433,12 @@ export function PromptEdit() {
           <div className="glass-panel p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2">
-                <ImageIcon size={16} className="text-blue-400" /> 实例图片 (Reference)
+                <ImageIcon size={16} className="text-[var(--accent-1)]" /> 实例图片 (Reference)
               </h3>
               <div className="flex gap-2">
                 <button 
                   onClick={() => setShowHistoryPicker(true)} 
-                  className="px-3 py-1 bg-[var(--accent-2)]/20 text-blue-400 text-[11px] font-bold rounded-lg hover:bg-[var(--accent-2)]/30 transition-colors cursor-pointer border border-[var(--accent-2)]/30 flex items-center gap-1"
+                  className="px-3 py-1 bg-[var(--accent-2)]/20 text-[var(--accent-1)] text-[11px] font-bold rounded-lg hover:bg-[var(--accent-2)]/30 transition-colors cursor-pointer border border-[var(--accent-2)]/30 flex items-center gap-1"
                 >
                   <History size={12} /> 选历史图
                 </button>
@@ -463,7 +469,7 @@ export function PromptEdit() {
           <div className="flex-1 flex flex-col gap-4">
             <div className="glass-panel p-5 space-y-4">
               <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2 mb-2">
-                <Cpu size={16} className="text-blue-400" /> 模型配置
+                <Cpu size={16} className="text-[var(--accent-1)]" /> 模型配置
               </h3>
               
               <div>
@@ -503,68 +509,12 @@ export function PromptEdit() {
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2 mt-4">
-                  <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold flex items-center gap-1.5">
-                    <Layers size={12} className="text-orange-400" /> 挂载的 LoRA
-                  </label>
-                </div>
-                
-                <div className="space-y-2">
-                  {(project.loraConfigs || []).map((lora, i) => (
-                    <div key={i} className={`p-2 rounded-lg border transition-colors ${lora.enabled ? 'bg-[var(--glass-bg)] border-[var(--glass-border)]' : 'bg-[var(--bg-layer-1)] border-[var(--glass-border)] opacity-60'}`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <input 
-                            type="checkbox" 
-                            checked={lora.enabled}
-                            onChange={(e) => updateLora(i, { enabled: e.target.checked })}
-                            className="w-3 h-3 rounded border-[var(--glass-border-active)] accent-orange-500 cursor-pointer"
-                          />
-                          <span className="text-[11px] font-bold text-[var(--text-primary)] truncate">{lora.name}</span>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            const newLoras = [...(project.loraConfigs || [])];
-                            newLoras.splice(i, 1);
-                            updateField('loraConfigs', newLoras);
-                          }}
-                          className="text-red-400/50 hover:text-red-400 cursor-pointer transition-colors"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2 pl-5">
-                        <input 
-                          type="range" 
-                          min="0" max="2" step="0.05" 
-                          value={lora.strength} 
-                          onChange={(e) => updateLora(i, { strength: parseFloat(e.target.value) })}
-                          className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-orange-400" 
-                        />
-                        <span className="text-[10px] font-mono font-bold text-orange-400 w-6 text-right">
-                          {lora.strength.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {(!project.loraConfigs || project.loraConfigs.length === 0) && (
-                    <div className="text-[11px] text-[var(--text-muted)] text-center py-3 border border-dashed border-[var(--glass-border)] rounded-lg">
-                      暂未添加 LoRA
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3 relative z-30">
-                  <SearchableDropdown 
-                    value=""
-                    onChange={v => { if(v) addLora(v); }}
-                    options={loras.map(l => ({ label: l, value: l }))}
-                    placeholder="+ 添加 LoRA..."
-                    searchPlaceholder="搜索可用 LoRA..."
-                    accentColor="orange"
-                  />
-                </div>
+              <div className="mt-4">
+                <LoraSelectorUI 
+                  selectedLoras={project.loraConfigs || []}
+                  onChange={v => updateField('loraConfigs', v)}
+                  availableLoras={loras}
+                />
               </div>
             </div>
           </div>

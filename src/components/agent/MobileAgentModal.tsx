@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X, Menu, ArrowDown, Paperclip, FileText } from "lucide-react";
 import { useAgentStore } from "../../stores/agentStore";
 import { useAgent, type ChatMessage, type ChatAttachment } from "../../hooks/useAgent";
@@ -265,7 +266,7 @@ export function MobileAgentModal() {
 
   if (!isMobileAgentOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[100] flex flex-col bg-[var(--bg-base)]/80 backdrop-blur-3xl animate-in slide-in-from-bottom-full duration-300 pb-[env(safe-area-inset-bottom)]">
       
       {/* Immersive Header */}
@@ -510,7 +511,7 @@ export function MobileAgentModal() {
 
             <div className="glass-panel p-5 space-y-4 rounded-2xl">
               <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
-                <Zap size={16} className="text-yellow-400" /> MCP 外挂子系统
+                <Zap size={16} className="text-[var(--accent-1)]" /> MCP 外挂子系统
               </h3>
               {mcp.length === 0 ? (
                 <div className="text-center py-6 text-[var(--text-muted)] text-sm">
@@ -536,6 +537,7 @@ export function MobileAgentModal() {
         )}
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -12,7 +12,9 @@ import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
+import { LoraSelectorUI } from "../../components/prompt/LoraSelectorUI";
 import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
+import { ArtistSelector } from "../../components/prompt/ArtistSelector";
 import { comfyService } from "../../services/comfyService";
 import { getImgSrc } from "../../utils/imageUtils";
 
@@ -90,6 +92,7 @@ export function Generate() {
   // Prompts
   const [positivePrompt, setPositivePrompt] = useState<string>("");
   const [negativePrompt, setNegativePrompt] = useState<string>("");
+  const [artistPrompt, setArtistPrompt] = useState<string>("");
 
   // Workflow structure flag
   const [hasSizePicker, setHasSizePicker] = useState<boolean>(false);
@@ -117,6 +120,7 @@ export function Generate() {
       setOverrideScheduler(project.scheduler || "beta57");
       setPositivePrompt(project.positivePrompt || "");
       setNegativePrompt(project.negativePrompt || "");
+      setArtistPrompt(project.artistPrompt || "");
     }
   }, [project?.id, workflows]);
 
@@ -234,7 +238,7 @@ export function Generate() {
       ...project,
       positivePrompt,
       negativePrompt,
-      artistPrompt: "",
+      artistPrompt,
       baseModel: overrideBaseModel,
       vaeModel: overrideVaeModel,
       loraConfigs: overrideLoras,
@@ -279,7 +283,7 @@ export function Generate() {
           </button>
           <div className="flex-1 min-w-0">
             <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-              <span className="text-blue-400 flex items-center justify-center"><Zap size={20} className="md:w-6 md:h-6" /></span> 渲染控制台
+              <span className="text-[var(--accent-1)] flex items-center justify-center"><Zap size={20} className="md:w-6 md:h-6" /></span> 渲染控制台
             </h2>
             <p className="text-[11px] md:text-[12px] text-[var(--text-muted)] truncate whitespace-nowrap overflow-hidden text-ellipsis">当前项目: {project.title}</p>
           </div>
@@ -319,6 +323,10 @@ export function Generate() {
               onChange={setNegativePrompt}
               type="negative"
             />
+            <ArtistSelector
+              selectedTriggers={artistPrompt}
+              onChange={(val) => setArtistPrompt(val)}
+            />
           </div>
 
           <div className="flex-1 flex flex-col gap-4 min-h-[400px] glass-panel rounded-2xl overflow-hidden relative border border-[var(--glass-border)]">
@@ -337,7 +345,7 @@ export function Generate() {
                 </PhotoView>
                 
                 <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-2xl px-4 absolute bottom-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => downloadImage(results[0], `generated_${Date.now()}.png`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-blue-400/50 cursor-pointer">
+                  <button onClick={() => downloadImage(results[0], `generated_${Date.now()}.png`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-[var(--accent-1)]/50 cursor-pointer">
                     <Download size={16} /> 下载原图
                   </button>
                 </div>
@@ -348,7 +356,7 @@ export function Generate() {
                   <div className="absolute inset-0 border-4 border-[var(--accent-2)]/20 rounded-full"></div>
                   <div className="absolute inset-0 border-4 border-[var(--accent-2)] rounded-full border-t-transparent animate-spin"></div>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xl font-mono font-bold text-blue-400">
+                    <span className="text-xl font-mono font-bold text-[var(--accent-1)]">
                       {progress ? Math.round((progress.value / progress.max) * 100) : 0}%
                     </span>
                   </div>
@@ -381,7 +389,7 @@ export function Generate() {
                 className="flex items-center gap-1.5 px-2 py-1 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-md text-[10px] text-[var(--text-primary)] transition-colors"
                 title="重新从当前工作流加载默认参数"
               >
-                <Layers size={10} className="text-yellow-400" /> 同步工作流参数
+                <Layers size={10} className="text-[var(--accent-1)]" /> 同步工作流参数
               </button>
             </div>
             
@@ -407,7 +415,7 @@ export function Generate() {
 
               <div>
                 <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
-                  <Layers size={12} className="text-blue-400" /> 工作流
+                  <Layers size={12} className="text-[var(--accent-1)]" /> 工作流
                 </label>
                 <div className="relative z-40">
                   <GlassDropdown 
@@ -429,7 +437,7 @@ export function Generate() {
 
               <div>
                 <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
-                  <Cpu size={12} className="text-purple-400" /> VAE 模型
+                  <Cpu size={12} className="text-[var(--accent-2)]" /> VAE 模型
                 </label>
                 <div className="relative z-30">
                   <GlassDropdown 
@@ -528,81 +536,11 @@ export function Generate() {
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold flex items-center gap-1.5">
-                    <Layers size={12} className="text-orange-400" /> 挂载的 LoRA
-                  </label>
-                </div>
-                
-                <div className="space-y-2">
-                  {overrideLoras.map((lora, i) => (
-                    <div key={i} className={`p-2 rounded-lg border transition-colors ${lora.enabled ? 'bg-[var(--glass-bg)] border-[var(--glass-border)]' : 'bg-[var(--bg-layer-1)] border-[var(--glass-border)] opacity-60'}`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <input 
-                            type="checkbox" 
-                            checked={lora.enabled}
-                            onChange={(e) => {
-                              const newLoras = [...overrideLoras];
-                              newLoras[i].enabled = e.target.checked;
-                              setOverrideLoras(newLoras);
-                            }}
-                            className="w-3 h-3 rounded border-[var(--glass-border-active)] accent-orange-500 cursor-pointer"
-                          />
-                          <span className="text-[11px] font-bold text-[var(--text-primary)] truncate">{lora.name}</span>
-                        </div>
-                        <button 
-                          onClick={() => {
-                            const newLoras = [...overrideLoras];
-                            newLoras.splice(i, 1);
-                            setOverrideLoras(newLoras);
-                          }}
-                          className="text-red-400/50 hover:text-red-400 cursor-pointer transition-colors"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2 pl-5">
-                        <input 
-                          type="range" 
-                          min="0" max="2" step="0.05" 
-                          value={lora.strength} 
-                          onChange={(e) => {
-                            const newLoras = [...overrideLoras];
-                            newLoras[i].strength = parseFloat(e.target.value);
-                            setOverrideLoras(newLoras);
-                          }}
-                          className="flex-1 h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-orange-400" 
-                        />
-                        <span className="text-[10px] font-mono font-bold text-orange-400 w-6 text-right">
-                          {lora.strength.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {overrideLoras.length === 0 && (
-                    <div className="text-[11px] text-[var(--text-muted)] text-center py-3 border border-dashed border-[var(--glass-border)] rounded-lg">
-                      暂未添加 LoRA
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3 relative z-30">
-                  <SearchableDropdown
-                    value=""
-                    placeholder="➕ 搜索并添加 LoRA..."
-                    searchPlaceholder="输入 LoRA 名称进行搜索..."
-                    options={loras.map(l => ({ label: l, value: l }))}
-                    onChange={(val) => {
-                      if (val) {
-                        setOverrideLoras([...overrideLoras, { name: val, strength: 0.8, enabled: true }]);
-                      }
-                    }}
-                    accentColor="orange"
-                  />
-                </div>
-              </div>
+              <LoraSelectorUI 
+                selectedLoras={overrideLoras}
+                onChange={setOverrideLoras}
+                availableLoras={loras}
+              />
             </div>
           </div>
         </div>
@@ -612,8 +550,8 @@ export function Generate() {
       {/* Session History Strip */}
       {results.length > 1 && (
         <div className="flex-shrink-0 glass-panel p-3 rounded-2xl border border-[var(--glass-border)] flex gap-3 overflow-x-auto no-scrollbar">
-          {results.slice(1).map((res, i) => (
-            <div key={i} className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[var(--glass-border)] hover:border-blue-400/50 cursor-pointer transition-colors relative group">
+          {results.slice(1).reverse().map((res, i) => (
+            <div key={i} className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[var(--glass-border)] hover:border-[var(--accent-1)]/50 cursor-pointer transition-colors relative group">
               <PhotoView src={getImgSrc(res)}>
                 <img src={getImgSrc(res)} alt={`History ${i}`} className={`w-full h-full object-cover opacity-60 group-hover:opacity-100 cursor-zoom-in transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
               </PhotoView>

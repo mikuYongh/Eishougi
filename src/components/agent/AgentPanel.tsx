@@ -88,6 +88,23 @@ export function AgentPanel() {
   const [selectedImages, setSelectedImages] = useState<{ path: string, previewUrl: string }[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<ChatAttachment[]>([]);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (!window.visualViewport) return;
+    const updateKeyboardHeight = () => {
+      // Calculate how much the visual viewport has shrunk relative to the window innerHeight
+      const offset = window.innerHeight - window.visualViewport!.height;
+      setKeyboardHeight(Math.max(0, offset));
+    };
+    window.visualViewport.addEventListener("resize", updateKeyboardHeight);
+    window.visualViewport.addEventListener("scroll", updateKeyboardHeight);
+    updateKeyboardHeight();
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateKeyboardHeight);
+      window.visualViewport?.removeEventListener("scroll", updateKeyboardHeight);
+    };
+  }, []);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   
   const { messages, isGenerating, sendMessage, stopGenerating } = useAgent();
@@ -154,6 +171,14 @@ When MCP tools (search_tags, get_related_tags, get_artist_recommendations) are l
 - get_related_tags(tags, limit): Find tags commonly co-occurring with selected tags, enrich prompts with complementary details.
 - get_artist_recommendations(tags, limit): Find artists skilled at drawing specific elements, suggest @artist_name references.
 Use these proactively when creating prompts to ensure tags are valid Danbooru keywords.
+
+## Custom Styles & Artists Library:
+You have tools to manage the user's custom styles and artists:
+- get_custom_styles(): Get the list of all saved styles.
+- add_custom_style(name, trigger, category, preview): Add a new style. Use this when the user asks to save or create a new style/artist.
+- update_custom_style(id, name, trigger, category, preview): Update an existing style.
+- delete_custom_style(id): Delete a style.
+When the user wants to manage their styles, use these tools to directly modify their library.
 
 ## INSTANCE IMAGES:
 - Use get_generated_images to browse history (filter by prompt_id optional).
@@ -324,6 +349,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
       style={{
         width: "100%",
         maxWidth: isExpanded ? "420px" : "70px",
+        paddingBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : undefined,
       }}
     >
       {/* Decorative vertical gradient line */}
@@ -549,7 +575,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
 
                 <div>
                   <label className="block text-sm font-bold text-[var(--text-primary)] mb-2 flex items-center gap-2">
-                    <Zap size={14} className="text-yellow-400" />
+                    <Zap size={14} className="text-[var(--accent-1)]" />
                     思考深度 (Reasoning Effort)
                   </label>
                   <p className="text-xs text-[var(--text-muted)] mb-3 leading-relaxed">
@@ -562,7 +588,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                         onClick={() => setTempReasoningEffort(effort)}
                         className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                           tempReasoningEffort === effort
-                            ? 'bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.4)]'
+                            ? 'bg-[var(--accent-1)] text-black shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.4)]'
                             : 'text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)]'
                         }`}
                       >
@@ -581,18 +607,18 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                     <li className="flex items-center justify-between"><span>• create_prompt</span> <span className="text-[10px] bg-[var(--accent-2)]/20 px-1.5 py-0.5 rounded text-[var(--accent-2)]">ACTIVE</span></li>
                     <li className="flex items-center justify-between"><span>• generate_image</span> <span className="text-[10px] bg-[var(--accent-2)]/20 px-1.5 py-0.5 rounded text-[var(--accent-2)]">ACTIVE</span></li>
                     {tempMcpServers.filter(s => s.enabled).length > 0 && (
-                      <li className="flex items-center justify-between"><span>• MCP: {tempMcpServers.filter(s => s.enabled).length} server(s)</span> <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.5 rounded text-purple-400">EXT</span></li>
+                      <li className="flex items-center justify-between"><span>• MCP: {tempMcpServers.filter(s => s.enabled).length} server(s)</span> <span className="text-[10px] bg-[var(--accent-2)]/20 px-1.5 py-0.5 rounded text-[var(--accent-2)]">EXT</span></li>
                     )}
                   </ul>
                 </div>
 
                 <div className="p-4 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)]">
                   <h4 className="font-bold text-[var(--text-primary)] text-sm mb-3 flex items-center gap-2">
-                    <Sparkles size={14} className="text-purple-400" /> MCP 外部工具服务器
+                    <Sparkles size={14} className="text-[var(--accent-2)]" /> MCP 外部工具服务器
                   </h4>
                   <div className="space-y-3">
                     {tempMcpServers.map((srv, i) => (
-                      <div key={i} className={`p-3 rounded-lg border transition-colors ${srv.enabled ? 'bg-purple-500/5 border-purple-500/20' : 'bg-[var(--bg-layer-1)] border-[var(--glass-border)] opacity-60'}`}>
+                      <div key={i} className={`p-3 rounded-lg border transition-colors ${srv.enabled ? 'bg-[var(--accent-2)]/5 border-[var(--accent-2)]/20' : 'bg-[var(--bg-layer-1)] border-[var(--glass-border)] opacity-60'}`}>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold text-[var(--text-primary)]">{srv.name}</span>
                           <label className="relative inline-flex items-center cursor-pointer">
@@ -606,7 +632,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                               }}
                               className="sr-only peer"
                             />
-                            <div className="w-8 h-4 bg-[var(--glass-border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:bg-purple-500 after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all" />
+                            <div className="w-8 h-4 bg-[var(--glass-border)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:bg-[var(--accent-2)] after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all" />
                           </label>
                         </div>
                         <input

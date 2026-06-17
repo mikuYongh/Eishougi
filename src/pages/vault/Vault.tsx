@@ -103,7 +103,7 @@ export function Vault() {
                     <div className="flex justify-end gap-2 pointer-events-auto">
                       <button 
                         onClick={(e) => { e.stopPropagation(); downloadImage(img.output_path || (img as any).outputPath, `vault_${img.id}.png`); }}
-                        className="w-8 h-8 rounded-full bg-black/50 text-white/70 hover:text-blue-400 hover:bg-black/80 flex items-center justify-center backdrop-blur-md transition-all cursor-pointer"
+                        className="w-8 h-8 rounded-full bg-black/50 text-white/70 hover:text-[var(--accent-1)] hover:bg-black/80 flex items-center justify-center backdrop-blur-md transition-all cursor-pointer"
                         title="下载到本地"
                       >
                         <Download size={14} />
@@ -132,7 +132,7 @@ export function Vault() {
                       <button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); }} className="w-6 h-6 rounded-full bg-[var(--accent-1)]/20 text-[var(--accent-1)] flex items-center justify-center">
                         <Maximize2 size={12} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); downloadImage(img.output_path || (img as any).outputPath, `vault_${img.id}.png`); }} className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                      <button onClick={(e) => { e.stopPropagation(); downloadImage(img.output_path || (img as any).outputPath, `vault_${img.id}.png`); }} className="w-6 h-6 rounded-full bg-blue-500/10 text-[var(--accent-1)] flex items-center justify-center">
                         <Download size={12} />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); unsaveImage(img.id); }} className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">

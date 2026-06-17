@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Play, Loader2, Plus, Minus, Image as ImageIcon } from 'lucide-react';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
@@ -135,8 +136,10 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="w-full h-[90vh] md:h-[85vh] max-w-6xl bg-[var(--bg-base)] md:rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-[var(--glass-border)] animate-in slide-in-from-bottom-8 duration-500">
         
         {/* Left / Top : Controls */}
@@ -283,6 +286,7 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
