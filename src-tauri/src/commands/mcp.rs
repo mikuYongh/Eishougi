@@ -10,6 +10,7 @@ pub struct McpToolDef {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 struct JsonRpcRequest {
     jsonrpc: String,
     method: String,
@@ -27,6 +28,7 @@ struct JsonRpcResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(non_snake_case)]
 struct InitializeResult {
     #[serde(default)]
     #[allow(dead_code)]

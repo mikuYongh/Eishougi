@@ -105,6 +105,7 @@ pub struct GeneratedImage {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct ChatMessage {
     pub id: String,
     pub session_id: String,
