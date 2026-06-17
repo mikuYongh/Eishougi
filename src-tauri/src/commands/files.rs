@@ -197,19 +197,20 @@ pub async fn copy_to_internal(
         // Use JNI to open content:// URI via ContentResolver
         let result: Result<(), String> = {
             let context = ndk_context::android_context();
-            let vm_ptr = context.vm();
-            let context_ptr = context.context();
-            if vm_ptr.is_null() || context_ptr.is_null() {
+            if context.vm().is_null() || context.context().is_null() {
                 return Err("JNI context not available".to_string());
             }
 
-            let vm = unsafe { jni::JavaVM::from_raw(vm_ptr) }.map_err(|e| e.to_string())?;
+            let vm = unsafe { jni::JavaVM::from_raw(context.vm().cast()) }.map_err(|e| e.to_string())?;
             let mut env = vm.attach_current_thread().map_err(|e| e.to_string())?;
+
+            // Wrap the raw context pointer into a JObject
+            let context_obj = unsafe { jni::objects::JObject::from_raw(context.context() as jni::sys::jobject) };
 
             // Get ContentResolver: context.getContentResolver()
             let resolver = env
                 .call_method(
-                    context_ptr as jni::sys::jobject,
+                    &context_obj,
                     "getContentResolver",
                     "()Landroid/content/ContentResolver;",
                     &[],
