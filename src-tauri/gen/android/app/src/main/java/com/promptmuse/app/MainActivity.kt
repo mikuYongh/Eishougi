@@ -28,7 +28,7 @@ class MainActivity : TauriActivity() {
       
       @JvmStatic
       external fun initJvmContext()
-      
+
       @JvmStatic
       fun saveImageToGallery(sourceFilePath: String, fileName: String): String {
           appContext?.let { context ->
@@ -40,11 +40,11 @@ class MainActivity : TauriActivity() {
                       val contentValues = android.content.ContentValues().apply {
                           put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                           put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
-                          put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/Eishougi")
+                          put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/Eishougi")
                           put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
                       }
                       val resolver = context.contentResolver
-                      val collection = android.provider.MediaStore.Downloads.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                      val collection = android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
                       val uri = resolver.insert(collection, contentValues)
                       if (uri != null) {
                           resolver.openOutputStream(uri)?.use { outputStream ->
@@ -55,11 +55,13 @@ class MainActivity : TauriActivity() {
                           contentValues.clear()
                           contentValues.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
                           resolver.update(uri, contentValues, null, null)
-                          return "Download/Eishougi/" + fileName
+                          return "Pictures/Eishougi/" + fileName
+                      } else {
+                          throw Exception("MediaStore insert returned null. Possible permissions issue or file already exists.")
                       }
                   } else {
                       @Suppress("DEPRECATION")
-                      val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                      val downloadDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
                       val targetDir = java.io.File(downloadDir, "Eishougi")
                       if (!targetDir.exists()) targetDir.mkdirs()
                       val targetFile = java.io.File(targetDir, fileName)

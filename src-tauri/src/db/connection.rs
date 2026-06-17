@@ -11,9 +11,9 @@ impl Database {
         let conn = Connection::open(&db_path)?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
         super::migrations::run(&conn)?;
-        if let Err(e) = super::init::init_library_data(&conn) {
-            log::warn!("Failed to initialize library data: {}", e);
-        }
+        // NOTE: library data init is deferred to the Tauri setup hook because
+        // on Android, reading APK assets requires the JNI/ndk_context which is
+        // only available after Tauri runtime starts. See lib.rs setup().
         Ok(Self { conn })
     }
 }

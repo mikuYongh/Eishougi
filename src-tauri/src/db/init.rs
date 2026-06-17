@@ -1,20 +1,23 @@
 use rusqlite::Connection;
 use serde_json::Value;
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub fn init_library_data(conn: &Connection) -> Result<(), String> {
+/// Initialize library data (characters / artists) into the database on first run.
+///
+/// Strategy: try several locations at runtime because Android bundles resources
+/// inside the APK assets/ directory (not accessible via std::fs), while desktop
+/// builds use either dev-time paths or tauri.conf.json `bundle.resources`.
+pub fn init_library_data(conn: &Connection, app_data_dir: &Path) -> Result<(), String> {
     let characters_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM characters", [], |row| row.get(0))
         .unwrap_or(0);
 
     if characters_count == 0 {
-        if let Ok(content) = std::fs::read_to_string("resources/characters.json") {
+        if let Some(content) = read_resource("characters.json", app_data_dir) {
             insert_characters(conn, &content)?;
         } else {
-            // fallback for when running from a different directory
-            if let Ok(content) = std::fs::read_to_string("src-tauri/resources/characters.json") {
-                insert_characters(conn, &content)?;
-            }
+            log::warn!("characters.json resource not found on this platform");
         }
     }
 
@@ -23,16 +26,43 @@ pub fn init_library_data(conn: &Connection) -> Result<(), String> {
         .unwrap_or(0);
 
     if artists_count == 0 {
-        if let Ok(content) = std::fs::read_to_string("resources/artists.json") {
+        if let Some(content) = read_resource("artists.json", app_data_dir) {
             insert_artists(conn, &content)?;
         } else {
-            if let Ok(content) = std::fs::read_to_string("src-tauri/resources/artists.json") {
-                insert_artists(conn, &content)?;
-            }
+            log::warn!("artists.json resource not found on this platform");
         }
     }
 
     Ok(())
+}
+
+/// Try multiple locations to find a packaged resource file.
+fn read_resource(name: &str, app_data_dir: &Path) -> Option<String> {
+    // Strategy 1: dev paths (desktop `cargo tauri dev` or running the binary from src-tauri/)
+    for c in [format!("resources/{}", name), format!("src-tauri/resources/{}", name)] {
+        if let Ok(content) = std::fs::read_to_string(&c) {
+            log::info!("Loaded resource {} from {}", name, c);
+            return Some(content);
+        }
+    }
+
+    // Strategy 2: Android APK assets (must be packaged into assets/ at build time)
+    #[cfg(target_os = "android")]
+    {
+        if let Some(content) = crate::jvm_plugin::read_asset_to_string(name) {
+            log::info!("Loaded resource {} from Android assets", name);
+            return Some(content);
+        }
+    }
+
+    // Strategy 3: app_data_dir/resources (post-install desktop layout)
+    let p = app_data_dir.join("resources").join(name);
+    if let Ok(content) = std::fs::read_to_string(&p) {
+        log::info!("Loaded resource {} from {:?}", name, p);
+        return Some(content);
+    }
+
+    None
 }
 
 fn now() -> i64 {
