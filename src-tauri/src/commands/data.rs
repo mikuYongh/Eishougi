@@ -110,15 +110,15 @@ fn collect_all_image_paths(rows: &[serde_json::Value], field: &str) -> Vec<Strin
     paths
 }
 
-/// Export all data as a zip archive (Vec<u8>).
-///
-/// Writes to a temp file first to avoid OOM on large datasets (300+ images
-/// in memory causes Windows stack overflow / exit code 0xe0000008).
+/// Export all data as a zip archive directly to a user-specified file path.
+/// Returns the number of records/images bundled. Avoids IPC serialization of
+/// large byte arrays which causes OOM (exit code 0xe0000008).
 #[tauri::command]
 pub async fn export_all_data(
     state: State<'_, AppState>,
     app: AppHandle,
-) -> Result<Vec<u8>, String> {
+    output_path: String,
+) -> Result<String, String> {
     let _ = app.emit(
         "export-progress",
         serde_json::json!({ "stage": "reading_db", "message": "正在读取数据库..." }),
@@ -149,23 +149,16 @@ pub async fn export_all_data(
         "outputPath",
     ));
 
-    // Deduplicate
+    // Deduplicate + filter out invalid paths
     let mut seen = HashSet::new();
-    image_paths.retain(|p| seen.insert(p.clone()));
-
-    // Filter out obviously invalid paths early (from other devices, etc.)
-    let valid_paths: Vec<&String> = image_paths
-        .iter()
+    let valid_paths: Vec<String> = image_paths
+        .into_iter()
         .filter(|p| {
-            // Skip Android paths from other apps
+            if !seen.insert(p.clone()) { return false; }
             if p.starts_with("/data/user/0/com.") && !p.starts_with("/data/user/0/com.promptmuse") {
                 return false;
             }
-            // Skip empty
-            if p.trim().is_empty() {
-                return false;
-            }
-            true
+            !p.trim().is_empty()
         })
         .collect();
 
@@ -180,11 +173,9 @@ pub async fn export_all_data(
         }),
     );
 
-    // 3. Build zip in a TEMP FILE (not memory) to avoid OOM
-    let tmp_dir = std::env::temp_dir();
-    let tmp_path = tmp_dir.join(format!("eishougi_export_{}.zip", now()));
-    let file = std::fs::File::create(&tmp_path)
-        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+    // 3. Write zip directly to the output file (not memory)
+    let file = std::fs::File::create(&output_path)
+        .map_err(|e| format!("Failed to create output file: {}", e))?;
     let mut zip = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
@@ -197,7 +188,7 @@ pub async fn export_all_data(
     zip.write_all(json_str.as_bytes())
         .map_err(|e| format!("Zip write error: {}", e))?;
 
-    // Bundle image files
+    // Bundle images
     let mut bundled = 0u32;
     let mut skipped = 0u32;
     let mut used_names: HashSet<String> = HashSet::new();
@@ -208,10 +199,8 @@ pub async fn export_all_data(
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     for (idx, path) in valid_paths.iter().enumerate() {
-        let path = *path;
         let is_http = path.starts_with("http://") || path.starts_with("https://");
 
-        // Generate unique filename in zip
         let file_name = if is_http {
             if let Some(qidx) = path.find("filename=") {
                 let rest = &path[qidx + 9..];
@@ -242,7 +231,6 @@ pub async fn export_all_data(
         }
         used_names.insert(final_name.clone());
 
-        // Get image bytes
         let image_bytes: Option<Vec<u8>> = if is_http {
             match client.get(path).send().await {
                 Ok(resp) if resp.status().is_success() => {
@@ -264,7 +252,6 @@ pub async fn export_all_data(
             skipped += 1;
         }
 
-        // Emit progress every 10 images (not every single one) to avoid UI lag
         if idx % 10 == 0 || idx == total_images - 1 {
             let _ = app.emit(
                 "export-progress",
@@ -281,25 +268,12 @@ pub async fn export_all_data(
     zip.finish()
         .map_err(|e| format!("Zip finalize error: {}", e))?;
 
-    eprintln!(
-        "[Export] Bundled {} images, skipped {} (not found)",
-        bundled, skipped
-    );
-
-    // 4. Read the temp file back into Vec<u8>
-    let result = std::fs::read(&tmp_path)
-        .map_err(|e| format!("Failed to read temp zip: {}", e))?;
-    let _ = std::fs::remove_file(&tmp_path);
-
+    let msg = format!("导出完成：打包 {} 张图片，跳过 {}", bundled, skipped);
     let _ = app.emit(
         "export-progress",
-        serde_json::json!({
-            "stage": "done",
-            "message": format!("导出完成：{} 张图片", bundled),
-        }),
+        serde_json::json!({ "stage": "done", "message": &msg }),
     );
-
-    Ok(result)
+    Ok(msg)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -383,6 +357,7 @@ fn insert_table_ignore(
 }
 
 /// Like insert_table_ignore but for INSERT OR REPLACE (overwrites existing).
+#[allow(dead_code)]
 fn insert_table(
     conn: &rusqlite::Connection,
     table: &str,
@@ -446,14 +421,17 @@ fn insert_table(
     Ok(count)
 }
 
-/// Import data from a zip archive (Vec<u8>).
-/// Extracts data.json for DB records and restores images from images/*.
+/// Import data from a zip archive file path.
+/// Reads the file directly in Rust — no IPC byte transfer.
 #[tauri::command]
 pub async fn import_all_data(
     state: State<'_, AppState>,
-    zip_bytes: Vec<u8>,
+    input_path: String,
 ) -> Result<String, String> {
-    let reader = std::io::Cursor::new(zip_bytes);
+    let reader = std::io::BufReader::new(
+        std::fs::File::open(&input_path)
+            .map_err(|e| format!("Failed to open backup file: {}", e))?,
+    );
     let mut archive =
         zip::ZipArchive::new(reader).map_err(|e| format!("Invalid zip file: {}", e))?;
 

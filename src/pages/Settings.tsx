@@ -88,18 +88,10 @@ export function Settings() {
   };
 
   const handleExport = async () => {
-    setExportStatus("正在准备打包...");
+    setExportStatus("请选择保存位置...");
     let unlisten: any = null;
     try {
-      unlisten = await listen<any>('export-progress', (event) => {
-        setExportStatus(event.payload.message);
-      });
-
-      // 1. Get zip bytes from Rust (contains DB data + bundled images)
-      const zipBytes: number[] = await invoke('export_all_data');
-
-      setExportStatus("请选择保存位置...");
-      // 2. Show save dialog
+      // 1. Show save dialog FIRST — get output path before export starts
       const filePath = await save({
         defaultPath: `eishougi-backup-${new Date().toISOString().slice(0, 10)}.eishougi`,
         filters: [{ name: "Eishougi Backup", extensions: ["eishougi"] }],
@@ -107,15 +99,18 @@ export function Settings() {
 
       if (!filePath) {
         setExportStatus(null);
-        if (unlisten) unlisten();
         return;
       }
 
-      setExportStatus("正在写入文件...");
-      // 3. Write zip file
-      await writeFile(filePath, new Uint8Array(zipBytes));
+      unlisten = await listen<any>('export-progress', (event) => {
+        setExportStatus(event.payload.message);
+      });
 
-      // 4. Also save frontend localStorage into a sidecar JSON
+      // 2. Export directly to the chosen file path (no IPC byte transfer)
+      setExportStatus("正在导出数据...");
+      const result = await invoke<string>('export_all_data', { outputPath: filePath });
+
+      // 3. Save frontend localStorage into a sidecar JSON
       const frontendData: Record<string, any> = {};
       const lsKeys = ['eishougi-settings', 'agent-storage'];
       for (const key of lsKeys) {
@@ -127,8 +122,8 @@ export function Settings() {
       const frontendPath = filePath + ".frontend.json";
       await writeFile(frontendPath, frontendBytes);
 
-      setExportStatus("导出成功！");
-      setTimeout(() => setExportStatus(null), 3000);
+      setExportStatus(result || "导出成功！");
+      setTimeout(() => setExportStatus(null), 5000);
     } catch (err: any) {
       console.error("Export failed:", err);
       setExportStatus(`导出失败: ${err}`);
@@ -154,12 +149,10 @@ export function Settings() {
         return;
       }
 
-      setImportStatus("正在读取备份...");
+      setImportStatus("正在导入数据...");
 
-      // 2. Read zip bytes and send to Rust for import
-      const fileBytes = await readFile(filePath);
-      const zipBytes: number[] = Array.from(fileBytes);
-      const result = await invoke('import_all_data', { zipBytes });
+      // 2. Import directly from file path (no IPC byte transfer)
+      const result = await invoke<string>('import_all_data', { inputPath: filePath });
 
       // 3. Restore frontend localStorage from sidecar if present
       const frontendPath = filePath + ".frontend.json";
