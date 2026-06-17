@@ -17,8 +17,26 @@ export function PromptList() {
   const prompts = usePromptStore((state) => state.prompts);
   const toggleFavorite = usePromptStore((state) => state.toggleFavorite);
   const removePrompt = usePromptStore((state) => state.removePrompt);
+  const addPrompt = usePromptStore((state) => state.addPrompt);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   const navigate = useNavigate();
+
+  const handleClone = async (p: typeof prompts[number]) => {
+    try {
+      const newId = "p_" + Date.now().toString();
+      const clone: typeof p = {
+        ...p,
+        id: newId,
+        title: `${p.title} (克隆)`,
+        isFavorite: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      await addPrompt(clone);
+    } catch (e: any) {
+      alert(`克隆失败: ${e.message}`);
+    }
+  };
 
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [currentPage, setCurrentPage] = useState(1);
@@ -222,6 +240,13 @@ export function PromptList() {
                       <Star size={14} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-[var(--text-primary)]"} />
                     </button>
                     <button 
+                      onClick={(e) => { e.stopPropagation(); handleClone(p); }}
+                      className="p-1.5 rounded-full bg-[var(--glass-bg)] backdrop-blur hover:bg-blue-500/20 text-[var(--text-primary)] hover:text-blue-400 transition-colors cursor-pointer"
+                      title="克隆项目"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button 
                       onClick={async (e) => {
                         e.stopPropagation();
                         try {
@@ -335,7 +360,7 @@ export function PromptList() {
                   <button onClick={() => toggleFavorite(p.id)} className="p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer text-[var(--text-muted)] hover:text-yellow-400">
                     <Star size={16} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : ""} />
                   </button>
-                  <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
+                  <button onClick={() => handleClone(p)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-blue-500/20 text-[var(--text-muted)] hover:text-blue-400 transition-colors cursor-pointer" title="克隆项目">
                     <Copy size={14} />
                   </button>
                   <button 

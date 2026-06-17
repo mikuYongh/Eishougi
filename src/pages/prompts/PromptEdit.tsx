@@ -48,11 +48,18 @@ export function PromptEdit() {
     } else if (id === 'new') {
       // Set default workflow for new prompts
       const defaultWorkflow = workflows.find(w => w.isDefault);
-      if (defaultWorkflow) {
-        setProject(prev => ({ ...prev, workflowId: defaultWorkflow.id }));
-      }
+      // Use the first local checkpoint as the default base model if the current
+      // placeholder is not present in the user's library.
+      setProject(prev => {
+        const next: Partial<PromptProject> = { ...prev };
+        if (defaultWorkflow) next.workflowId = defaultWorkflow.id;
+        if (checkpoints.length > 0 && (!next.baseModel || !checkpoints.includes(next.baseModel))) {
+          next.baseModel = checkpoints[0];
+        }
+        return next;
+      });
     }
-  }, [id, prompts, workflows]);
+  }, [id, prompts, workflows, checkpoints]);
 
   // Extract all unique tags
   const allTags = Array.from(new Set(prompts.flatMap(p => p.tags)));
