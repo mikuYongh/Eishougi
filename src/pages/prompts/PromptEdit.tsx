@@ -149,7 +149,7 @@ export function PromptEdit() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 pb-10">
+      <div className="flex flex-col-reverse md:flex-row gap-6 pb-10">
         
         {/* Left Column - Content & Params */}
         <div className="flex-1 flex flex-col gap-5 min-w-0">
@@ -479,6 +479,23 @@ export function PromptEdit() {
                 >
                   <RefreshCw size={10} className="text-[var(--accent-1)]" /> 刷新列表
                 </button>
+              </div>
+              
+              <div>
+                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
+                  <Layers size={12} className="text-[var(--accent-1)]" /> 工作流 (Workflow)
+                </label>
+                <div className="relative z-[60]">
+                  <GlassDropdown 
+                    value={project.workflowId || ""}
+                    onChange={v => updateField('workflowId', v || undefined)}
+                    options={[
+                      { label: "默认工作流", value: "" },
+                      ...workflows.map(w => ({ label: w.name, value: w.id }))
+                    ]}
+                    accentColor="blue"
+                  />
+                </div>
               </div>
               
               <div>

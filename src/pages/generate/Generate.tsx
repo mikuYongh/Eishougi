@@ -304,7 +304,7 @@ export function Generate() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 pb-10">
+      <div className="flex flex-col-reverse md:flex-row gap-6 pb-10">
         
         {/* Left Column - Main Preview & Editor */}
         <div className="flex-1 flex flex-col gap-4 min-w-0 pr-1">
