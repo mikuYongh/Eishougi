@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Plus, Search, Star, Edit3, Rocket, Copy, Trash2, Cpu, Maximize, Layers, LayoutGrid, List as ListIcon, ChevronLeft, ChevronRight, ChevronDown, Image as ImageIcon, Sparkles, FileText } from "lucide-react";
 import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -38,13 +38,53 @@ export function PromptList() {
     }
   };
 
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    () => (sessionStorage.getItem('pl_viewMode') as ViewMode) || 'grid'
+  );
+  const [currentPage, setCurrentPage] = useState(
+    () => parseInt(sessionStorage.getItem('pl_page') || '1')
+  );
+  const [activeTag, setActiveTag] = useState<string | null>(
+    () => sessionStorage.getItem('pl_tag') || null
+  );
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(
+    () => sessionStorage.getItem('pl_fav') === 'true'
+  );
+  const [searchQuery, setSearchQuery] = useState(
+    () => sessionStorage.getItem('pl_search') || ''
+  );
   const [isAutoTagging, setIsAutoTagging] = useState(false);
   const [tagProgress, setTagProgress] = useState("");
+
+  // Persist filter state so it survives navigation away and back
+  useEffect(() => { sessionStorage.setItem('pl_viewMode', viewMode); }, [viewMode]);
+  useEffect(() => { sessionStorage.setItem('pl_page', String(currentPage)); }, [currentPage]);
+  useEffect(() => { if (activeTag) sessionStorage.setItem('pl_tag', activeTag); else sessionStorage.removeItem('pl_tag'); }, [activeTag]);
+  useEffect(() => { sessionStorage.setItem('pl_fav', String(showFavoritesOnly)); }, [showFavoritesOnly]);
+  useEffect(() => { if (searchQuery) sessionStorage.setItem('pl_search', searchQuery); else sessionStorage.removeItem('pl_search'); }, [searchQuery]);
+
+  // Restore scroll position once after data loads
+  const listRef = useRef<HTMLDivElement>(null);
+  const scrollRestored = useRef(false);
+  useEffect(() => {
+    if (prompts.length === 0 || scrollRestored.current) return;
+    const savedScroll = sessionStorage.getItem('pl_scroll');
+    if (savedScroll && listRef.current) {
+      requestAnimationFrame(() => {
+        if (listRef.current) listRef.current.scrollTop = parseInt(savedScroll);
+      });
+    }
+    scrollRestored.current = true;
+  }, [prompts]);
+
+  // Persist scroll position continuously
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const onScroll = () => sessionStorage.setItem('pl_scroll', String(el.scrollTop));
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
 
   const pageSize = viewMode === 'grid' ? 12 : 8;
 
@@ -212,7 +252,7 @@ export function PromptList() {
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto pr-2 pb-4 flex flex-col">
+      <div ref={listRef} className="flex-1 overflow-y-auto pr-2 pb-4 flex flex-col">
         
         {viewMode === 'grid' ? (
           /* GRID VIEW */

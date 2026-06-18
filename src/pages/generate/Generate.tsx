@@ -64,7 +64,30 @@ export function Generate() {
   const navigate = useNavigate();
   const prompts = usePromptStore(state => state.prompts);
   const updatePrompt = usePromptStore(state => state.updatePrompt);
-  const project = prompts.find(p => p.id === promptId) || prompts[0];
+
+  // Remember the last prompt ID the user opened/generated from.
+  // When navigating to /generate without a specific prompt, use the last one.
+  const LAST_PROMPT_KEY = 'last_generate_prompt_id';
+  useEffect(() => {
+    if (promptId) {
+      localStorage.setItem(LAST_PROMPT_KEY, promptId);
+    }
+  }, [promptId]);
+
+  const defaultProject = useMemo(() => {
+    if (promptId) {
+      return prompts.find(p => p.id === promptId);
+    }
+    // No promptId in URL — try last-used, then most recent, then first
+    const lastId = localStorage.getItem(LAST_PROMPT_KEY);
+    if (lastId) {
+      const last = prompts.find(p => p.id === lastId);
+      if (last) return last;
+    }
+    return prompts[0];
+  }, [promptId, prompts]);
+
+  const project = defaultProject;
 
   const { jobs, isConnected, connect, addJob } = useQueueStore();
   const workflows = useWorkflowStore(state => state.workflows);
@@ -106,7 +129,7 @@ export function Generate() {
       setOverrideVaeModel(project.vaeModel || "auto");
       setOverrideWidth(project.width || 896);
       setOverrideHeight(project.height || 1088);
-      
+
       let initialResolution = project.resolution || "896x1088 (0.82)";
       if (initialResolution && !initialResolution.includes("(")) {
         const matched = SDXL_RESOLUTIONS.find(r => r.value.startsWith(initialResolution));
@@ -131,7 +154,7 @@ export function Generate() {
       if (workflow && workflow.jsonContent) {
         const analysis = comfyService.analyzeWorkflow(workflow.jsonContent);
         setHasSizePicker(analysis.hasSizePicker);
-        
+
         // Prioritize project's saved parameters if this is the project's selected workflow,
         // otherwise default to workflow defaults.
         if (project && project.baseModel) {

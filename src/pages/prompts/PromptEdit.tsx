@@ -17,12 +17,14 @@ import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
 import { ArtistSelector } from "../../components/prompt/ArtistSelector";
 import { LoraSelectorUI } from "../../components/prompt/LoraSelectorUI";
 import { getImgSrc } from "../../utils/imageUtils";
+import { comfyService } from "../../services/comfyService";
 
 export function PromptEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
   const prompts = usePromptStore((state) => state.prompts);
   const updatePrompt = usePromptStore((state) => state.updatePrompt);
+  const addPrompt = usePromptStore((state) => state.addPrompt);
   const { checkpoints, loras, fetchModels } = useModelStore();
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
@@ -35,7 +37,7 @@ export function PromptEdit() {
   const [project, setProject] = useState<Partial<PromptProject>>({
     title: "", description: "", coverImage: "", positivePrompt: "", negativePrompt: "", artistPrompt: "",
     width: 896, height: 1088, steps: 20, cfgScale: 5.0, seed: "-1",
-    baseModel: "sd_xl_base_1.0.safetensors", vaeModel: "auto", loraConfigs: [], tags: [], instanceImages: []
+    baseModel: "", vaeModel: "auto", loraConfigs: [], tags: [], instanceImages: []
   });
   const [tagInput, setTagInput] = useState("");
   const [showTagDropdown, setShowTagDropdown] = useState(false);
@@ -63,6 +65,20 @@ export function PromptEdit() {
     }
   }, [id, prompts, workflows, checkpoints]);
 
+  useEffect(() => {
+    const wfId = project.workflowId;
+    if (!wfId) return;
+    const workflow = workflows.find(w => w.id === wfId);
+    if (!workflow || !workflow.jsonContent) return;
+
+    try {
+      const analysis = comfyService.analyzeWorkflow(workflow.jsonContent);
+      updateField('loraConfigs', analysis.loras || []);
+    } catch (e) {
+      console.warn("[PromptEdit] lora-sync: failed to parse loras from workflow:", e);
+    }
+  }, [project.workflowId, workflows]);
+
   // Extract all unique tags
   const allTags = Array.from(new Set(prompts.flatMap(p => p.tags)));
   const filteredTags = allTags.filter(t => t.toLowerCase().includes(tagInput.toLowerCase()) && !project.tags?.includes(t));
@@ -82,8 +98,46 @@ export function PromptEdit() {
       console.log("[PromptEdit] saving positivePrompt:", project.positivePrompt?.substring(0, 50), "negativePrompt:", project.negativePrompt?.substring(0, 50));
       await updatePrompt(id, project);
       console.log("[PromptEdit] save complete");
+    } else if (id === 'new') {
+      // Create a new prompt project
+      const newId = "p_" + Date.now().toString();
+      const now = Date.now();
+      const newProject: PromptProject = {
+        id: newId,
+        title: project.title || "未命名项目",
+        description: project.description || "",
+        coverImage: project.coverImage,
+        positivePrompt: project.positivePrompt || "",
+        negativePrompt: project.negativePrompt || "",
+        artistPrompt: project.artistPrompt || "",
+        promptSyntax: project.promptSyntax || 'danbooru',
+        width: project.width || 896,
+        height: project.height || 1088,
+        steps: project.steps || 20,
+        cfgScale: project.cfgScale || 5.0,
+        seed: project.seed || "-1",
+        sampler: project.sampler || "euler_ancestral",
+        scheduler: project.scheduler || "beta57",
+        baseModel: project.baseModel || "",
+        vaeModel: project.vaeModel || "auto",
+        loraConfigs: project.loraConfigs || [],
+        workflowId: project.workflowId,
+        tags: project.tags || [],
+        isFavorite: false,
+        createdAt: now,
+        updatedAt: now,
+        instanceImages: project.instanceImages || [],
+      };
+      console.log("[PromptEdit] creating new prompt:", {
+        id: newId,
+        title: newProject.title,
+        workflowId: newProject.workflowId,
+        baseModel: newProject.baseModel,
+        loraConfigsLength: newProject.loraConfigs?.length,
+      });
+      await addPrompt(newProject);
+      console.log("[PromptEdit] create complete");
     }
-    // For 'new', we'd addPrompt. Simplified for demo.
     navigate('/prompts');
   };
 
@@ -536,7 +590,7 @@ export function PromptEdit() {
               </div>
 
               <div className="mt-4">
-                <LoraSelectorUI 
+                <LoraSelectorUI
                   selectedLoras={project.loraConfigs || []}
                   onChange={v => updateField('loraConfigs', v)}
                   availableLoras={loras}
