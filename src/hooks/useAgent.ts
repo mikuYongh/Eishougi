@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useQueueStore } from '../stores/queueStore';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useModelStore } from '../stores/modelStore';
+import { comfyService } from '../services/comfyService';
 
 export interface ChatMessage {
   id: string;
@@ -559,6 +560,88 @@ User input: ${userText}`;
         return m;
       }));
 
+      // === 消息历史消毒 ===
+      // OpenAI API 严格要求：
+      //   1. assistant.tool_calls 中每个 id 必须有对应 tool message（同 tool_call_id）
+      //   2. 每个 tool message 必须对应 assistant.tool_calls 中的某个 id
+      //   3. tool_calls[i].function.arguments 必须是合法 JSON
+      // 中断/网络异常/流式截断会留下：
+      //   - arguments 是空串或半个 JSON 的 tool_call
+      //   - 声明了 tool_calls 但没来得及执行（无对应 tool message）
+      //   - tool message 但对应 assistant.tool_calls 已丢失
+      // 这些都会让后续每次请求 API 都 400 Bad Request，对话彻底报废。
+      // 发送前过滤一次，保证发给 API 的 history 总是干净的。
+
+      // Step 1: 修复 arguments 是无效 JSON 的 tool_calls（替换为 "{}"）
+      const repairedMessages = mappedMessages.map((m: any) => {
+        if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
+          const repairedCalls = m.tool_calls.map((tc: any) => {
+            if (!tc || !tc.function) return null;
+            const args = tc.function.arguments;
+            if (typeof args !== 'string' || args.trim() === '') {
+              return { ...tc, function: { ...tc.function, arguments: '{}' } };
+            }
+            try {
+              JSON.parse(args);
+              return tc;
+            } catch (e) {
+              return { ...tc, function: { ...tc.function, arguments: '{}' } };
+            }
+          }).filter((tc: any) => tc !== null);
+          return { ...m, tool_calls: repairedCalls };
+        }
+        return m;
+      });
+
+      // Step 2: 收集 assistant 声明的 tool_call_ids 和 tool message 提供的 tool_call_ids
+      const assistantToolCallIds = new Set<string>();
+      const toolMessageIds = new Set<string>();
+      for (const m of repairedMessages) {
+        if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
+          for (const tc of m.tool_calls) {
+            if (tc.id) assistantToolCallIds.add(tc.id);
+          }
+        } else if (m.role === 'tool' && m.tool_call_id) {
+          toolMessageIds.add(m.tool_call_id);
+        }
+      }
+      // 只有双向匹配（assistant 声明 + tool 提供）的 id 才算有效
+      const validIds = new Set<string>();
+      for (const id of assistantToolCallIds) {
+        if (toolMessageIds.has(id)) validIds.add(id);
+      }
+
+      // Step 3: 过滤消息
+      // - assistant.tool_calls 只保留 validIds 中的
+      // - tool message 只保留 validIds 中的
+      // - 完全空的 assistant（无 content 且 tool_calls 过滤后为空）整条移除
+      const finalMessages = repairedMessages
+        .map((m: any) => {
+          if (m.role === 'assistant' && Array.isArray(m.tool_calls)) {
+            const filtered = m.tool_calls.filter((tc: any) => tc.id && validIds.has(tc.id));
+            return { ...m, tool_calls: filtered.length > 0 ? filtered : undefined };
+          }
+          return m;
+        })
+        .filter((m: any) => {
+          if (m.role === 'tool') {
+            return m.tool_call_id && validIds.has(m.tool_call_id);
+          }
+          if (m.role === 'assistant') {
+            const hasContent = typeof m.content === 'string'
+              ? m.content.trim().length > 0
+              : Array.isArray(m.content) && m.content.length > 0;
+            const hasToolCalls = Array.isArray(m.tool_calls) && m.tool_calls.length > 0;
+            return hasContent || hasToolCalls;
+          }
+          return true;
+        });
+
+      const droppedCount = mappedMessages.length - finalMessages.length;
+      if (droppedCount > 0) {
+        console.warn(`[Agent] message history sanitization: dropped ${droppedCount} invalid message(s), sending ${finalMessages.length}/${mappedMessages.length}`);
+      }
+
       const allTools = [...ALL_TOOLS, ...mcpTools];
       const mcpToolsPrompt = Object.entries(mcpTools).length > 0 
         ? `\n\n## AVAILABLE MCP TOOLS\nYou can use the following MCP tools:\n${Object.values(mcpTools).map(t => 
@@ -600,7 +683,7 @@ User input: ${userText}`;
           model: llm.model || 'agnes-2.0-flash',
           messages: [
             systemMessage,
-            ...mappedMessages
+            ...finalMessages
           ],
           tools: allTools.map((t: any) => {
             const { _mcp, ...rest } = t;
@@ -768,12 +851,66 @@ User input: ${userText}`;
             try {
               const fnName = call.function.name;
               if (fnName === 'create_prompt') {
-                // Default base model: use the first local checkpoint if available,
-                // otherwise fall back to a sensible default.
+                // Resolve base model: validate against local checkpoints, fallback gracefully.
+                // We don't throw on invalid base_model (unlike update_prompt_settings) because
+                // failing the whole create is worse than a fallback. Just use first checkpoint.
                 const localCheckpoints = useModelStore.getState().checkpoints || [];
-                const defaultBaseModel = parsedArgs.base_model
-                  || localCheckpoints[0]
-                  || "sd_xl_base_1.0.safetensors";
+                let resolvedBaseModel: string;
+                if (parsedArgs.base_model && localCheckpoints.length > 0 && localCheckpoints.includes(parsedArgs.base_model)) {
+                  resolvedBaseModel = parsedArgs.base_model;
+                } else if (parsedArgs.base_model && localCheckpoints.length === 0) {
+                  // User has no checkpoints loaded; trust agent's input (maybe models will load later)
+                  resolvedBaseModel = parsedArgs.base_model;
+                } else if (localCheckpoints.length > 0) {
+                  // Invalid base_model or none provided: fallback to first local checkpoint
+                  resolvedBaseModel = localCheckpoints[0];
+                } else {
+                  // No checkpoints, no agent input: empty string (better than hardcoded fake filename)
+                  resolvedBaseModel = "";
+                }
+
+                // Resolve workflow: explicit > user's default (isDefault=true) > null
+                const workflows = useWorkflowStore.getState().workflows;
+                const defaultWf = workflows.find(w => w.isDefault);
+                const resolvedWorkflowId: string | null =
+                  parsedArgs.workflow_id
+                  || (defaultWf ? defaultWf.id : null)
+                  || null;
+
+                // LoRA 总是从绑定的 workflow JSON 解析，忽略 agent 传的 lora_configs。
+                // 原因：agent 不可能知道用户本地装了什么 LoRA，agent 编出来的 lora_configs 是错的，
+                // 保存到数据库后会污染 Generate 页面（Generate 的逻辑是项目有 loraConfigs 就用项目的）。
+                // workflow 是 LoRA 的真实来源（rgthree Power Lora Loader / LoraLoader 节点）。
+                let resolvedLoraConfigs: string | null = null;
+                let workflowParsedLoras: any[] = [];
+                if (resolvedWorkflowId) {
+                  const wf = workflows.find(w => w.id === resolvedWorkflowId);
+                  if (wf && wf.jsonContent) {
+                    try {
+                      const analysis = comfyService.analyzeWorkflow(wf.jsonContent);
+                      workflowParsedLoras = analysis.loras || [];
+                      resolvedLoraConfigs = workflowParsedLoras.length > 0
+                        ? JSON.stringify(workflowParsedLoras)
+                        : null;
+                    } catch (e) {
+                      console.warn("[Agent] create_prompt: failed to parse loras from workflow:", e);
+                    }
+                  }
+                }
+
+                console.log("[Agent] create_prompt resolution:", {
+                  title: parsedArgs.title,
+                  agentBaseModel: parsedArgs.base_model,
+                  resolvedBaseModel,
+                  agentWorkflowId: parsedArgs.workflow_id,
+                  resolvedWorkflowId,
+                  defaultWorkflowExists: !!defaultWf,
+                  agentLoraConfigs: parsedArgs.lora_configs,
+                  workflowParsedLoras,
+                  resolvedLoraConfigs,
+                  localCheckpointsCount: localCheckpoints.length,
+                });
+
                 const newPrompt = {
                   id: "p_" + Date.now().toString(),
                   title: parsedArgs.title || parsedArgs.tags?.[0] || "Agent Generated",
@@ -789,9 +926,10 @@ User input: ${userText}`;
                   seed: parsedArgs.seed || "-1",
                   samplerName: parsedArgs.sampler_name || "euler",
                   scheduler: parsedArgs.scheduler || "beta57",
-                  baseModel: defaultBaseModel,
+                  baseModel: resolvedBaseModel,
                   vaeModel: parsedArgs.vae_model || "auto",
-                  loraConfigs: parsedArgs.lora_configs ? JSON.stringify(parsedArgs.lora_configs) : null,
+                  workflowId: resolvedWorkflowId,
+                  loraConfigs: resolvedLoraConfigs,
                   tags: (parsedArgs.tags || []).map((t: string, i: number) => ({
                     id: "tag_" + Date.now() + i,
                     name: t,
