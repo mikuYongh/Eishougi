@@ -46,10 +46,20 @@ CRITICAL RULES FOR PROMPT GENERATION (create_prompt / update_prompt):
 1. NO SPAM TAGS: DO NOT use excessive "beautiful_xxx" tags or massive dictionary-style tag lists. Modern models perform much better with concise, highly descriptive prompts.
 2. QUALITY OVER QUANTITY: Limit quality tags to a few essential ones (e.g., masterpiece, best quality, highres).
 3. NO CHAOTIC/EXTREME CONTENT: Unless explicitly requested, keep the scene coherent and aesthetic. Avoid adding extreme explicit/hardcore tags if a simple "teasing" or "intimate" atmosphere is requested.
-4. USE MCP TOOLS: If search_tags is available, use it FIRST to convert the scene description into accurate Danbooru English tags. If unavailable, use your own Danbooru knowledge.
+4. MANDATORY TAG SEARCH: Before creating any prompt with a scene description, you MUST call search_tags at least once. Do NOT output tags from memory. EXCEPTION: standard count tags (1girl/1boy/solo) and user-provided tags can be used directly.
 5. NEGATIVE PROMPT: Auto-generate suitable negative_prompt keywords tailored to the specific scene.
-6. DO NOT INVENT CHARACTER TRAITS: If the user specifies a known character (e.g., Hatsune Miku, Hiiragi Kagami), DO NOT add tags for their hair color, eye color, or hairstyle unless the user EXPLICITLY asks to change them. The image model already knows what the character looks like. Guessing incorrect traits (e.g., "black hair" for a character with purple hair) will ruin the character generation. Just use the character's name tag and focus on their outfit, action, and scene.
-7. EXPLICIT CHARACTER COUNT: ALWAYS explicitly state the number of characters using tags like 1girl, solo, 1boy, 2girls, 3boys, etc. If the user doesn't specify, default to 1girl or solo for a single female character. Failing to do this often results in the model generating the wrong number of people or strange anatomy!
+6. CHARACTER APPEARANCE PROTECTION (CRITICAL — #1 CAUSE OF BAD GENERATIONS):
+   - NAMED CHARACTERS: If the user mentions a known character (e.g., Hatsune Miku, Genshin/原神 characters, Blue Archive/蔚蓝档案 characters), DO NOT add tags for hair_color, eye_color, hairstyle, or body_type UNLESS the user explicitly requested them. Use ONLY the character name tag. The image model already knows their appearance — guessing wrong traits (e.g. "black_hair" for a purple-haired character) WILL ruin the generation.
+   - UNSURE? VERIFY FIRST: If unsure whether a name is a known character, call search_tags with category="character" FIRST. Only add appearance tags if the name is NOT a known character.
+   - ORIGINAL CHARACTERS: For unnamed/original characters, freely describe appearance.
+7. EXPLICIT CHARACTER COUNT: ALWAYS explicitly state the number of characters using tags like 1girl, solo, 1boy, 2girls, 3boys, etc. If the user doesn't specify, default to 1girl or solo for a single female character.
+8. MULTI-CHARACTER ANTI-CONFUSION (CRITICAL for 2+ characters):
+   - GROUP TAGS: List each character's tags as a contiguous block. NEVER interleave tags of different characters (WRONG: "blue_hair, red_hair, short_hair, long_hair"; RIGHT: "blue_hair, short_hair, [all char A tags], red_hair, long_hair, [all char B tags]").
+   - SPATIAL ANCHORING: Use position words (left/right/foreground/background) to separate characters.
+   - KEY FEATURE EMPHASIS: For easily-confused features between characters, use weight syntax like (blue_hair:1.3).
+9. SEARCH BOUNDARY RULES:
+   - If the user provided explicit English tags (e.g., "1girl, white_hair, serafuku"), DO NOT search for those concepts again. Only search dimensions NOT already covered.
+   - Focus search queries ONLY on uncovered dimensions. Do not include already-provided concepts in search queries.
 
 When asked to create a prompt, use the create_prompt tool.
 When asked to modify or delete a prompt, use the update_prompt or delete_prompt tools.
@@ -226,10 +236,11 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: 'prompt-muse-agent',
-      version: 3,
+      version: 4,
       migrate: (persistedState: any, version: number) => {
-        if (version === 0 || version === 1 || version === 2) {
-          // Reset systemPrompt to apply the new character trait rules
+        if (version < 4) {
+          // v4: Added character protection, multi-character anti-confusion,
+          // mandatory search, and search boundary rules to systemPrompt
           if (persistedState.settings) {
             persistedState.settings.systemPrompt = defaultSystemPrompt;
           }
