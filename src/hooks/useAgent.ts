@@ -142,7 +142,7 @@ export function useAgent() {
       type: "function",
       function: {
         name: "create_prompt",
-        description: "Create a new prompt project.",
+        description: "Create a new prompt project. CHARACTER PROTECTION (CRITICAL — violating this is the #1 cause of bad generations): (1) NAMED CHARACTERS: If the scene mentions a known character (e.g. Hatsune Miku, Genshin/原神, Blue Archive/蔚蓝档案 characters), DO NOT add hair_color/eye_color/hairstyle/body_type tags — use ONLY the character name tag. The image model already knows their appearance; guessing wrong traits ruins generation. (2) UNSURE? VERIFY FIRST: If unsure whether a name is a known character, call search_tags with category='character' to check before adding ANY appearance tags. (3) ORIGINAL CHARACTERS: For unnamed/original characters, freely describe appearance. (4) MULTI-CHARACTER: Group each character's tags as a contiguous block — NEVER interleave tags of different characters (WRONG: 'blue_hair, red_hair, short_hair, long_hair'; RIGHT: 'blue_hair, short_hair, [all char A], red_hair, long_hair, [all char B]').",
         parameters: {
           type: "object",
           properties: {
@@ -184,7 +184,7 @@ export function useAgent() {
       type: "function",
       function: {
         name: "update_prompt_content",
-        description: "Update the textual content (prompts, title, tags) of an existing project.",
+        description: "Update the textual content (prompts, title, tags) of an existing project. CHARACTER PROTECTION: Same critical rules as create_prompt — do NOT invent appearance tags (hair/eye/body) for NAMED characters; group multi-character tags contiguously; verify unknown character names via search_tags category='character' before adding appearance tags.",
         parameters: {
           type: "object",
           properties: {
@@ -425,6 +425,89 @@ export function useAgent() {
     }
   ];
 
+  // Pre-check ref: holds the result of the lightweight character-detection +
+  // query-rewrite pre-check, injected into the system prompt for the main LLM call.
+  const precheckRef = useRef<string>("");
+
+  /**
+   * Lightweight pre-check call before the main agent loop.
+   * Detects named characters and rewrites the query into search dimensions,
+   * so even weak LLMs know which concepts to protect / search.
+   * Returns a context string to inject into the system prompt, or "" on failure.
+   */
+  const rewriteQueryAndDetectCharacters = async (userText: string): Promise<string> => {
+    const { llm } = useSettingsStore.getState().settings;
+    if (!llm.apiKey) return "";
+
+    const precheckPrompt = `Analyze the user's image-generation request and extract structured information.
+Output ONLY a valid JSON object, no markdown fences, no explanation:
+{
+  "has_named_character": boolean,
+  "character_names": ["..."],
+  "provided_tags": ["1girl", "white_hair"],
+  "search_dimensions": ["维度1", "维度2"]
+}
+
+Rules:
+1. has_named_character: true ONLY if the text mentions a known IP character (e.g. Hatsune Miku, Genshin/原神 characters, Blue Archive characters, etc.). A generic description like "一个蓝发少女" is NOT a named character.
+2. character_names: detected character names in their original language.
+3. provided_tags: English Danbooru tags explicitly provided by the user (comma-separated English words/underscores found in the input, e.g. "1girl,white_hair,serafuku").
+4. search_dimensions: split the remaining scene description into 2-4 concise Chinese search dimensions (人设/表情动作/环境). Skip any dimension already covered by provided_tags. If the input is entirely already-provided English tags, return an empty array.
+
+User input: ${userText}`;
+
+    let apiUrl = llm.apiUrl || 'https://apihub.agnes-ai.com/v1';
+    if (!apiUrl.endsWith('/chat/completions')) {
+      apiUrl = apiUrl.replace(/\/$/, '') + '/chat/completions';
+    }
+
+    try {
+      const resp = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${llm.apiKey}`
+        },
+        body: JSON.stringify({
+          model: llm.model || 'agnes-2.0-flash',
+          messages: [{ role: 'user', content: precheckPrompt }],
+          temperature: 0.2,
+          max_tokens: 400,
+        }),
+        signal: abortControllerRef.current?.signal,
+      });
+      if (!resp.ok) return "";
+      const data = await resp.json();
+      const content = (data.choices?.[0]?.message?.content || "").replace(/```json/gi, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(content);
+
+      const parts: string[] = [];
+      if (parsed.has_named_character && Array.isArray(parsed.character_names) && parsed.character_names.length > 0) {
+        parts.push(
+          `⚠ NAMED CHARACTERS DETECTED: ${parsed.character_names.join(', ')}\n` +
+          `CRITICAL: DO NOT add ANY appearance tags (hair_color, eye_color, hairstyle, body_type) for these characters. ` +
+          `Use ONLY their name tags. The model already knows their appearance — wrong guesses ruin generation.`
+        );
+      }
+      if (Array.isArray(parsed.provided_tags) && parsed.provided_tags.length > 0) {
+        parts.push(
+          `📋 USER-PROVIDED TAGS (trust directly, DO NOT search these again): ${parsed.provided_tags.join(', ')}`
+        );
+      }
+      if (Array.isArray(parsed.search_dimensions) && parsed.search_dimensions.length > 0) {
+        parts.push(
+          `🔍 SEARCH DIMENSIONS (call search_tags for each of these, in Chinese):\n` +
+          parsed.search_dimensions.map((d: string, i: number) => `  ${i + 1}. ${d}`).join('\n')
+        );
+      }
+      return parts.length > 0
+        ? "\n\n[PRE-CHECK ANALYSIS — follow these strictly when building the prompt:]\n" + parts.join('\n\n')
+        : "";
+    } catch {
+      return "";
+    }
+  };
+
   const callLLM = async (currentMessages: ChatMessage[]) => {
     const { llm } = useSettingsStore.getState().settings;
     
@@ -507,9 +590,10 @@ export function useAgent() {
 
       let bodyJson: string;
       try {
+        const precheckContext = precheckRef.current;
         const systemMessage = {
           role: "system",
-          content: agentSettings.systemPrompt + mcpToolsPrompt + systemContext + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually." 
+          content: agentSettings.systemPrompt + mcpToolsPrompt + systemContext + precheckContext + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually." 
         };
         
         const payload: any = {
@@ -1154,11 +1238,27 @@ export function useAgent() {
     const newMessages = [...messages, userMsg];
     setIsGenerating(true);
 
+    // AbortController must exist before pre-check so user can cancel it
+    abortControllerRef.current = new AbortController();
+
+    // Pre-check: only run for substantive prompts (likely scene descriptions),
+    // skip short commands / greetings to avoid unnecessary latency
+    const trimmed = finalContent.trim();
+    const looksLikeSceneRequest = trimmed.length > 12
+      && !/^(你好|hello|hi|删除|生成图片|列表|帮助|help|谢谢|再见|bye|ok|好的|嗯|是|否)/i.test(trimmed.toLowerCase());
+
     try {
+      if (looksLikeSceneRequest) {
+        precheckRef.current = await rewriteQueryAndDetectCharacters(finalContent);
+      } else {
+        precheckRef.current = "";
+      }
+
       await callLLM(newMessages);
     } finally {
       setIsGenerating(false);
       abortControllerRef.current = null;
+      precheckRef.current = "";
     }
   };
 
