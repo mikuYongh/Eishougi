@@ -119,8 +119,11 @@ export function WorkflowEdit() {
         if (typeof finalJson === 'object') {
           finalJson = JSON.stringify(finalJson, null, 2);
         }
+        console.log("[WorkflowEdit] injectParameters completed, finalJson length:", finalJson?.length ?? 0);
       } catch (e) {
-        console.error("Failed to inject parameters before saving", e);
+        console.error("[WorkflowEdit] injectParameters failed:", e);
+        alert(`保存失败：参数注入失败 — ${String(e).substring(0, 200)}`);
+        return;
       }
     }
 
@@ -130,16 +133,22 @@ export function WorkflowEdit() {
       updatedAt: Date.now(),
     };
 
-    if (id && id !== 'new') {
-      await updateWorkflow(id, payload as WorkflowProject);
-    } else {
-      await addWorkflow({
-        ...payload as WorkflowProject,
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-      });
+    try {
+      if (id && id !== 'new') {
+        await updateWorkflow(id, payload as WorkflowProject);
+      } else {
+        await addWorkflow({
+          ...payload as WorkflowProject,
+          id: crypto.randomUUID(),
+          createdAt: Date.now(),
+        });
+      }
+      console.log("[WorkflowEdit] save complete, navigating to /workflows");
+      navigate('/workflows');
+    } catch (e) {
+      console.error("[WorkflowEdit] save failed:", e);
+      alert(`保存失败：${String(e).substring(0, 200)}`);
     }
-    navigate('/workflows');
   };
 
   const updateField = (key: keyof WorkflowProject, value: any) => {

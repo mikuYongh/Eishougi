@@ -166,13 +166,21 @@ export class ComfyService {
   async fetchObjectInfo() {
     try {
       const comfyUrl = getComfyUrl();
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 8000);
       const response = await fetch(`${comfyUrl}/object_info`, {
-        method: 'GET'
+        method: 'GET',
+        signal: abortController.signal
       });
+      clearTimeout(timeoutId);
       if (!response.ok) throw new Error("Failed to fetch object info");
       return await response.json();
     } catch (e) {
-      console.error(e);
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        console.warn("[ComfyService] fetchObjectInfo timed out after 8s");
+      } else {
+        console.error(e);
+      }
       return {};
     }
   }
@@ -352,11 +360,10 @@ export class ComfyService {
 
   // Inject user PromptProject parameters into a raw ComfyUI JSON workflow
   async injectParameters(workflowStr: string, project: any): Promise<any> {
-    console.log("[ComfyService] injectParameters started.");
-    console.log("[ComfyService] Input project settings:", JSON.stringify(project, null, 2));
-    
-    // Fetch object_info to get dynamic widget valid options
-    const objectInfo = await this.getObjectInfo();
+    // Use cached objectInfo only — never block on a fetch to ComfyUI.
+    // getObjectInfo is only needed for SDXLEmptyLatentSizePicker+ resolution fallback,
+    // which is a nice-to-have. If ComfyUI is offline, we just skip it.
+    let objectInfo: any = this.cachedObjectInfo || null;
     
     try {
       const workflow = JSON.parse(workflowStr);
@@ -497,9 +504,7 @@ export class ComfyService {
 
         // 6. Power Lora Loader (rgthree)
         if (node.class_type === "Power Lora Loader (rgthree)") {
-          console.log("[comfyService] Processing Power Lora Loader (rgthree)", node.inputs);
           if (loraConfigs && Array.isArray(loraConfigs)) {
-            console.log("[comfyService] loraConfigs to apply:", loraConfigs);
             let configQueue = [...loraConfigs];
             
             // First pass: update existing slots or clear deleted ones
@@ -548,12 +553,10 @@ export class ComfyService {
               nextSlotIdx++;
             }
           }
-          console.log("[comfyService] Power Lora Loader (rgthree) inputs after injection:", node.inputs);
         }
 
         // 7. General LoraLoader
         if (node.class_type === "LoraLoader") {
-          console.log("[comfyService] Processing LoraLoader", node.inputs);
           if (node.inputs.lora_name) {
             const config = loraConfigs ? (Array.isArray(loraConfigs) ? loraConfigs.find((lc: any) => lc.name === node.inputs.lora_name) : null) : null;
             if (config) {
@@ -561,47 +564,14 @@ export class ComfyService {
               if (node.inputs.strength_model !== undefined) node.inputs.strength_model = str;
               if (node.inputs.strength_clip !== undefined) node.inputs.strength_clip = str;
             } else if (Array.isArray(loraConfigs)) {
-              // If we have an array of LoRAs and this one is NOT in it, it means user deleted it.
-              // Set strength to 0 to disable it.
-              console.log(`[comfyService] Disabling LoraLoader ${node.inputs.lora_name} as it was not found in loraConfigs`);
+              // If we have an array of LoRAs and this one is NOT in it, user deleted it — disable.
               if (node.inputs.strength_model !== undefined) node.inputs.strength_model = 0;
               if (node.inputs.strength_clip !== undefined) node.inputs.strength_clip = 0;
             }
-            console.log("[comfyService] LoraLoader inputs after injection:", node.inputs);
           }
         }
       }
 
-      const summary: any = {};
-      for (const key in workflow) {
-        const node = workflow[key];
-        if (!node.inputs) continue;
-        const ct = node.class_type || "";
-        const t = node._meta?.title || "";
-        if (ct.includes("KSampler") || ct.includes("CLIPTextEncode") || ct.includes("Simple String") || ct.includes("StringConcatenate") || ct.includes("EmptyLatent") || ct.includes("SizePicker") || ct.includes("Loader") || ct.includes("Anything Everywhere") || ct.includes("Power Lora") || ct.includes("Ollama") || ct.includes("ToriiGate") || ct.includes("Captioner")) {
-          const info: any = { class_type: ct, title: t };
-          if (ct.includes("KSampler")) {
-            info.params = { steps: node.inputs.steps, cfg: node.inputs.cfg, sampler: node.inputs.sampler_name, scheduler: node.inputs.scheduler };
-          } else if (ct.includes("CLIPTextEncode")) {
-            info.text_input = typeof node.inputs.text === 'string' ? node.inputs.text.substring(0, 60) : `link->[${node.inputs.text}]`;
-          } else if (ct === "Simple String" || ct === "SimpleString") {
-            info.text = node.inputs.string?.substring?.(0, 60) || node.inputs.string;
-          } else if (ct === "StringConcatenate") {
-            info.string_a = typeof node.inputs.string_a === 'string' ? node.inputs.string_a.substring(0, 40) : node.inputs.string_a;
-            info.string_b = typeof node.inputs.string_b === 'string' ? node.inputs.string_b.substring(0, 40) : node.inputs.string_b;
-          } else if (ct.includes("Loader")) {
-            info.model = node.inputs.unet_name || node.inputs.ckpt_name || node.inputs.clip_name || node.inputs.vae_name || "?";
-          } else if (ct.includes("Anything Everywhere")) {
-            info.inputs = JSON.stringify(node.inputs);
-          } else if (ct.includes("Ollama") || ct.includes("ToriiGate") || ct.includes("Captioner")) {
-            info.prompt_source = JSON.stringify(node.inputs.prompt || node.inputs.string || node.inputs.system);
-          }
-          summary[key] = info;
-        }
-      }
-      console.log("[ComfyService] Workflow node summary:", JSON.stringify(summary, null, 2));
-
-      console.log("[ComfyService] Final injected workflow payload:", JSON.stringify(workflow, null, 2));
       return workflow;
     } catch (e) {
       console.error("Failed to inject parameters into workflow JSON", e);
