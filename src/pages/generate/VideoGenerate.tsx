@@ -1,16 +1,50 @@
-import { useState, useRef } from "react";
-import { UploadCloud, Image as ImageIcon, Video, Play, FastForward, Clock, Maximize, Film } from "lucide-react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
+import { UploadCloud, Image as ImageIcon, Video, Play, FastForward, Clock, Maximize, Film, Layers, Loader2, Cpu } from "lucide-react";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
+import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useWorkflowStore } from "../../stores/workflowStore";
+import { useModelStore } from "../../stores/modelStore";
+import { useQueueStore } from "../../stores/queueStore";
+import { comfyService } from "../../services/comfyService";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 
 export function VideoGenerate() {
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   const [image, setImage] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState("");
   const [fps, setFps] = useState(16);
-  const [duration, setDuration] = useState(2);
+  const [duration, setDuration] = useState(2); // in seconds
   const [resolution, setResolution] = useState("512x512");
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [baseModel, setBaseModel] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const checkpoints = useModelStore(state => state.checkpoints);
+
+  const workflows = useWorkflowStore(state => state.workflows);
+  const videoWorkflows = useMemo(() => workflows.filter(w => w.type === 'img2video'), [workflows]);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string>(videoWorkflows.length > 0 ? videoWorkflows[0].id : '');
+
+  const addVideoJob = useQueueStore(state => state.addVideoJob);
+  const jobs = useQueueStore(state => state.jobs);
+  
+  // Find the active video job for this session (just grabbing the latest pending/generating one)
+  const activeJob = useMemo(() => {
+    return jobs.find(j => j.projectTitle === '图生视频工作区' && (j.status === 'pending' || j.status === 'generating'));
+  }, [jobs]);
+
+  const completedJob = useMemo(() => {
+    return [...jobs].reverse().find(j => j.projectTitle === '图生视频工作区' && j.status === 'completed');
+  }, [jobs]);
+
+  // Set default workflow if none selected
+  useEffect(() => {
+    if (!selectedWorkflowId && videoWorkflows.length > 0) {
+      setSelectedWorkflowId(videoWorkflows[0].id);
+    }
+  }, [videoWorkflows, selectedWorkflowId]);
+
+  const isGenerating = !!activeJob;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -19,10 +53,40 @@ export function VideoGenerate() {
     }
   };
 
-  const handleGenerate = () => {
-    if (!image) return;
-    setIsGenerating(true);
-    setTimeout(() => setIsGenerating(false), 3000);
+  const handleGenerate = async () => {
+    if (!image || !selectedWorkflowId) return;
+    
+    try {
+      const tempProject = {
+        id: 'video_' + Date.now(),
+        title: '图生视频工作区',
+        seed: Math.floor(Math.random() * 1000000000)
+      };
+
+      const [wStr, hStr] = resolution.split('x');
+      const width = parseInt(wStr);
+      const height = parseInt(hStr);
+      const totalFrames = fps * duration;
+
+      const response = await fetch(image);
+      const blob = await response.blob();
+      const filename = `upload_${Date.now()}.png`;
+      const uploadedFilename = await comfyService.uploadImage(blob, filename);
+
+      await addVideoJob(
+        tempProject,
+        selectedWorkflowId,
+        uploadedFilename,
+        fps,
+        totalFrames,
+        width,
+        height,
+        prompt,
+        baseModel
+      );
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -38,11 +102,11 @@ export function VideoGenerate() {
         </div>
         <button 
           onClick={handleGenerate}
-          disabled={!image || isGenerating}
-          className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-[14px] font-bold shadow-[0_4px_15px_rgba(156,39,176,0.3)] transition-all ${!image ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] cursor-pointer text-[var(--text-primary)]'}`}
+          disabled={!image || isGenerating || !selectedWorkflowId}
+          className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-[14px] font-bold shadow-[0_4px_15px_rgba(156,39,176,0.3)] transition-all ${(!image || !selectedWorkflowId) ? 'opacity-50 cursor-not-allowed' : 'hover:scale-[1.02] cursor-pointer text-[var(--text-primary)]'}`}
           style={{ background: image ? "linear-gradient(135deg, #AB47BC, #7E57C2)" : "rgba(255,255,255,0.1)", border: image ? "1px solid rgba(255,255,255,0.2)" : "none" }}
         >
-          <Play size={18} fill="currentColor" />
+          {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} fill="currentColor" />}
           {isGenerating ? '正在渲染序列...' : '开始生成视频'}
         </button>
       </div>
@@ -50,9 +114,9 @@ export function VideoGenerate() {
       <div className="flex flex-col md:flex-row gap-6 flex-1 min-h-0">
         
         {/* Left Column - Input Image & Params */}
-        <div className="w-full md:w-[420px] flex flex-col gap-5 flex-shrink-0">
+        <div className="w-full md:w-[420px] flex flex-col gap-5 flex-shrink-0 overflow-y-auto pb-4 pr-1 scrollbar-hide">
           
-          <div className="glass-panel p-1 rounded-2xl flex flex-col relative overflow-hidden group h-64 border border-[var(--glass-border)] hover:border-[var(--accent-2)]/30 transition-colors">
+          <div className="glass-panel p-1 rounded-2xl flex flex-col relative overflow-hidden group h-64 border border-[var(--glass-border)] hover:border-[var(--accent-2)]/30 transition-colors flex-shrink-0">
             <div className="absolute inset-0 bg-[var(--bg-layer-1)] z-0"></div>
             {image ? (
               <div className="relative w-full h-full z-10 flex flex-col items-center justify-center p-2 group/img">
@@ -79,12 +143,45 @@ export function VideoGenerate() {
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
           </div>
 
-          <div className="glass-panel p-5 rounded-2xl space-y-5">
+          <div className="glass-panel p-5 rounded-2xl space-y-5 flex-shrink-0">
             <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2 mb-2">
               <Video size={16} className="text-[var(--accent-2)]" /> 动画参数控制
             </h3>
-            
+
             <div className="space-y-4">
+              <div className="relative z-[60]">
+                <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><Layers size={12}/> 工作流 (Workflow)</label>
+                <GlassDropdown 
+                  value={selectedWorkflowId}
+                  onChange={v => setSelectedWorkflowId(v || '')}
+                  options={videoWorkflows.map(w => ({ label: w.name, value: w.id }))}
+                  accentColor="purple"
+                />
+                {videoWorkflows.length === 0 && (
+                  <p className="text-xs text-orange-400 mt-1">未找到视频工作流，请先导入</p>
+                )}
+              </div>
+
+              <div className="relative z-[50]">
+                <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><Cpu size={12}/> 基础模型 (Checkpoint)</label>
+                <SearchableDropdown 
+                  value={baseModel}
+                  onChange={v => setBaseModel(v)}
+                  options={checkpoints.map(c => ({ label: c, value: c }))}
+                  placeholder="未选择，使用工作流默认模型..."
+                />
+              </div>
+
+              <div className="relative z-[40]">
+                <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">提示词 (Prompt)</label>
+                <textarea 
+                  value={prompt}
+                  onChange={e => setPrompt(e.target.value)}
+                  placeholder="可选，描述视频画面内容..."
+                  className="w-full h-16 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-2)]/50 resize-none"
+                />
+              </div>
+              
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1.5"><FastForward size={12}/> 帧率 (FPS)</label>
@@ -128,16 +225,24 @@ export function VideoGenerate() {
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center p-5 bg-[var(--glass-bg)]">
-              {isGenerating ? (
+              {activeJob ? (
                 <div className="w-full max-w-md space-y-4">
                   <div className="flex justify-between text-[12px] font-bold text-[var(--accent-2)]">
-                    <span>正在渲染 AnimateDiff 节点...</span>
-                    <span>45%</span>
+                    <span>{activeJob.node ? `正在渲染节点: ${activeJob.node}` : '正在准备渲染...'}</span>
+                    <span>{activeJob.progress}%</span>
                   </div>
                   <div className="h-1.5 w-full bg-[var(--bg-layer-1)] rounded-full overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-[var(--accent-2)] to-[var(--accent-1)] w-[45%] animate-pulse"></div>
+                    <div className="h-full bg-gradient-to-r from-[var(--accent-2)] to-[var(--accent-1)] transition-all duration-300" style={{ width: `${activeJob.progress}%` }}></div>
                   </div>
-                  <p className="text-[11px] text-[var(--text-muted)] text-center font-mono">STEP 12 / 20 • KSampler</p>
+                  <p className="text-[11px] text-[var(--text-muted)] text-center font-mono">{activeJob.status === 'pending' ? '等待排队...' : '生成中'}</p>
+                </div>
+              ) : completedJob && completedJob.images && completedJob.images.length > 0 ? (
+                <div className="relative w-full h-full flex items-center justify-center">
+                  {completedJob.images[0].endsWith('.mp4') || completedJob.images[0].endsWith('.webm') ? (
+                    <video src={convertFileSrc(completedJob.images[0])} autoPlay loop controls className={`max-w-full max-h-full rounded-lg shadow-2xl ${privacyMode ? 'blur-2xl hover:blur-none transition-all' : ''}`} />
+                  ) : (
+                    <img src={convertFileSrc(completedJob.images[0])} alt="Generated Video/Gif" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl ${privacyMode ? 'blur-2xl hover:blur-none transition-all' : ''}`} />
+                  )}
                 </div>
               ) : (
                 <div className="text-[var(--text-muted)] flex flex-col items-center">
