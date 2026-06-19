@@ -6,7 +6,7 @@ import { usePromptStore } from "../../stores/promptStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useQueueStore } from "../../stores/queueStore";
 import { downloadImage } from "../../utils/download";
-import { getImgSrc } from "../../utils/imageUtils";
+import { getImgSrc, isVideoFile } from "../../utils/imageUtils";
 
 
 
@@ -210,7 +210,11 @@ export function History() {
                     className="aspect-square w-full relative overflow-hidden flex items-center justify-center cursor-pointer"
                     onClick={() => setPreviewImage(img)}
                   >
-                    <img src={getImgSrc(img.url)} alt="Result" loading="lazy" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                    {isVideoFile(img.url) ? (
+                       <video src={getImgSrc(img.url)} controls className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500" />
+                     ) : (
+                       <img src={getImgSrc(img.url)} alt="Result" loading="lazy" className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                     )}
                     
                   {/* Hover Actions (Desktop Only) */}
                     <div className="absolute inset-0 bg-[var(--glass-bg)] opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex flex-col items-center justify-center gap-3">
@@ -310,13 +314,17 @@ export function History() {
           >
             {/* Left: Image */}
             <div className="w-full h-[45vh] flex-shrink-0 md:h-auto md:flex-1 flex items-center justify-center bg-black/50 p-4 relative overflow-hidden">
-              <PhotoView src={getImgSrc(previewImage.url)}>
-                <img 
-                  src={getImgSrc(previewImage.url)} 
-                  alt="Preview full" 
-                  className={`max-w-full max-h-full object-contain shadow-2xl rounded-lg cursor-zoom-in ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
-                />
-              </PhotoView>
+              {isVideoFile(previewImage.url) ? (
+                <video src={getImgSrc(previewImage.url)} controls className="max-w-full max-h-full object-contain shadow-2xl rounded-lg" />
+              ) : (
+                <PhotoView src={getImgSrc(previewImage.url)}>
+                  <img 
+                    src={getImgSrc(previewImage.url)} 
+                    alt="Preview full" 
+                    className={`max-w-full max-h-full object-contain shadow-2xl rounded-lg cursor-zoom-in ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
+                  />
+                </PhotoView>
+              )}
             </div>
             
             {/* Right: Info */}

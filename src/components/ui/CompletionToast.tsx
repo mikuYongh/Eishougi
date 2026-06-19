@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { X, ImageIcon, Sparkles } from "lucide-react";
 import { useQueueStore, type CompletionNotification } from "../../stores/queueStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { getImgSrc, isVideoFile } from "../../utils/imageUtils";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 function ToastItem({ item }: { item: CompletionNotification }) {
@@ -30,10 +31,14 @@ function ToastItem({ item }: { item: CompletionNotification }) {
     >
       <div className="flex-shrink-0 relative">
         {item.images?.[0] ? (
-          <img
-            src={item.images[0].startsWith('http') ? item.images[0] : convertFileSrc(item.images[0])}
-            className={`w-14 h-14 rounded-xl object-cover border-2 border-green-500/30 shadow-md transition-all duration-300 ${privacyMode ? "blur-md hover:blur-none" : ""}`}
-          />
+          isVideoFile(item.images[0]) ? (
+            <video src={item.images[0].startsWith('http') ? item.images[0] : convertFileSrc(item.images[0])} className="w-14 h-14 rounded-xl object-cover border-2 border-green-500/30 shadow-md" />
+          ) : (
+            <img
+              src={item.images[0].startsWith('http') ? item.images[0] : convertFileSrc(item.images[0])}
+              className={`w-14 h-14 rounded-xl object-cover border-2 border-green-500/30 shadow-md transition-all duration-300 ${privacyMode ? "blur-md hover:blur-none" : ""}`}
+            />
+          )
         ) : (
           <div className="w-14 h-14 rounded-xl bg-green-500/10 border-2 border-green-500/20 flex items-center justify-center">
             <ImageIcon size={20} className="text-green-400" />
@@ -47,7 +52,7 @@ function ToastItem({ item }: { item: CompletionNotification }) {
       <div className="flex-1 min-w-0">
         <p className="text-[12px] font-bold text-[var(--text-primary)] truncate">{item.projectTitle}</p>
         <p className="text-[10px] text-green-400 font-medium mt-0.5">
-          已生成完成 · {item.images?.length || 0} 张图片
+          已生成完成 · {item.images?.length || 0} 个文件
         </p>
       </div>
 

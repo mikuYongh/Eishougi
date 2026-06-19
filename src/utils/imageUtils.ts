@@ -38,3 +38,10 @@ export const getImgSrc = (url?: string): string => {
   
   return convertFileSrc(finalUrl);
 };
+
+const VIDEO_EXTS = new Set(['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v']);
+
+export const isVideoFile = (path: string) => {
+  const ext = path.split('?')[0].split('.').pop()?.toLowerCase() || '';
+  return VIDEO_EXTS.has(ext);
+};
