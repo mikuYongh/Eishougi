@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { comfyService, getComfyUrl } from '../services/comfyService';
+import { comfyService, getComfyUrl, getVideoComfyUrl } from '../services/comfyService';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
@@ -32,6 +32,7 @@ interface QueueStore {
   isConnected: boolean;
   completedNotifications: CompletionNotification[];
   addJob: (project: any, workflowId?: string, batchCount?: number) => Promise<string[][]>;
+  addVideoJob: (tempProject: any, workflowId: string, imageFilename: string, fps: number, duration: number, width: number, height: number, prompt: string, baseModel: string) => Promise<string[]>;
   removeJob: (id: string) => void;
   clearCompleted: () => void;
   connect: () => Promise<void>;
@@ -240,6 +241,82 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         }
         set(state => ({
           jobs: state.jobs.map(j => jobs.some(bj => bj.id === j.id) ? { ...j, status: 'failed', error: e.message } : j)
+        }));
+        throw e;
+      }
+    },
+
+    addVideoJob: async (tempProject: any, workflowId: string, imageFilename: string, fps: number, duration: number, width: number, height: number, prompt: string, baseModel: string) => {
+      await get().connect();
+
+      const jobId = tempProject.id; // use tempProject id directly to match
+      const promise = new Promise<string[]>((resolve) => {
+        _jobResolvers.set(jobId, resolve);
+      });
+
+      const job: QueueJob = {
+        id: jobId,
+        projectId: tempProject.id,
+        projectTitle: tempProject.title,
+        status: 'pending',
+        progress: 0,
+        workflowId: workflowId,
+        createdAt: Date.now()
+      };
+
+      set(state => ({ jobs: [...state.jobs, job] }));
+
+      try {
+        let wfString = "";
+        try {
+          const w = await invoke('get_workflow', { id: workflowId }) as any;
+          if (w && w.jsonContent) {
+            wfString = w.jsonContent;
+          }
+        } catch (e) {
+          console.warn("[Queue] Failed to fetch workflow", e);
+        }
+
+        if (!wfString) {
+          throw new Error("Cannot find workflow");
+        }
+
+        const injectedWf = comfyService.injectVideoParameters(
+          JSON.parse(wfString),
+          imageFilename,
+          prompt,
+          fps,
+          duration,
+          width,
+          height,
+          baseModel
+        );
+
+        const videoComfyUrl = getVideoComfyUrl();
+        const res = await invoke<any>('queue_prompt_and_track', {
+          prompt: injectedWf,
+          comfyUrl: videoComfyUrl,
+          clientId: globalClientId,
+          jobId: job.id,
+          projectId: tempProject.id,
+          projectTitle: tempProject.title,
+          workflowId: workflowId,
+          seed: tempProject.seed
+        });
+
+        console.log("[Queue] queued video prompt_id:", res.prompt_id);
+
+        set(state => ({
+          jobs: state.jobs.map(j => j.id === job.id ? { ...j, comfyPromptId: res.prompt_id } : j)
+        }));
+
+        const result = await promise;
+        return result;
+      } catch (e: any) {
+        console.error("[Queue] addVideoJob error:", e.message);
+        _jobResolvers.delete(jobId);
+        set(state => ({
+          jobs: state.jobs.map(j => j.id === job.id ? { ...j, status: 'failed', error: e.message } : j)
         }));
         throw e;
       }

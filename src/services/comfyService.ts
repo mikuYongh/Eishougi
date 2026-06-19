@@ -1,6 +1,7 @@
 // ComfyUI Service Integration
 
 import { useSettingsStore } from '../stores/settingsStore';
+import { invoke } from '@tauri-apps/api/core';
 
 // Get dynamically from settings
 export const getComfyUrl = () => {
@@ -188,24 +189,18 @@ export class ComfyService {
   async uploadImage(file: File | Blob, filename: string): Promise<string> {
     try {
       const comfyUrl = getVideoComfyUrl();
-      const formData = new FormData();
-      formData.append('image', file, filename);
-      formData.append('type', 'input');
-      formData.append('overwrite', 'true');
-
-      const response = await fetch(`${comfyUrl}/upload/image`, {
-        method: 'POST',
-        body: formData
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      const resultName = await invoke<string>("upload_image_to_comfy", {
+        comfyUrl,
+        imageData: Array.from(uint8Array),
+        filename
       });
 
-      if (!response.ok) {
-        throw new Error(`Upload failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      return result.name || filename;
+      return resultName;
     } catch (e: any) {
-      throw new Error(`Failed to upload image: ${e.message}`);
+      throw new Error(`Failed to upload image: ${e.message || e}`);
     }
   }
 
@@ -216,7 +211,8 @@ export class ComfyService {
     fps: number,
     duration: number,
     width: number,
-    height: number
+    height: number,
+    baseModel?: string
   ) {
     const finalJson = JSON.parse(JSON.stringify(workflow));
 
@@ -236,10 +232,34 @@ export class ComfyService {
       }
 
       if (classType === "PrimitiveInt" && node.inputs.value !== undefined) {
-        if (title === "Width") node.inputs.value = width;
-        if (title === "Height") node.inputs.value = height;
-        if (title === "Frame Rate") node.inputs.value = fps;
-        if (title === "Duration") node.inputs.value = duration;
+        if (!Array.isArray(node.inputs.value)) {
+          if (title === "Width") node.inputs.value = width;
+          if (title === "Height") node.inputs.value = height;
+          if (title === "Frame Rate") node.inputs.value = fps;
+          if (title === "Duration") node.inputs.value = duration;
+        }
+      }
+
+      if (["EmptyLatentVideo", "EmptyLTXVLatentVideo", "EmptyLatentImage"].includes(classType)) {
+        if (node.inputs.width !== undefined && !Array.isArray(node.inputs.width)) {
+          node.inputs.width = width;
+        }
+        if (node.inputs.height !== undefined && !Array.isArray(node.inputs.height)) {
+          node.inputs.height = height;
+        }
+        if (node.inputs.length !== undefined && !Array.isArray(node.inputs.length)) {
+          node.inputs.length = duration;
+        }
+        if (classType === "EmptyLatentVideo" && node.inputs.batch_size !== undefined && !Array.isArray(node.inputs.batch_size)) {
+          node.inputs.batch_size = duration;
+        }
+      }
+
+      if (["UNETLoader", "CheckpointLoaderSimple", "ImageOnlyCheckpointLoader"].includes(classType)) {
+        if (baseModel && baseModel.trim() !== '') {
+          if (node.inputs.unet_name !== undefined) node.inputs.unet_name = baseModel;
+          if (node.inputs.ckpt_name !== undefined) node.inputs.ckpt_name = baseModel;
+        }
       }
     }
 
@@ -442,7 +462,18 @@ export class ComfyService {
 
         // 5. Resolution / Empty Latent
         if (node.class_type === "SDXLEmptyLatentSizePicker+") {
-          if (project.width !== undefined && project.height !== undefined && project.width > 0 && project.height > 0) {
+          if (project.resolution !== undefined && project.resolution !== null) {
+            node.inputs.resolution = project.resolution;
+            const m = project.resolution.match(/(\d+)\s*[x×]\s*(\d+)/);
+            if (m) {
+              const w = parseInt(m[1]);
+              const h = parseInt(m[2]);
+              if (node.inputs.empty_latent_width !== undefined) node.inputs.empty_latent_width = w;
+              if (node.inputs.width_override !== undefined) node.inputs.width_override = w;
+              if (node.inputs.empty_latent_height !== undefined) node.inputs.empty_latent_height = h;
+              if (node.inputs.height_override !== undefined) node.inputs.height_override = h;
+            }
+          } else if (project.width !== undefined && project.height !== undefined && project.width > 0 && project.height > 0) {
             // Try to find the valid "custom" option from the node's actual schema.
             // The exact string varies across versions of the custom node (e.g. "custom", "Custom", "custom ⚠️").
             // We must NEVER write a hardcoded fallback that is not in the valid list, or ComfyUI will reject
@@ -492,14 +523,21 @@ export class ComfyService {
             if (node.inputs.width_override !== undefined) node.inputs.width_override = project.width;
             if (node.inputs.empty_latent_height !== undefined) node.inputs.empty_latent_height = project.height;
             if (node.inputs.height_override !== undefined) node.inputs.height_override = project.height;
-          } else if (project.resolution !== undefined && project.resolution !== null) {
-            node.inputs.resolution = project.resolution;
           }
         } else if (node.class_type.includes("EmptyLatent") || node.class_type.includes("SizePicker") || node.class_type.includes("Latent")) {
           if (project.width !== undefined && node.inputs.width !== undefined) node.inputs.width = project.width;
           if (project.height !== undefined && node.inputs.height !== undefined) node.inputs.height = project.height;
           if (project.width !== undefined && node.inputs.width_override !== undefined) node.inputs.width_override = project.width;
           if (project.height !== undefined && node.inputs.height_override !== undefined) node.inputs.height_override = project.height;
+        }
+
+        // Generic Primitive overrides for custom generic workflows
+        if ((node.class_type === "PrimitiveInt" || node.class_type === "PrimitiveNode") && node.inputs.value !== undefined) {
+          if (!Array.isArray(node.inputs.value)) {
+            const title = (node._meta?.title || "").toLowerCase();
+            if (title.includes("width") && project.width !== undefined) node.inputs.value = project.width;
+            if (title.includes("height") && project.height !== undefined) node.inputs.value = project.height;
+          }
         }
 
         // 6. Power Lora Loader (rgthree)
