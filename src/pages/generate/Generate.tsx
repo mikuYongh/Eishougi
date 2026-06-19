@@ -235,8 +235,8 @@ export function Generate() {
   const progress = activeJob && activeJob.status === 'generating' ? { value: activeJob.progress, max: 100, node: activeJob.node } : null;
   const error = activeJob?.error || jobs.find(j => j.projectId === project?.id && j.status === 'failed')?.error;
   
-  // Combine all images from completed jobs for this session
-  const results = completedJobs.flatMap(j => j.images || []);
+  // Combine all images from completed jobs for this session (newest first)
+  const results = useMemo(() => completedJobs.flatMap(j => j.images || []).reverse(), [completedJobs]);
 
   useEffect(() => {
     connect();
@@ -492,7 +492,14 @@ export function Generate() {
                   <div className="relative z-20">
                     <GlassDropdown
                       value={overrideResolution}
-                      onChange={setOverrideResolution}
+                      onChange={(val) => {
+                        setOverrideResolution(val);
+                        const m = val.match(/(\d+)\s*[x×]\s*(\d+)/);
+                        if (m) {
+                          setOverrideWidth(parseInt(m[1]));
+                          setOverrideHeight(parseInt(m[2]));
+                        }
+                      }}
                       options={SDXL_RESOLUTIONS}
                       accentColor="blue"
                     />
@@ -580,10 +587,10 @@ export function Generate() {
       </div>
       
       {/* Session History Strip */}
-      {results.length > 1 && (
+      {results.length > 0 && (
         <div className="flex-shrink-0 glass-panel p-3 rounded-2xl border border-[var(--glass-border)] flex gap-3 overflow-x-auto no-scrollbar">
-          {results.slice(1).reverse().map((res, i) => (
-            <div key={i} className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[var(--glass-border)] hover:border-[var(--accent-1)]/50 cursor-pointer transition-colors relative group">
+          {results.map((res, i) => (
+            <div key={res} className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[var(--glass-border)] hover:border-[var(--accent-1)]/50 cursor-pointer transition-colors relative group">
               <PhotoView src={getImgSrc(res)}>
                 <img src={getImgSrc(res)} alt={`History ${i}`} className={`w-full h-full object-cover opacity-60 group-hover:opacity-100 cursor-zoom-in transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
               </PhotoView>

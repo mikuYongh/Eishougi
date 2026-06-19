@@ -175,7 +175,7 @@ export function PromptEdit() {
         <div className="flex items-center gap-4 w-full md:w-auto">
           <button 
             onClick={() => navigate('/prompts')}
-            className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
+            className="w-10 h-10 rounded-full bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
           >
             <ArrowLeft size={18} />
           </button>
@@ -190,7 +190,7 @@ export function PromptEdit() {
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto justify-end">
           <button 
             onClick={handleSave}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-white/10 hover:bg-white/20 text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)] w-full sm:w-auto"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-[var(--glass-bg-hover)] hover:bg-[var(--glass-border-active)] text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)] w-full sm:w-auto"
           >
             <Save size={16} /> 保存项目
           </button>
@@ -208,7 +208,7 @@ export function PromptEdit() {
         {/* Left Column - Content & Params */}
         <div className="flex-1 flex flex-col gap-5 min-w-0">
           
-          <div className="glass-panel p-5 space-y-4">
+          <div className="glass-panel p-5 space-y-4 relative z-[60]">
             <div>
               <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">项目名称</label>
               <input 
@@ -287,7 +287,7 @@ export function PromptEdit() {
                               setTagInput("");
                               setShowTagDropdown(false);
                             }}
-                            className="w-full text-left px-3 py-2 rounded-lg text-[12px] transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-white/10 hover:text-[var(--text-primary)]"
+                            className="w-full text-left px-3 py-2 rounded-lg text-[12px] transition-colors cursor-pointer text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]"
                           >
                             {tag}
                           </button>
@@ -307,7 +307,7 @@ export function PromptEdit() {
                   <Cpu size={14} className="text-[var(--accent-2)]" />
                   Prompt Syntax
                 </label>
-                <div className="flex bg-black/30 rounded-lg p-1 gap-1 overflow-x-auto max-w-full">
+                <div className="flex bg-[var(--bg-layer-0)] rounded-lg p-1 gap-1 overflow-x-auto max-w-full">
                   {(['danbooru', 'natural', 'xml'] as const).map(syntax => (
                     <button
                       key={syntax}
@@ -315,8 +315,8 @@ export function PromptEdit() {
                       onClick={() => updateField('promptSyntax', syntax)}
                       className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
                         (project.promptSyntax || 'danbooru') === syntax
-                          ? 'bg-[var(--accent-2)] text-white shadow-[0_0_15px_var(--accent-2)]'
-                          : 'text-[var(--text-muted)] hover:text-white hover:bg-white/10'
+                          ? 'bg-[var(--accent-2)] text-white shadow-[0_0_15px_rgba(179,136,255,0.5)]'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)]'
                       }`}
                     >
                       {syntax.toUpperCase()}
@@ -324,7 +324,7 @@ export function PromptEdit() {
                   ))}
                 </div>
               </div>
-              <div className="text-[11px] text-[var(--text-muted)] bg-black/20 px-3 py-1.5 rounded-lg whitespace-nowrap text-center lg:text-right">
+              <div className="text-[11px] text-[var(--text-muted)] bg-[var(--glass-bg)] px-3 py-1.5 rounded-lg whitespace-nowrap text-center lg:text-right">
                 {(project.promptSyntax || 'danbooru') === 'danbooru' && "标准逗号分隔标签 (支持智能预测)"}
                 {project.promptSyntax === 'natural' && "自然语言描述 (无限制输入)"}
                 {project.promptSyntax === 'xml' && "结构化 XML (兼容 NewBie/Anima)"}
@@ -342,7 +342,7 @@ export function PromptEdit() {
                   <textarea
                     value={project.positivePrompt || ""}
                     onChange={e => updateField('positivePrompt', e.target.value)}
-                    className="flex-1 w-full bg-black/30 border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-[var(--accent-1)]/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
+                    className="flex-1 w-full bg-[var(--bg-layer-0)] border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-[var(--accent-1)]/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
                     placeholder={project.promptSyntax === 'xml' ? "<character>\n  <name>Hatsune Miku</name>\n</character>\n<caption>...</caption>" : "A beautifully detailed cinematic wide shot of..."}
                   />
                 </div>
@@ -355,7 +355,7 @@ export function PromptEdit() {
                   <textarea
                     value={project.negativePrompt || ""}
                     onChange={e => updateField('negativePrompt', e.target.value)}
-                    className="flex-1 w-full bg-black/30 border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-[var(--accent-2)]/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
+                    className="flex-1 w-full bg-[var(--bg-layer-0)] border border-[var(--glass-border)] rounded-xl p-4 text-[var(--text-primary)] text-sm font-mono outline-none focus:border-[var(--accent-2)]/50 transition-colors resize-none scrollbar-thin scrollbar-thumb-white/10 relative z-10"
                     placeholder="low quality, bad anatomy, worst quality..."
                   />
                 </div>
@@ -388,7 +388,7 @@ export function PromptEdit() {
         <div className="w-full md:w-[380px] flex-shrink-0 flex flex-col gap-5">
           
           {/* Generation Settings */}
-          <div className="glass-panel p-5">
+          <div className="glass-panel p-5 relative z-[50]">
             <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
               <Cpu size={16} className="text-[var(--accent-1)]" /> 生成参数配置
             </h3>
@@ -450,7 +450,7 @@ export function PromptEdit() {
           </div>
 
           {/* Cover Image Uploader */}
-          <div className="glass-panel p-5">
+          <div className="glass-panel p-5 relative z-[40]">
             <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
               <ImageIcon size={16} className="text-[var(--accent-1)]" /> 示范预览图
             </h3>
@@ -467,7 +467,7 @@ export function PromptEdit() {
                 </div>
               ) : (
                 <>
-                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <div className="w-12 h-12 rounded-full bg-[var(--glass-bg)] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                     <UploadCloud size={20} className="text-[var(--text-muted)] group-hover:text-[var(--accent-1)] transition-colors" />
                   </div>
                   <span className="text-[11px] font-bold text-[var(--text-muted)]">点击或拖拽上传封面</span>
@@ -484,7 +484,7 @@ export function PromptEdit() {
           </div>
 
           {/* Reference Images */}
-          <div className="glass-panel p-5">
+          <div className="glass-panel p-5 relative z-[30]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2">
                 <ImageIcon size={16} className="text-[var(--accent-1)]" /> 实例图片 (Reference)
@@ -521,7 +521,7 @@ export function PromptEdit() {
 
           {/* Model Configuration */}
           <div className="flex-1 flex flex-col gap-4">
-            <div className="glass-panel p-5 space-y-4">
+            <div className="glass-panel p-5 space-y-4 relative z-[20]">
               <div className="flex items-center justify-between mb-2 border-b border-[var(--glass-border)] pb-2">
                 <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2">
                   <Cpu size={16} className="text-[var(--accent-1)]" /> 模型配置
