@@ -12,6 +12,19 @@ export interface AgentSession {
 export interface AgentSettings {
   systemPrompt: string;
   reasoningEffort: 'low' | 'medium' | 'high';
+  /**
+   * Agent 执行模式分档，借鉴 LPF 的 Effort 级别。
+   * - low:    流水线模式。不让弱模型做多轮 tool calling 决策——
+   *           重写 → 批量 search_tags → 一次性组装。
+   * - medium: 当前默认行为，单轮 Agent。
+   * - high:   多轮 Agent + 关联标签深挖，适合强模型。
+   */
+  effort: 'low' | 'medium' | 'high';
+  /**
+   * Agent 工具调用最大轮次预算。超过后强制收尾输出。
+   * 0 表示不限制。仅对 medium/high 生效。
+   */
+  maxRounds: number;
 }
 
 interface AgentStore {
@@ -105,6 +118,8 @@ export const useAgentStore = create<AgentStore>()(
       settings: {
         systemPrompt: defaultSystemPrompt,
         reasoningEffort: 'medium',
+        effort: 'medium',
+        maxRounds: 8,
       },
       isMobileAgentOpen: false,
       isGenerating: false,
@@ -236,13 +251,20 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: 'prompt-muse-agent',
-      version: 4,
+      version: 5,
       migrate: (persistedState: any, version: number) => {
         if (version < 4) {
           // v4: Added character protection, multi-character anti-confusion,
           // mandatory search, and search boundary rules to systemPrompt
           if (persistedState.settings) {
             persistedState.settings.systemPrompt = defaultSystemPrompt;
+          }
+        }
+        if (version < 5) {
+          // v5: Added effort (Low/Medium/High) and maxRounds budget
+          if (persistedState.settings) {
+            persistedState.settings.effort = 'medium';
+            persistedState.settings.maxRounds = 8;
           }
         }
         return persistedState;

@@ -112,6 +112,8 @@ export function AgentPanel() {
   
   const [tempSystemPrompt, setTempSystemPrompt] = useState(settings.systemPrompt);
   const [tempReasoningEffort, setTempReasoningEffort] = useState(settings.reasoningEffort || 'medium');
+  const [tempEffort, setTempEffort] = useState<'low' | 'medium' | 'high'>(settings.effort || 'medium');
+  const [tempMaxRounds, setTempMaxRounds] = useState<number>(settings.maxRounds || 8);
   const mcp = useSettingsStore.getState().settings.mcpServers || [];
   const [tempMcpServers, setTempMcpServers] = useState<McpServerConfig[]>(() => 
     JSON.parse(JSON.stringify(mcp))
@@ -279,7 +281,12 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
   };
 
   const handleSaveSettings = () => {
-    updateSettings({ systemPrompt: tempSystemPrompt, reasoningEffort: tempReasoningEffort });
+    updateSettings({
+      systemPrompt: tempSystemPrompt,
+      reasoningEffort: tempReasoningEffort,
+      effort: tempEffort,
+      maxRounds: tempMaxRounds,
+    });
     const curSettings = useSettingsStore.getState().settings;
     useSettingsStore.getState().updateSettings({ ...curSettings, mcpServers: tempMcpServers });
     setViewMode('chat');
@@ -315,7 +322,12 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
             {msg.images.map((img, i) => {
               const o = img as any;
               const src = typeof o === 'string' ? o : (o?.url || o?.filePath || o?.outputPath || o?.path || '');
-              return src ? <ChatImage key={i} src={src} /> : null;
+              if (!src) return null;
+              const ext = (typeof src === 'string' ? src.split('?')[0].split('.').pop()?.toLowerCase() : '') || '';
+              const isVideo = ['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v'].includes(ext);
+              return isVideo
+                ? <video key={i} src={getImgSrc(src)} controls className="max-w-xs max-h-64 rounded-lg border border-[var(--glass-border)] mt-2" />
+                : <ChatImage key={i} src={src} />;
             })}
           </div>
         )}
@@ -596,6 +608,44 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-[var(--text-primary)] mb-2 flex items-center gap-2">
+                    <Zap size={14} className="text-[var(--accent-1)]" />
+                    执行模式 (Effort)
+                  </label>
+                  <p className="text-xs text-[var(--text-muted)] mb-3 leading-relaxed">
+                    弱模型建议选 LOW：只允许一轮工具调用，避免多轮决策跑飞。强模型可选 HIGH 做深度探索。
+                  </p>
+                  <div className="flex bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-1 gap-1">
+                    {(['low', 'medium', 'high'] as const).map(ef => (
+                      <button
+                        key={ef}
+                        onClick={() => setTempEffort(ef)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+                          tempEffort === ef
+                            ? 'bg-[var(--accent-1)] text-black shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.4)]'
+                            : 'text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)]'
+                        }`}
+                      >
+                        {ef === 'low' ? 'LOW (弱模型)' : ef === 'medium' ? 'MEDIUM' : 'HIGH (强模型)'}
+                      </button>
+                    ))}
+                  </div>
+                  {tempEffort !== 'low' && (
+                    <div className="mt-3">
+                      <label className="text-xs text-[var(--text-muted)] mb-1.5 block">最大工具调用轮次: {tempMaxRounds}</label>
+                      <input
+                        type="range"
+                        min={1}
+                        max={15}
+                        value={tempMaxRounds}
+                        onChange={(e) => setTempMaxRounds(Number(e.target.value))}
+                        className="w-full accent-[var(--accent-1)]"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-4 rounded-xl bg-[var(--accent-2)]/20 border border-[var(--accent-2)]/20 relative overflow-hidden">
