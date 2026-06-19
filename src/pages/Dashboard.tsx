@@ -7,7 +7,8 @@ import { useWorkflowStore } from "../stores/workflowStore";
 import { useQueueStore } from "../stores/queueStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { getImgSrc } from "../utils/imageUtils";
+import { getImgSrc, isVideoFile } from "../utils/imageUtils";
+import { toast } from "sonner";
 
 
 
@@ -69,7 +70,7 @@ export function Dashboard() {
         JSON.parse(content); // validate JSON
         navigate('/workflows', { state: { importJson: content } });
       } catch {
-        alert('无效的 JSON 文件，请检查后重试');
+        toast.error('无效的 JSON 文件，请检查后重试');
       }
     };
     input.click();
@@ -258,25 +259,33 @@ export function Dashboard() {
           <div className="flex items-center justify-between mb-4 border-b border-[var(--glass-border)] pb-2">
             <div className="text-[13px] font-bold flex items-center gap-2 text-[var(--text-primary)]">
               <ImageIcon size={16} className="text-green-400" />
-              最近生成的图片
+              最近生成的文件
             </div>
             <button onClick={() => navigate('/history')} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1">
               查看全部历史 <ChevronRight size={12} />
             </button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {recentImages.map((img, i) => (
-              <div
-                key={i}
-                className="aspect-square rounded-xl overflow-hidden border border-[var(--glass-border)] hover:border-green-400/50 cursor-pointer group relative transition-all"
-                onClick={() => navigate('/history')}
-              >
-                <img src={getImgSrc(img.outputPath)} className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
-                <div className="absolute inset-0 bg-[var(--bg-layer-1)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <ImageIcon size={20} className="text-[var(--text-primary)]" />
-                </div>
-              </div>
-            ))}
+              {recentImages.map((img, i) => {
+                const src = getImgSrc(img.outputPath);
+                const isVideo = isVideoFile(img.outputPath);
+                return (
+                  <div
+                    key={i}
+                    className="aspect-square rounded-xl overflow-hidden border border-[var(--glass-border)] hover:border-green-400/50 cursor-pointer group relative transition-all"
+                    onClick={() => navigate('/history')}
+                  >
+                    {isVideo ? (
+                      <video src={src} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-500" />
+                    ) : (
+                      <img src={src} className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                    )}
+                    <div className="absolute inset-0 bg-[var(--bg-layer-1)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <ImageIcon size={20} className="text-[var(--text-primary)]" />
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
