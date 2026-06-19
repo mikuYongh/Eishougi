@@ -163,7 +163,7 @@ export function PromptList() {
             <Sparkles size={16} className={isAutoTagging ? "animate-pulse text-blue-400" : "text-blue-400"} /> 
             {isAutoTagging ? `打标中 ${tagProgress}...` : "AI 自动打标"}
           </button>
-          <button className="px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-white/10 transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)] hidden sm:block">
+          <button className="px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)] hidden sm:block">
             导入项目 JSON
           </button>
           <button 
@@ -186,13 +186,13 @@ export function PromptList() {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold transition-all flex-shrink-0 border ${
               showFavoritesOnly 
                 ? "bg-[var(--accent-1)]/20 text-[var(--accent-1)] border-[var(--accent-1)] shadow-[0_0_15px_rgba(255,100,100,0.3)]" 
-                : "bg-[var(--bg-layer-1)] text-[var(--text-muted)] border-[var(--glass-border)] hover:bg-white/10"
+                : "bg-[var(--bg-layer-1)] text-[var(--text-muted)] border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)]"
             }`}
           >
             <Star size={14} className={showFavoritesOnly ? "fill-[var(--accent-1)]" : ""} /> 收藏
           </button>
 
-          <div className="w-[1px] h-6 bg-white/10 flex-shrink-0 mx-1" />
+          <div className="w-[1px] h-6 bg-[var(--glass-border)] flex-shrink-0 mx-1" />
 
           <div className="relative flex-shrink-0">
             <SearchableDropdown
@@ -211,7 +211,7 @@ export function PromptList() {
               triggerClassName={`px-4 py-1.5 rounded-full text-[12px] font-bold outline-none cursor-pointer transition-colors shadow-sm min-w-[120px] ${
                 activeTag
                   ? "border border-blue-500/50 bg-blue-500/10 text-blue-400"
-                  : "border border-[var(--glass-border)] bg-[var(--bg-layer-1)] text-[var(--text-primary)] hover:bg-white/10"
+                  : "border border-[var(--glass-border)] bg-[var(--bg-layer-1)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)]"
               }`}
               dropdownClassName="w-48 left-0"
             />
@@ -223,14 +223,14 @@ export function PromptList() {
           <div className="flex bg-[var(--bg-layer-1)] p-1 rounded-lg border border-[var(--glass-border)]">
             <button 
               onClick={() => { setViewMode('grid'); setCurrentPage(1); }}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'grid' ? 'bg-white/10 text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'grid' ? 'bg-[var(--glass-bg-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
               title="网格视图"
             >
               <LayoutGrid size={16} />
             </button>
             <button 
               onClick={() => { setViewMode('list'); setCurrentPage(1); }}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'list' ? 'bg-white/10 text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'list' ? 'bg-[var(--glass-bg-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
               title="列表视图"
             >
               <ListIcon size={16} />
@@ -319,7 +319,7 @@ export function PromptList() {
                   {/* Tags */}
                   <div className="flex flex-wrap gap-1.5">
                     {p.tags.slice(0, 3).map(tag => (
-                      <span key={tag} className="px-1.5 py-0.5 rounded bg-white/10 text-[var(--text-muted)] text-[9px] font-bold truncate max-w-[60px]">
+                      <span key={tag} className="px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] text-[9px] font-bold truncate max-w-[60px]">
                         {tag}
                       </span>
                     ))}
@@ -339,7 +339,7 @@ export function PromptList() {
                   <div className="flex gap-2 mt-1">
                     <button 
                       onClick={() => navigate(`/prompts/${p.id}/edit`)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-primary)] text-[11px] font-bold transition-colors cursor-pointer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] text-[11px] font-bold transition-colors cursor-pointer"
                     >
                       <Edit3 size={12} /> 编辑
                     </button>
@@ -358,7 +358,7 @@ export function PromptList() {
           /* LIST VIEW */
           <div className="flex flex-col gap-3">
             {paginatedPrompts.map((p) => (
-              <div key={p.id} className="glass-panel p-3 rounded-xl flex flex-col md:flex-row items-start md:items-center gap-4 group border border-[var(--glass-border)] hover:border-blue-400/30 transition-all hover:bg-white/[0.02]">
+              <div key={p.id} className="glass-panel p-3 rounded-xl flex flex-col md:flex-row items-start md:items-center gap-4 group border border-[var(--glass-border)] hover:border-blue-400/30 transition-all hover:bg-[var(--glass-bg-hover)]">
                 
                 {/* Square Thumbnail & Info Wrapper for Mobile Stack */}
                 <div className="flex items-center gap-4 w-full md:w-auto flex-1 min-w-0">
@@ -379,7 +379,7 @@ export function PromptList() {
                     <h3 className="text-[14px] font-bold text-[var(--text-primary)] truncate">{p.title}</h3>
                     <div className="flex gap-1.5">
                       {p.tags.map(tag => (
-                        <span key={tag} className="px-1.5 py-0.5 rounded bg-white/10 text-[var(--text-muted)] text-[9px] font-bold">
+                        <span key={tag} className="px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] text-[9px] font-bold">
                           {tag}
                         </span>
                       ))}
@@ -397,10 +397,10 @@ export function PromptList() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-3 flex-shrink-0 md:border-l md:border-[var(--glass-border)] md:pl-4 md:ml-2 w-full md:w-auto justify-end mt-2 md:mt-0 pt-2 md:pt-0 border-t border-[var(--glass-border)] md:border-t-0">
-                  <button onClick={() => toggleFavorite(p.id)} className="p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer text-[var(--text-muted)] hover:text-yellow-400">
+                  <button onClick={() => toggleFavorite(p.id)} className="p-2 rounded-full hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer text-[var(--text-muted)] hover:text-yellow-400">
                     <Star size={16} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : ""} />
                   </button>
-                  <button onClick={() => handleClone(p)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-blue-500/20 text-[var(--text-muted)] hover:text-blue-400 transition-colors cursor-pointer" title="克隆项目">
+                  <button onClick={() => handleClone(p)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--glass-bg)] hover:bg-blue-500/20 text-[var(--text-muted)] hover:text-blue-400 transition-colors cursor-pointer" title="克隆项目">
                     <Copy size={14} />
                   </button>
                   <button 
@@ -409,14 +409,14 @@ export function PromptList() {
                         removePrompt(p.id);
                       }
                     }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 hover:bg-red-500/20 text-red-400/80 hover:text-red-400 transition-colors cursor-pointer"
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--glass-bg)] hover:bg-red-500/20 text-red-400/80 hover:text-red-400 transition-colors cursor-pointer"
                     title="删除项目"
                   >
                     <Trash2 size={14} />
                   </button>
                   <button 
                     onClick={() => navigate(`/prompts/${p.id}/edit`)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-primary)] text-[12px] font-bold transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] text-[12px] font-bold transition-colors cursor-pointer"
                   >
                     <Edit3 size={14} /> 配置
                   </button>
@@ -439,7 +439,7 @@ export function PromptList() {
             <button 
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-[var(--text-muted)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
             >
               <ChevronLeft size={16} />
             </button>
@@ -448,7 +448,7 @@ export function PromptList() {
               <button
                 key={page}
                 onClick={() => handlePageChange(page)}
-                className={`w-8 h-8 flex items-center justify-center rounded-full text-[12px] font-bold transition-colors cursor-pointer ${currentPage === page ? 'bg-[var(--accent-2)] text-[var(--text-primary)] shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'text-[var(--text-muted)] hover:bg-white/10 hover:text-[var(--text-primary)]'}`}
+                className={`w-8 h-8 flex items-center justify-center rounded-full text-[12px] font-bold transition-colors cursor-pointer ${currentPage === page ? 'bg-[var(--accent-2)] text-[var(--text-primary)] shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]'}`}
               >
                 {page}
               </button>
@@ -457,7 +457,7 @@ export function PromptList() {
             <button 
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-[var(--text-muted)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
             >
               <ChevronRight size={16} />
             </button>

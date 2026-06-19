@@ -192,7 +192,7 @@ export function WorkflowEdit() {
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate('/workflows')}
-            className="w-10 h-10 flex-shrink-0 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
+            className="w-10 h-10 flex-shrink-0 rounded-full bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
           >
             <ArrowLeft size={18} />
           </button>
@@ -215,9 +215,11 @@ export function WorkflowEdit() {
 
       <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden pb-[20vh] xl:pb-0 custom-scrollbar">
         
-        {/* Left Column - Metadata */}
-        <div className="w-full md:w-[380px] flex-shrink-0 flex flex-col gap-5 xl:overflow-y-auto xl:pr-2 custom-scrollbar">
-          <div className="glass-panel p-5 space-y-5">
+        {/* Left Column */}
+        <div className="w-full md:w-[320px] flex flex-col gap-6 flex-shrink-0 relative z-20">
+          
+          {/* Metadata */}
+          <div className="glass-panel p-5 space-y-5 relative z-50">
             <div>
               <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">工作流名称</label>
               <input 
@@ -248,7 +250,7 @@ export function WorkflowEdit() {
           </div>
 
           {/* Thumbnail Uploader */}
-          <div className="glass-panel p-5">
+          <div className="glass-panel p-5 relative z-40">
             <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3 block">缩略图</label>
             <div className="h-40 w-full rounded-xl border-2 border-dashed border-[var(--glass-border)] hover:border-yellow-400/50 bg-[var(--glass-bg-hover)] flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer transition-colors">
               {workflow.thumbnail ? (
@@ -257,7 +259,7 @@ export function WorkflowEdit() {
                 </div>
               ) : (
                 <>
-                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <div className="w-10 h-10 rounded-full bg-[var(--glass-bg)] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                     <UploadCloud size={16} className="text-[var(--text-muted)] group-hover:text-yellow-400 transition-colors" />
                   </div>
                   <span className="text-[11px] font-bold text-[var(--text-muted)]">上传缩略图 (可选)</span>
@@ -283,7 +285,7 @@ export function WorkflowEdit() {
 
           {!workflow.jsonContent ? (
             <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
-              <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-6 border-2 border-dashed border-white/10">
+              <div className="w-20 h-20 rounded-full bg-[var(--glass-bg)] flex items-center justify-center mb-6 border-2 border-dashed border-[var(--glass-border-active)]">
                 <FileJson size={32} className="text-[var(--text-muted)]" />
               </div>
               <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">尚未导入工作流</h3>
@@ -365,7 +367,7 @@ export function WorkflowEdit() {
                   </h4>
                   <button 
                     onClick={() => setIsLoraPickerOpen(true)}
-                    className="flex items-center gap-1 text-[11px] text-[var(--accent-1)] hover:text-yellow-300 font-bold px-2 py-1 bg-white/5 rounded-lg cursor-pointer transition-colors"
+                    className="flex items-center gap-1 text-[11px] text-[var(--accent-1)] hover:text-yellow-300 font-bold px-2 py-1 bg-[var(--glass-bg)] rounded-lg cursor-pointer transition-colors"
                   >
                     <Plus size={12} /> 添加 LoRA
                   </button>
@@ -373,21 +375,21 @@ export function WorkflowEdit() {
                 
                 <div className="space-y-3">
                   {draftParams.loraConfigs.length === 0 ? (
-                    <div className="text-center py-6 text-[12px] text-[var(--text-muted)] bg-white/5 rounded-xl border border-white/5">
+                    <div className="text-center py-6 text-[12px] text-[var(--text-muted)] bg-[var(--glass-bg)] rounded-xl border border-[var(--glass-border)]">
                       此工作流尚未配置默认 LoRA
                     </div>
                   ) : (
                     draftParams.loraConfigs.map((lora: any, i: number) => (
                       <div 
                         key={lora.id} 
-                        className={`flex flex-col gap-3 p-4 rounded-xl border relative shadow-[0_4px_20px_rgba(0,0,0,0.1)] transition-colors group ${lora.enabled !== false ? 'bg-[var(--glass-bg)] border-[var(--glass-border)] hover:border-yellow-500/30' : 'bg-black/20 border-white/5 opacity-60 grayscale'}`}
+                        className={`flex flex-col gap-3 p-4 rounded-xl border relative shadow-[0_4px_20px_rgba(0,0,0,0.1)] transition-colors group ${lora.enabled !== false ? 'bg-[var(--glass-bg)] border-[var(--glass-border)] hover:border-yellow-500/30' : 'bg-[var(--bg-layer-0)] border-[var(--glass-border)] opacity-60 grayscale'}`}
                         style={{ zIndex: 100 - i }}
                       >
                         <div className="flex items-center justify-between">
                           <h5 className={`text-[12px] font-bold flex items-center gap-2 ${lora.enabled !== false ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
                             <div className={`w-2 h-2 rounded-full ${lora.enabled !== false ? (lora.name ? 'bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)]' : 'bg-gray-500') : 'bg-gray-600'}`}></div> 
                             LoRA 节点 {i + 1}
-                            {lora.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 ml-2">已禁用</span>}
+                            {lora.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] ml-2">已禁用</span>}
                           </h5>
                           <div className="flex gap-1">
                             <button 
@@ -396,7 +398,7 @@ export function WorkflowEdit() {
                                 newList[i].enabled = lora.enabled === false ? true : false;
                                 updateDraft('loraConfigs', newList);
                               }}
-                              className={`p-1.5 rounded-lg cursor-pointer transition-colors ${lora.enabled !== false ? 'text-green-400 hover:bg-green-400/10' : 'text-[var(--text-muted)] hover:bg-white/10'}`}
+                              className={`p-1.5 rounded-lg cursor-pointer transition-colors ${lora.enabled !== false ? 'text-green-400 hover:bg-green-400/10' : 'text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)]'}`}
                               title={lora.enabled !== false ? "点击禁用" : "点击启用"}
                             >
                               <div className={`w-3.5 h-3.5 rounded-sm border ${lora.enabled !== false ? 'border-green-400 bg-green-400/20' : 'border-[var(--text-muted)]'}`}></div>
@@ -454,7 +456,7 @@ export function WorkflowEdit() {
                               newList[i].strength = parseFloat(e.target.value) || 0;
                               updateDraft('loraConfigs', newList);
                             }}
-                            className="flex-1 h-1.5 bg-black/40 rounded-full appearance-none cursor-pointer accent-yellow-400"
+                            className="flex-1 h-1.5 bg-[var(--bg-layer-0)] rounded-full appearance-none cursor-pointer accent-yellow-400"
                           />
                         </div>
                       </div>

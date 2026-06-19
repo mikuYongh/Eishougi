@@ -17,7 +17,7 @@ const TypeBadge = ({ type }: { type: WorkflowType }) => {
     case 'tagger':
       return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 text-[10px] font-bold border border-orange-500/30"><Search size={12}/> 反推</span>;
     default:
-      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-white/10 text-[var(--text-muted)] text-[10px] font-bold border border-[var(--glass-border-active)]"><Settings size={12}/> 自定义</span>;
+      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] text-[10px] font-bold border border-[var(--glass-border-active)]"><Settings size={12}/> 自定义</span>;
   }
 };
 
@@ -54,7 +54,7 @@ export function WorkflowList() {
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">配置并保存 ComfyUI JSON 渲染节点图，与提示词项目绑定</p>
         </div>
         <div className="flex gap-3">
-          <button onClick={handleImportClipboard} className="px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-white/10 transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)]">
+          <button onClick={handleImportClipboard} className="px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)]">
             从剪贴板导入 JSON
           </button>
           <button 
@@ -72,7 +72,7 @@ export function WorkflowList() {
           {["全部", "文生图", "视频生成", "实用工具"].map((tab, i) => (
             <button 
               key={i}
-              className={`px-4 py-1.5 text-[12px] font-bold rounded-full transition-colors cursor-pointer border ${i === 0 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : "bg-white/5 text-[var(--text-muted)] border-[var(--glass-border)] hover:bg-white/10 hover:text-[var(--text-primary)]"}`}
+              className={`px-4 py-1.5 text-[12px] font-bold rounded-full transition-colors cursor-pointer border ${i === 0 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : "bg-[var(--glass-bg)] text-[var(--text-muted)] border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]"}`}
             >
               {tab}
             </button>
@@ -102,7 +102,7 @@ export function WorkflowList() {
                     <img src={getImgSrc(wf.thumbnail)} alt={wf.name} className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                   </>
                 ) : (
-                  <Cpu size={32} className="text-white/10 group-hover:scale-110 group-hover:text-yellow-400/30 transition-all" />
+                  <Cpu size={32} className="text-[var(--text-muted)] opacity-30 group-hover:scale-110 group-hover:text-yellow-400/30 group-hover:opacity-100 transition-all" />
                 )}
                 <div className="absolute top-3 left-3 z-20">
                   <TypeBadge type={wf.type} />
@@ -115,7 +115,7 @@ export function WorkflowList() {
                     <h3 className="text-[16px] font-bold text-[var(--text-primary)] line-clamp-1 flex-1">{wf.name}</h3>
                     <button
                       onClick={() => setDefaultWorkflow(wf.id)}
-                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${wf.isDefault ? 'text-yellow-400 bg-yellow-500/10 border border-yellow-500/20' : 'text-[var(--text-muted)] hover:text-yellow-400 hover:bg-white/5 border border-transparent'}`}
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${wf.isDefault ? 'text-yellow-400 bg-yellow-500/10 border border-yellow-500/20' : 'text-[var(--text-muted)] hover:text-yellow-400 hover:bg-[var(--glass-bg-hover)] border border-transparent'}`}
                       title={wf.isDefault ? "当前默认工作流" : "设为默认工作流"}
                     >
                       <Star size={14} className={wf.isDefault ? "fill-yellow-400" : ""} />
@@ -127,7 +127,7 @@ export function WorkflowList() {
                 {/* Tags */}
                 <div className="flex flex-wrap gap-1.5">
                   {wf.tags.map(tag => (
-                    <span key={tag} className="px-1.5 py-0.5 rounded bg-white/10 text-[var(--text-muted)] text-[10px] font-bold">
+                    <span key={tag} className="px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] text-[10px] font-bold">
                       {tag}
                     </span>
                   ))}
@@ -148,7 +148,7 @@ export function WorkflowList() {
                   <div className="flex gap-2">
                     <button 
                       onClick={() => navigate(`/workflows/${wf.id}/edit`)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-primary)] text-[12px] font-bold transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] text-[12px] font-bold transition-colors cursor-pointer"
                     >
                       <Edit3 size={14} /> 编辑
                     </button>

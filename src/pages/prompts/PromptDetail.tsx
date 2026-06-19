@@ -42,7 +42,7 @@ export function PromptDetail() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/prompts")}
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
+            className="p-2 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
           >
             <ArrowLeft size={18} />
           </button>
@@ -69,14 +69,14 @@ export function PromptDetail() {
           </button>
           <button
             onClick={() => navigate(`/prompts/${prompt.id}/edit`)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-bold border border-[var(--glass-border)] transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm font-bold border border-[var(--glass-border)] transition-all cursor-pointer"
           >
             <Settings size={16} /> 编辑
           </button>
-          <button className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]" title="复制">
+          <button className="p-2.5 rounded-xl bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]" title="克隆项目">
             <Copy size={16} />
           </button>
-          <button className="p-2.5 rounded-xl bg-white/5 hover:bg-red-500/20 text-red-500 hover:text-red-400 transition-colors cursor-pointer border border-[var(--glass-border)]" title="删除">
+          <button className="p-2.5 rounded-xl bg-[var(--glass-bg)] hover:bg-red-500/20 text-red-500 hover:text-red-400 transition-colors cursor-pointer border border-[var(--glass-border)]" title="删除项目">
             <Trash2 size={16} />
           </button>
         </div>
@@ -178,7 +178,7 @@ export function PromptDetail() {
             </div>
             <div className="flex flex-wrap gap-2">
               {prompt.tags.map(tag => (
-                <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 text-[var(--text-secondary)] text-xs font-medium border border-[var(--glass-border)] hover:bg-white/10 transition-colors cursor-pointer">
+                <span key={tag} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--glass-bg)] text-[var(--text-secondary)] text-xs font-medium border border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer">
                   <Tag size={10} /> {tag}
                 </span>
               ))}
