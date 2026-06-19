@@ -306,6 +306,7 @@ pub fn run() {
             commands::library::toggle_favorite_character,
             commands::library::toggle_favorite_artist,
             comfy_ws::queue_prompt_and_track,
+            comfy_ws::upload_image_to_comfy,
         ])
         .setup(|app| {
             // Initialize library data (characters / artists) AFTER Tauri runtime

@@ -55,15 +55,20 @@ pub async fn process_executed(app_clone: AppHandle, ctx: JobContext, images: Vec
     let mut local_paths = Vec::new();
     for (i, url) in images_urls.iter().enumerate() {
         if let Ok(local_path) = crate::commands::images::download_comfyui_image(app_clone.clone(), url.clone()).await {
+            let output_type = if local_path.ends_with(".mp4") || local_path.ends_with(".webm") || local_path.ends_with(".avi") || local_path.ends_with(".mov") || local_path.ends_with(".mkv") {
+                "video"
+            } else {
+                "image"
+            };
             local_paths.push(local_path.clone());
             
             let img_record = GeneratedImage {
                 id: format!("img_{}_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(), i),
-                prompt_id: Some(ctx.project_id.clone()),
+                prompt_id: if ctx.project_id.starts_with("video_") { None } else { Some(ctx.project_id.clone()) },
                 workflow_id: ctx.workflow_id.clone(),
                 seed: ctx.seed.map(|s| s.to_string()),
                 output_path: local_path,
-                output_type: "image".to_string(),
+                output_type: output_type.to_string(),
                 status: "completed".to_string(),
                 error_msg: None,
                 is_saved: false,
@@ -71,7 +76,12 @@ pub async fn process_executed(app_clone: AppHandle, ctx: JobContext, images: Vec
             };
             
             if let Some(app_state) = app_clone.try_state::<AppState>() {
-                let _ = crate::commands::history::save_generated_image(app_state, img_record).await;
+                match crate::commands::history::save_generated_image(app_state, img_record.clone()).await {
+                    Ok(_) => println!("[ComfyWS] Saved to history: {}", img_record.output_path),
+                    Err(e) => eprintln!("[ComfyWS] Failed to save to history: {}", e),
+                }
+            } else {
+                eprintln!("[ComfyWS] AppState not available, cannot save to history");
             }
         }
     }
@@ -151,6 +161,12 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
                                                                 for (_, node_output) in outputs {
                                                                     if let Some(imgs) = node_output.get("images").and_then(|i| i.as_array()) {
                                                                         images_list.extend(imgs.clone());
+                                                                    }
+                                                                    if let Some(gifs) = node_output.get("gifs").and_then(|g| g.as_array()) {
+                                                                        images_list.extend(gifs.clone());
+                                                                    }
+                                                                    if let Some(videos) = node_output.get("video").and_then(|v| v.as_array()) {
+                                                                        images_list.extend(videos.clone());
                                                                     }
                                                                 }
                                                             }
@@ -263,6 +279,12 @@ pub async fn queue_prompt_and_track(
                                     if let Some(imgs) = node_output.get("images").and_then(|i| i.as_array()) {
                                         images_list.extend(imgs.clone());
                                     }
+                                    if let Some(gifs) = node_output.get("gifs").and_then(|g| g.as_array()) {
+                                        images_list.extend(gifs.clone());
+                                    }
+                                    if let Some(videos) = node_output.get("video").and_then(|v| v.as_array()) {
+                                        images_list.extend(videos.clone());
+                                    }
                                 }
                             }
                         }
@@ -311,6 +333,12 @@ pub async fn queue_prompt_and_track(
                                         for (_, node_output) in outputs {
                                             if let Some(imgs) = node_output.get("images").and_then(|i| i.as_array()) {
                                                 images_list.extend(imgs.clone());
+                                            }
+                                            if let Some(gifs) = node_output.get("gifs").and_then(|g| g.as_array()) {
+                                                images_list.extend(gifs.clone());
+                                            }
+                                            if let Some(videos) = node_output.get("video").and_then(|v| v.as_array()) {
+                                                images_list.extend(videos.clone());
                                             }
                                         }
 
@@ -443,4 +471,29 @@ pub fn android_stop_service(_app: &tauri::AppHandle) {
 
 #[cfg(not(target_os = "android"))]
 pub fn android_stop_service(_app: &tauri::AppHandle) {}
+
+#[tauri::command]
+pub async fn upload_image_to_comfy(
+    comfy_url: String,
+    image_data: Vec<u8>,
+    filename: String,
+) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/upload/image", comfy_url);
+    let part = reqwest::multipart::Part::bytes(image_data)
+        .file_name(filename.clone())
+        .mime_str("image/png")
+        .map_err(|e| e.to_string())?;
+    let form = reqwest::multipart::Form::new()
+        .part("image", part)
+        .text("type", "input")
+        .text("overwrite", "true");
+    let res = client.post(&url).multipart(form).send().await.map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("Upload failed: {}", res.status()));
+    }
+    let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
+    let name = json["name"].as_str().unwrap_or(&filename).to_string();
+    Ok(name)
+}
 
