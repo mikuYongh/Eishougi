@@ -89,11 +89,11 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
       hash = tag.charCodeAt(i) + ((hash << 5) - hash);
     }
     const colors = [
-      'from-pink-500/20 to-purple-500/20 border-pink-500/30 text-pink-200',
-      'from-blue-500/20 to-indigo-500/20 border-blue-500/30 text-blue-200',
-      'from-emerald-500/20 to-teal-500/20 border-emerald-500/30 text-emerald-200',
-      'from-violet-500/20 to-fuchsia-500/20 border-violet-500/30 text-violet-200',
-      'from-amber-500/20 to-orange-500/20 border-amber-500/30 text-amber-200',
+      'from-pink-500/20 to-purple-500/20 border-pink-500/30 text-[var(--text-primary)]',
+      'from-blue-500/20 to-indigo-500/20 border-blue-500/30 text-[var(--text-primary)]',
+      'from-emerald-500/20 to-teal-500/20 border-emerald-500/30 text-[var(--text-primary)]',
+      'from-violet-500/20 to-fuchsia-500/20 border-violet-500/30 text-[var(--text-primary)]',
+      'from-amber-500/20 to-orange-500/20 border-amber-500/30 text-[var(--text-primary)]',
     ];
     return colors[Math.abs(hash) % colors.length];
   };
@@ -101,17 +101,17 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
   return (
     <div className="w-full flex flex-col gap-3 rounded-2xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] p-4 shadow-[inset_0_2px_15px_rgba(0,0,0,0.1)] transition-all duration-300">
       {/* Editor Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-white/5 gap-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-[var(--glass-border)] gap-3">
         <span className="text-sm font-semibold tracking-wide text-[var(--text-secondary)]">{label}</span>
         <div className="flex flex-wrap items-center gap-2">
           {/* Mode Switcher */}
-          <div className="flex bg-white/5 rounded-lg p-0.5 border border-white/5">
+          <div className="flex bg-[var(--glass-bg)] rounded-lg p-0.5 border border-[var(--glass-border)]">
             <button
               onClick={() => setMode('tag')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 ${
                 mode === 'tag'
-                  ? 'bg-[var(--accent-1)] text-white shadow-md'
-                  : 'text-[var(--text-secondary)] hover:text-white'
+                  ? 'bg-[var(--glass-bg-hover)] text-[var(--text-primary)] shadow-md border border-[var(--glass-border-active)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
               }`}
             >
               <LayoutGrid size={13} />
@@ -121,8 +121,8 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
               onClick={() => setMode('text')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all duration-200 ${
                 mode === 'text'
-                  ? 'bg-[var(--accent-1)] text-white shadow-md'
-                  : 'text-[var(--text-secondary)] hover:text-white'
+                  ? 'bg-[var(--glass-bg-hover)] text-[var(--text-primary)] shadow-md border border-[var(--glass-border-active)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent'
               }`}
             >
               <FileText size={13} />
@@ -144,7 +144,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
           {/* Copy Button */}
           <button
             onClick={handleCopy}
-            className="p-1.5 bg-white/5 hover:bg-white/10 border border-white/5 text-[var(--text-secondary)] hover:text-white rounded-lg transition-all"
+            className="p-1.5 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg transition-all"
             title="复制全部"
           >
             {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
@@ -153,7 +153,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
           {/* Clear Button */}
           <button
             onClick={handleClear}
-            className="p-1.5 bg-white/5 hover:bg-red-500/20 border border-white/5 text-[var(--text-secondary)] hover:text-red-400 rounded-lg transition-all"
+            className="p-1.5 bg-[var(--glass-bg)] hover:bg-red-500/20 border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-red-400 rounded-lg transition-all"
             title="清空"
           >
             <Trash2 size={14} />
@@ -165,9 +165,9 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
       {mode === 'tag' ? (
         <div className="flex flex-col gap-3">
           {/* Tag Chips Container */}
-          <div className="flex flex-wrap gap-2 min-h-[80px] p-3 rounded-xl bg-black/10 border border-white/5 max-h-[220px] overflow-y-auto custom-scrollbar">
+          <div className="flex flex-wrap gap-2 min-h-[80px] p-3 rounded-xl bg-[var(--bg-layer-0)] border border-[var(--glass-border)] max-h-[220px] overflow-y-auto custom-scrollbar">
             {tags.length === 0 ? (
-              <span className="text-xs text-white/30 italic m-auto">暂无标签，在下方输入或从收藏夹添加</span>
+              <span className="text-xs text-[var(--text-muted)] italic m-auto">暂无标签，在下方输入或从收藏夹添加</span>
             ) : (
               tags.map((tag, index) => {
                 const colorClass = getTagColor(tag);
@@ -187,14 +187,14 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
                           handleAddFavoriteTag(tag);
                         }
                       }}
-                      className="p-0.5 rounded text-white/40 hover:text-yellow-400 opacity-40 group-hover:opacity-100 transition-all cursor-pointer"
+                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-yellow-400 opacity-40 group-hover:opacity-100 transition-all cursor-pointer"
                       title={isFav ? "取消收藏" : "收藏该标签"}
                     >
                       <Star size={10} className={isFav ? "text-yellow-400 fill-yellow-400" : ""} />
                     </button>
                     <button
                       onClick={() => handleRemoveTag(index)}
-                      className="p-0.5 rounded text-white/40 hover:text-red-400 hover:bg-white/10 transition-all cursor-pointer"
+                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-red-400 hover:bg-[var(--glass-bg-hover)] transition-all cursor-pointer"
                     >
                       <X size={10} />
                     </button>
@@ -217,11 +217,11 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
                   handleAddTag();
                 }
               }}
-              className="flex-1 px-3 py-2 rounded-xl bg-black/20 border border-white/10 text-sm text-white focus:outline-none focus:border-[var(--accent-1)]/50 focus:shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.1)] transition-all"
+              className="flex-1 px-3 py-2 rounded-xl bg-[var(--bg-layer-0)] border border-[var(--glass-border)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-1)]/50 focus:shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.1)] transition-all"
             />
             <button
               onClick={handleAddTag}
-              className="flex items-center gap-1 px-4 py-2 rounded-xl bg-[var(--accent-1)] hover:bg-[var(--accent-1)]/80 text-white text-xs font-medium transition-all shadow-md active:scale-95"
+              className="flex items-center gap-1 px-4 py-2 rounded-xl bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[var(--text-primary)] text-xs font-medium transition-all shadow-md active:scale-95"
             >
               <Plus size={14} />
               <span>添加</span>
@@ -233,7 +233,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
           placeholder="请输入提示词，用英文逗号分隔..."
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full h-32 px-3 py-2 rounded-xl bg-black/20 border border-white/10 text-sm text-white focus:outline-none focus:border-[var(--accent-1)]/50 focus:shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.1)] transition-all resize-none custom-scrollbar"
+          className="w-full h-32 px-3 py-2 rounded-xl bg-[var(--bg-layer-0)] border border-[var(--glass-border)] text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-1)]/50 focus:shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.1)] transition-all resize-none custom-scrollbar"
         />
       )}
 
@@ -248,20 +248,20 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
         </button>
 
         {showFavorites && (
-          <div className="flex flex-col gap-3 p-3 rounded-xl bg-black/20 border border-white/5 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex flex-col gap-3 p-3 rounded-xl bg-[var(--bg-layer-0)] border border-[var(--glass-border)] animate-in fade-in slide-in-from-top-1 duration-200">
             {/* Add current prompt to favorites */}
             {value && (
-              <div className="flex gap-2 items-center pb-2 border-b border-white/5">
+              <div className="flex gap-2 items-center pb-2 border-b border-[var(--glass-border)]">
                 <input
                   type="text"
                   placeholder="给当前整段提示词起个备注名..."
                   value={favoriteLabel}
                   onChange={(e) => setFavoriteLabel(e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 rounded-lg bg-black/20 border border-white/5 text-xs text-white focus:outline-none focus:border-[var(--accent-1)]/30"
+                  className="flex-1 px-2.5 py-1.5 rounded-lg bg-[var(--bg-layer-0)] border border-[var(--glass-border)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-1)]/30"
                 />
                 <button
                   onClick={handleAddFavoriteAll}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-medium border border-white/5 transition-all"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] text-xs font-medium border border-[var(--glass-border)] transition-all"
                 >
                   <Star size={12} className="text-yellow-400 fill-yellow-400" />
                   <span>收藏整段</span>
@@ -272,12 +272,12 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
             {/* Favorites List */}
             <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto custom-scrollbar">
               {favorites.length === 0 ? (
-                <span className="text-xs text-white/30 italic">收藏夹空空如也，快去收藏一些吧</span>
+                <span className="text-xs text-[var(--text-muted)] italic">收藏夹空空如也，快去收藏一些吧</span>
               ) : (
                 favorites.map((fav) => (
                   <div
                     key={fav.id}
-                    className="flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-lg bg-white/5 border border-white/5 text-xs text-white hover:border-yellow-500/30 transition-all group"
+                    className="flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-xs text-[var(--text-primary)] hover:border-yellow-500/30 transition-all group"
                   >
                     <button
                       onClick={() => handleInsertFavorite(fav.content)}
@@ -288,7 +288,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
                     </button>
                     <button
                       onClick={() => deleteFavorite(fav.id)}
-                      className="p-0.5 rounded text-white/20 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                       title="删除收藏"
                     >
                       <X size={10} />

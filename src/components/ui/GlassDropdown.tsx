@@ -59,11 +59,11 @@ export function GlassDropdown({
       </div>
 
       {isOpen && (
-        <div className={`absolute left-0 right-0 top-[110%] bg-[var(--glass-bg)] backdrop-blur-3xl border border-[var(--glass-border)] rounded-xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.6)] z-[100] py-1 max-h-60 overflow-y-auto ${small ? 'text-xs' : 'text-[13px]'}`}>
+        <div className={`absolute left-0 right-0 top-[110%] bg-[var(--glass-bg)] backdrop-blur-3xl border border-[var(--glass-border)] rounded-xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.6)] z-[100] py-1 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent ${small ? 'text-xs' : 'text-[13px]'}`}>
           {options.map((opt) => (
             <div 
               key={opt.value}
-              className={`px-4 py-2.5 font-bold cursor-pointer flex items-center justify-between transition-colors ${value === opt.value ? `${c.bg} ${c.text}` : 'text-[var(--text-secondary)] hover:bg-white/10 hover:text-[var(--text-primary)]'}`}
+              className={`px-4 py-2.5 font-bold cursor-pointer flex items-center justify-between transition-colors ${value === opt.value ? `${c.bg} ${c.text}` : 'text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]'}`}
               onClick={() => {
                 onChange(opt.value);
                 setIsOpen(false);

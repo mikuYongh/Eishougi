@@ -134,7 +134,7 @@ export function Tagger() {
               <div className="flex gap-2">
                 <button 
                   disabled={results.length === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--text-primary)] text-[11px] font-bold transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] text-[11px] font-bold transition-colors disabled:opacity-50"
                 >
                   <Copy size={12} /> 复制文本
                 </button>

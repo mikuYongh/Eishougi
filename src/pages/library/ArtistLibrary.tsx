@@ -38,7 +38,7 @@ export function ArtistLibrary() {
 
         <div className="flex items-center gap-3">
           {/* Model Type Selector */}
-          <div className="flex p-1 bg-black/20 rounded-lg border border-[var(--glass-border)] hidden sm:flex">
+          <div className="flex p-1 bg-[var(--glass-bg)] rounded-lg border border-[var(--glass-border)] hidden sm:flex">
             <button className="px-3 py-1.5 rounded-md text-xs font-bold transition-all bg-[var(--accent-1)] text-white shadow-md">
               Anima
             </button>

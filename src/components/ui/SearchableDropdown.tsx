@@ -102,7 +102,7 @@ export function SearchableDropdown({
       </button>
 
       {isOpen && (
-        <div className={`absolute z-50 mt-2 bg-[#1A1625]/95 backdrop-blur-xl border border-[var(--glass-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in slide-in-from-top-2 duration-200 ${dropdownClassName || 'w-full left-0'}`}>
+        <div className={`absolute z-50 mt-2 bg-[var(--glass-bg)] backdrop-blur-3xl border border-[var(--glass-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in slide-in-from-top-2 duration-200 ${dropdownClassName || 'w-full left-0'}`}>
           
           <div className="p-2 border-b border-[var(--glass-border)] flex-shrink-0">
             <div className="relative flex items-center">
@@ -128,7 +128,7 @@ export function SearchableDropdown({
                     onChange(option.value);
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-[12px] flex items-center justify-between transition-colors cursor-pointer ${value === option.value ? theme.bg + ' ' + theme.text : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]'}`}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-[12px] flex items-center justify-between transition-colors cursor-pointer ${value === option.value ? theme.bg + ' ' + theme.text : 'text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]'}`}
                 >
                   <span className="truncate pr-2">{option.label}</span>
                   {value === option.value && <Check size={14} />}

@@ -165,7 +165,7 @@ export function Vault() {
           onClick={() => setPreviewImage(null)}
         >
           <div 
-            className="flex flex-col md:flex-row bg-[#1A1020]/95 border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden w-full max-w-6xl max-h-[90vh] min-h-0"
+            className="flex flex-col md:flex-row bg-[var(--bg-layer-2)]/95 border border-[var(--glass-border)] rounded-2xl shadow-2xl overflow-hidden w-full max-w-6xl max-h-[90vh] min-h-0"
             onClick={e => e.stopPropagation()}
           >
             <div className="w-full h-[45vh] flex-shrink-0 md:h-auto md:flex-1 flex items-center justify-center bg-black/50 p-4 relative overflow-hidden">
