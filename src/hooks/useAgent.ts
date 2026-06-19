@@ -7,6 +7,7 @@ import { useQueueStore } from '../stores/queueStore';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useModelStore } from '../stores/modelStore';
 import { comfyService } from '../services/comfyService';
+import { buildOutputSpec, type PromptSyntax } from '../lib/agentPrompts';
 
 export interface ChatMessage {
   id: string;
@@ -271,17 +272,17 @@ export function useAgent() {
       type: "function",
       function: {
         name: "generate_video_from_image",
-        description: "Generate a video from a source image using the default img2video workflow. Use this tool when the user asks to animate or make a video from an image. You must analyze the image and generate a suitable English prompt describing the scene.",
+        description: "Generate a video from an image using an img2video workflow. The source image is taken AUTOMATICALLY from the most recent image in the conversation (user-attached or generation result) — do NOT ask the user for a path. You should write a vivid prompt describing the MOTION, camera language, and atmosphere for the video based on the image content you can see. The workflow has a built-in translation LLM, so you may write in Chinese or English. Parameters: duration is in SECONDS (default 5). fps default 25.",
         parameters: {
           type: "object",
           properties: {
-            image_path: { type: "string", description: "The URL or path of the source image" },
-            prompt: { type: "string", description: "English prompt describing the desired video scene and motion" },
-            duration: { type: "number", description: "Video duration in frames/seconds (default 10)" },
+            prompt: { type: "string", description: "Description of desired video motion, camera movement, and atmosphere. Can be Chinese or English." },
+            duration: { type: "number", description: "Video duration in SECONDS (default 5)" },
             fps: { type: "number", description: "Frames per second (default 25)" },
-            workflow_id: { type: "string", description: "Optional. The ID of the img2video workflow to use." }
+            base_model: { type: "string", description: "Optional. Override the workflow's default checkpoint model." },
+            workflow_id: { type: "string", description: "Optional. Specific img2video workflow ID." }
           },
-          required: ["image_path", "prompt"]
+          required: ["prompt"]
         }
       }
     },
@@ -430,6 +431,9 @@ export function useAgent() {
   // query-rewrite pre-check, injected into the system prompt for the main LLM call.
   const precheckRef = useRef<string>("");
 
+  const roundCounterRef = useRef<number>(0);
+  const duplicateTrackerRef = useRef<Map<string, number>>(new Map());
+
   /**
    * Lightweight pre-check call before the main agent loop.
    * Detects named characters and rewrites the query into search dimensions,
@@ -511,7 +515,13 @@ User input: ${userText}`;
 
   const callLLM = async (currentMessages: ChatMessage[]) => {
     const { llm } = useSettingsStore.getState().settings;
-    
+    const { effort, maxRounds } = agentSettings;
+
+    roundCounterRef.current += 1;
+    const currentRound = roundCounterRef.current;
+    const effectiveMaxRounds = effort === 'low' ? 1 : (maxRounds || 8);
+    const budgetExceeded = currentRound > effectiveMaxRounds;
+
     let apiUrl = llm.apiUrl || 'https://apihub.agnes-ai.com/v1';
     if (!apiUrl.endsWith('/chat/completions')) {
       apiUrl = apiUrl.replace(/\/$/, '') + '/chat/completions';
@@ -521,11 +531,15 @@ User input: ${userText}`;
     abortControllerRef.current = abortController;
 
     try {
-      // Pre-process messages to fetch base64 for images
+      // Pre-process messages to fetch base64 for images.
+      // Skip video files — LLM Vision API can only consume static images.
+      const VIDEO_EXTS = new Set(['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v']);
+      const isVideoExt = (p: string) => VIDEO_EXTS.has((p.split('?')[0].split('.').pop() || '').toLowerCase());
       const mappedMessages = await Promise.all(currentMessages.map(async (msg) => {
         const m: any = { role: msg.role };
-        if (msg.images && msg.images.length > 0) {
-          const b64Images = await Promise.all(msg.images.map(async (urlOrPath) => {
+        const imageOnly = (msg.images || []).filter(p => !isVideoExt(p));
+        if (imageOnly.length > 0) {
+          const b64Images = await Promise.all(imageOnly.map(async (urlOrPath) => {
             if (urlOrPath.startsWith('data:')) return urlOrPath;
             if (urlOrPath.startsWith('http')) {
               try {
@@ -666,17 +680,30 @@ User input: ${userText}`;
           } else if (activePrompt.promptSyntax === 'xml') {
             systemContext += `\n- Output a structured XML block containing <character>, <general_tags>, <background>, etc., and an English <caption> element. Follow NewBie standard.`;
           }
+          systemContext += buildOutputSpec(activePrompt.promptSyntax as PromptSyntax);
         }
       } else {
         systemContext += `\nThe user is NOT viewing a specific prompt. If they ask to generate a scene, you can use create_prompt.`;
+        systemContext += buildOutputSpec('danbooru');
       }
 
       let bodyJson: string;
       try {
         const precheckContext = precheckRef.current;
+
+        let budgetContext = "";
+        if (budgetExceeded) {
+          budgetContext = `\n\n[ROUND BUDGET EXHAUSTED] You have used all ${effectiveMaxRounds} tool-call rounds. Output final answer directly — do NOT call any more tools.`;
+        } else if (effort === 'low') {
+          budgetContext = `\n\n[EFFORT: LOW] You have 1 tool-call round. Call search_tags in parallel for all dimensions from the pre-check, then assemble and output the final prompt. Do NOT do multi-turn exploration.`;
+        } else {
+          const remaining = effectiveMaxRounds - currentRound;
+          budgetContext = `\n\n[ROUND PROGRESS] Round ${currentRound}/${effectiveMaxRounds} (${remaining} remaining).`;
+        }
+
         const systemMessage = {
           role: "system",
-          content: agentSettings.systemPrompt + mcpToolsPrompt + systemContext + precheckContext + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually." 
+          content: agentSettings.systemPrompt + mcpToolsPrompt + systemContext + precheckContext + budgetContext + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually." 
         };
         
         const payload: any = {
@@ -685,14 +712,16 @@ User input: ${userText}`;
             systemMessage,
             ...finalMessages
           ],
-          tools: allTools.map((t: any) => {
-            const { _mcp, ...rest } = t;
-            return rest;
-          }),
           stream: true,
           temperature: llm.temperature !== undefined ? llm.temperature : 0.7,
           max_tokens: llm.maxTokens !== undefined ? llm.maxTokens : 2048,
         };
+        if (!budgetExceeded) {
+          payload.tools = allTools.map((t: any) => {
+            const { _mcp, ...rest } = t;
+            return rest;
+          });
+        }
         
         const modelName = (llm.model || '').toLowerCase();
         if (modelName.includes('o1') || modelName.includes('o3') || modelName.includes('reason')) {
@@ -848,6 +877,22 @@ User input: ${userText}`;
             rawArgs = (call.function.arguments || '{}').trim();
             call.function.arguments = rawArgs; // MUST write back so history has valid JSON for subsequent API calls
             const parsedArgs = JSON.parse(rawArgs);
+
+            // Duplicate detection: skip identical calls after 3 repeats
+            const dupKey = call.function.name + ":" + JSON.stringify(parsedArgs, Object.keys(parsedArgs).sort());
+            const dupCount = (duplicateTrackerRef.current.get(dupKey) || 0) + 1;
+            duplicateTrackerRef.current.set(dupKey, dupCount);
+            if (dupCount > 3) {
+              resultStr = JSON.stringify({ skipped: "duplicate", message: `This exact call has been made ${dupCount} times. Stop repeating and produce final answer.` });
+              const toolMsg: ChatMessage = {
+                id: Date.now().toString() + Math.random().toString().slice(2, 6),
+                role: 'tool', content: resultStr, tool_call_id: call.id, name: call.function.name,
+              };
+              newMessages.push(toolMsg);
+              setMessages([...newMessages]);
+              continue;
+            }
+
             try {
               const fnName = call.function.name;
               if (fnName === 'create_prompt') {
@@ -1037,74 +1082,92 @@ User input: ${userText}`;
                   message: `Successfully generated ${allImages.length} image(s).`
                 };
               } else if (fnName === 'generate_video_from_image') {
-                const imagePath = typeof parsedArgs.image_path === 'string' ? parsedArgs.image_path : '';
-                if (!imagePath) throw new Error("image_path must be a valid string URL/path");
-                const { ComfyService } = await import('../services/comfyService');
+                const prompt = typeof parsedArgs.prompt === 'string' ? parsedArgs.prompt : '';
+                if (!prompt) throw new Error("prompt is required for video generation");
+
+                const fps = typeof parsedArgs.fps === 'number' ? parsedArgs.fps : 25;
+                const durationSec = typeof parsedArgs.duration === 'number' ? parsedArgs.duration : 5;
+                const baseModel = typeof parsedArgs.base_model === 'string' ? parsedArgs.base_model : '';
+
                 const workflows = useWorkflowStore.getState().workflows;
                 let img2videoWorkflow = workflows.find((w: any) => w.id === parsedArgs.workflow_id);
                 if (!img2videoWorkflow) {
                   img2videoWorkflow = workflows.find((w: any) => w.type === 'img2video' && w.isDefault) || workflows.find((w: any) => w.type === 'img2video');
                 }
                 if (!img2videoWorkflow || !img2videoWorkflow.jsonContent) {
-                  throw new Error("No 'img2video' workflow found in system. Please create one first.");
+                  throw new Error("未找到图生视频工作流，请先在系统中导入一个 img2video 工作流。");
+                }
+
+                // Auto-extract the most recent image from the conversation
+                let imagePath: string | null = null;
+                for (let i = currentMessages.length - 1; i >= 0; i--) {
+                  const msg = currentMessages[i];
+                  if (msg.images && msg.images.length > 0) {
+                    imagePath = msg.images[msg.images.length - 1];
+                    break;
+                  }
+                }
+                if (!imagePath) {
+                  throw new Error("没有找到可用的图片。请先发送一张图片或用 generate_image 生成一张。");
                 }
 
                 addMessage({
                   id: "sys_" + Date.now(),
                   role: "assistant",
-                  content: `我正在尝试将该图片转换为视频...\n\n**提示词**: ${parsedArgs.prompt}\n**时长**: ${parsedArgs.duration || 10} 帧/秒\n**FPS**: ${parsedArgs.fps || 25}`
+                  content: `🎬 正在将图片转换为视频...\n\n**提示词**: ${prompt}\n**时长**: ${durationSec} 秒\n**FPS**: ${fps}\n**工作流**: ${img2videoWorkflow.name}`
                 });
 
-                const comfyService = new ComfyService();
-                const imageSrc = imagePath.startsWith('http') || imagePath.startsWith('data:') 
-                  ? imagePath 
-                  : (window as any).__TAURI__ ? await import('@tauri-apps/api/core').then(m => m.convertFileSrc(imagePath)) : imagePath;
-                
-                // 1. Read dimensions
+                // Read image as base64 (Tauri: use invoke, not fetch on asset URLs)
+                let rawB64: string;
+                if (imagePath.startsWith('data:')) {
+                  rawB64 = imagePath;
+                } else if (imagePath.startsWith('http')) {
+                  const resp = await fetch(imagePath);
+                  const blob = await resp.blob();
+                  rawB64 = await new Promise<string>((resolve) => {
+                    const r = new FileReader();
+                    r.onloadend = () => resolve(r.result as string);
+                    r.readAsDataURL(blob);
+                  });
+                } else {
+                  rawB64 = await invoke<string>('read_image_base64', { path: imagePath });
+                }
+                const imageBase64 = rawB64.includes(',') ? rawB64.split(',')[1] : rawB64;
+                const byteChars = atob(imageBase64);
+                const byteArr = new Uint8Array(byteChars.length);
+                for (let j = 0; j < byteChars.length; j++) byteArr[j] = byteChars.charCodeAt(j);
+                const imgBlob = new Blob([byteArr], { type: 'image/png' });
+                const uploadName = `upload_agent_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.png`;
+                const uploadedFilename = await comfyService.uploadImage(imgBlob, uploadName);
+
+                // Read dimensions from base64 data URL
                 const imgObj = new Image();
-                imgObj.src = imageSrc;
-                await new Promise((resolve, reject) => {
-                  imgObj.onload = resolve;
-                  imgObj.onerror = reject;
-                });
+                imgObj.src = `data:image/png;base64,${imageBase64}`;
+                try {
+                  await new Promise<void>((resolve, reject) => {
+                    imgObj.onload = () => resolve();
+                    imgObj.onerror = () => reject(new Error('image decode failed'));
+                  });
+                } catch { /* use fallback */ }
                 const imgW = imgObj.naturalWidth || 832;
                 const imgH = imgObj.naturalHeight || 1216;
 
-                const imgResponse = await fetch(imageSrc);
-                const imgBlob = await imgResponse.blob();
-                const filename = `img2video_agent_${Date.now()}.png`;
-
-                const uploadedFilename = await comfyService.uploadImage(imgBlob, filename);
-                
-                const workflowJson = JSON.parse(img2videoWorkflow.jsonContent);
-                const injectedWorkflow = comfyService.injectVideoParameters(
-                  workflowJson,
-                  uploadedFilename,
-                  parsedArgs.prompt,
-                  parsedArgs.fps || 25,
-                  parsedArgs.duration || 10,
-                  imgW, imgH
+                const tempProject = {
+                  id: 'video_' + Date.now(),
+                  title: '图生视频 (Agent)',
+                  positivePrompt: prompt,
+                  negativePrompt: '',
+                  width: imgW, height: imgH,
+                  seed: Math.floor(Math.random() * 1000000000),
+                };
+                const generatedVideos = await useQueueStore.getState().addVideoJob(
+                  tempProject, img2videoWorkflow.id, uploadedFilename, fps, durationSec, imgW, imgH, prompt, baseModel
                 );
-
-                const generatedVideos = await new Promise<string[]>((resolve, reject) => {
-                  comfyService.connect(
-                    () => {}, 
-                    (images) => {
-                      comfyService.disconnect();
-                      resolve(images);
-                    },
-                    (err) => {
-                      comfyService.disconnect();
-                      reject(err);
-                    }
-                  );
-                  comfyService.queuePrompt(injectedWorkflow).catch(reject);
-                });
 
                 res = {
                   status: "completed",
                   videos: generatedVideos,
-                  message: "Video generation completed."
+                  message: `视频生成完成，共 ${generatedVideos.length} 个视频。`
                 };
               } else if (fnName === 'auto_tag_all_prompts') {
             const { aiService } = await import('../services/aiService');
@@ -1290,6 +1353,10 @@ User input: ${userText}`;
             toolImages = res.images
               .map((img: any) => typeof img === 'string' ? img : (img.url || img.filePath || img.outputPath || img.path))
               .filter((s: any) => typeof s === 'string' && s.length > 0);
+          } else if (res && res.videos && Array.isArray(res.videos)) {
+            toolImages = res.videos
+              .map((v: any) => typeof v === 'string' ? v : (v.url || v.filePath || v.outputPath || v.path))
+              .filter((s: any) => typeof s === 'string' && s.length > 0);
           } else if (Array.isArray(res) && res.length > 0 && res[0].url) {
             toolImages = res.map((item: any) => item.url).filter(Boolean);
           }
@@ -1375,6 +1442,9 @@ User input: ${userText}`;
     addMessage(userMsg);
     const newMessages = [...messages, userMsg];
     setIsGenerating(true);
+
+    roundCounterRef.current = 0;
+    duplicateTrackerRef.current = new Map();
 
     // AbortController must exist before pre-check so user can cancel it
     abortControllerRef.current = new AbortController();
