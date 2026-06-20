@@ -1,9 +1,11 @@
 import { Plus, Search, Edit3, Trash2, Cpu, Video, Settings, Play, Star, Zap } from "lucide-react";
-import { useWorkflowStore, type WorkflowType } from "../../stores/workflowStore";
+import { useWorkflowStore, type WorkflowType, type WorkflowProject } from "../../stores/workflowStore";
+import { usePromptStore } from "../../stores/promptStore";
 import { useNavigate } from "react-router-dom";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getImgSrc } from "../../utils/imageUtils";
+import { toast } from "sonner";
 
 
 
@@ -11,13 +13,13 @@ import { getImgSrc } from "../../utils/imageUtils";
 const TypeBadge = ({ type }: { type: WorkflowType }) => {
   switch (type) {
     case 'text2img':
-      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--accent-2)]/20 text-blue-400 text-[10px] font-bold border border-[var(--accent-2)]/30"><Cpu size={12}/> 文生图</span>;
+      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--accent-2)]/20 text-blue-400 text-[10px] font-bold border border-[var(--accent-2)]/30">文生图</span>;
     case 'img2video':
-      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--accent-2)]/20 text-[var(--accent-2)] text-[10px] font-bold border border-[var(--accent-2)]/30"><Video size={12}/> 视频</span>;
+      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--accent-2)]/20 text-[var(--accent-2)] text-[10px] font-bold border border-[var(--accent-2)]/30">视频</span>;
     case 'tagger':
-      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 text-[10px] font-bold border border-orange-500/30"><Search size={12}/> 反推</span>;
+      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 text-[10px] font-bold border border-orange-500/30">反推</span>;
     default:
-      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] text-[10px] font-bold border border-[var(--glass-border-active)]"><Settings size={12}/> 自定义</span>;
+      return <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] text-[10px] font-bold border border-[var(--glass-border-active)]">自定义</span>;
   }
 };
 
@@ -26,19 +28,53 @@ export function WorkflowList() {
   const workflows = useWorkflowStore(state => state.workflows);
   const setDefaultWorkflow = useWorkflowStore(state => state.setDefaultWorkflow);
   const removeWorkflow = useWorkflowStore(state => state.removeWorkflow);
+  const addPrompt = usePromptStore(state => state.addPrompt);
   const navigate = useNavigate();
+
+  const handleTestWorkflow = async (w: WorkflowProject) => {
+    if (w.type !== 'text2img') {
+      toast.info("非图文工作流暂不支持在此处直接测试，请前往对应的功能页面。");
+      return;
+    }
+    const newId = crypto.randomUUID();
+    await addPrompt({
+      id: newId,
+      title: "工作流测试: " + w.name,
+      description: "用于测试工作流的临时项目",
+      positivePrompt: "1girl, solo, masterpiece, best quality",
+      negativePrompt: "lowres, bad anatomy, bad hands, text, error, missing fingers",
+      artistPrompt: "",
+      promptSyntax: 'danbooru',
+      width: 896,
+      height: 1088,
+      steps: 20,
+      cfgScale: 7.0,
+      seed: "-1",
+      sampler: "euler",
+      scheduler: "normal",
+      baseModel: "",
+      vaeModel: "auto",
+      loraConfigs: [],
+      workflowId: w.id,
+      tags: ["test"],
+      isFavorite: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+    navigate(`/generate/${newId}`);
+  };
 
   const handleImportClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText();
       if (!text) {
-        alert("剪贴板为空");
+        toast.warning("剪贴板为空");
         return;
       }
       JSON.parse(text); // validate JSON
       navigate('/workflows/new/edit', { state: { importJson: text } });
     } catch (e) {
-      alert("无法读取剪贴板或剪贴板内容不是有效的 JSON");
+      toast.error("无法读取剪贴板或剪贴板内容不是有效的 JSON");
     }
   };
 
@@ -48,8 +84,8 @@ export function WorkflowList() {
       {/* PageHeader */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0">
         <div>
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-            <span className="text-yellow-400 flex items-center justify-center"><Zap size={24} /></span> 工作流管理
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
+            工作流管理
           </h2>
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">配置并保存 ComfyUI JSON 渲染节点图，与提示词项目绑定</p>
         </div>
@@ -148,11 +184,14 @@ export function WorkflowList() {
                   <div className="flex gap-2">
                     <button 
                       onClick={() => navigate(`/workflows/${wf.id}/edit`)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] text-[12px] font-bold transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[var(--text-primary)] text-[12px] font-bold transition-all active:scale-95 cursor-pointer"
                     >
                       <Edit3 size={14} /> 编辑
                     </button>
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-[12px] font-bold border border-yellow-500/20 transition-colors cursor-pointer">
+                    <button 
+                      onClick={() => handleTestWorkflow(wf)}
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] hover:opacity-90 text-white text-[12px] font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                    >
                       <Play size={14} /> 测试
                     </button>
                   </div>

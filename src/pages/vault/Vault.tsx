@@ -54,8 +54,8 @@ export function Vault() {
     <div className="flex flex-col h-full relative z-10 gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0">
         <div className="hidden md:block">
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-            <span className="text-[var(--accent-1)] flex items-center justify-center"><Sparkles size={24} /></span> 典藏库
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
+            典藏库
           </h2>
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">您收藏的精彩创作 (图像与视频)</p>
         </div>

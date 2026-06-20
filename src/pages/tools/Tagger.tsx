@@ -3,6 +3,7 @@ import { UploadCloud, Image as ImageIcon, Sparkles, Copy, FileText, CheckCircle2
 import { useSettingsStore } from "../../stores/settingsStore";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { llmService } from "../../services/llmService";
+import { toast } from "sonner";
 
 export function Tagger() {
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
@@ -35,8 +36,9 @@ export function Tagger() {
           try {
             const tags = await llmService.tagImage(base64data);
             setResults(tags);
+            toast.success("反推完成");
           } catch (e: any) {
-            alert(e.message);
+            toast.error(e.message);
           } finally {
             setIsAnalyzing(false);
           }
@@ -50,14 +52,24 @@ export function Tagger() {
     }
   };
 
+  const handleCopy = async () => {
+    try {
+      const text = results.map(r => r.tag).join(', ');
+      await navigator.clipboard.writeText(text);
+      toast.success("标签已复制到剪贴板");
+    } catch (e) {
+      toast.error("复制失败");
+    }
+  };
+
   return (
     <div className="flex flex-col h-full relative z-10 gap-6 max-w-5xl mx-auto w-full">
       
       {/* PageHeader */}
       <div className="flex items-center justify-between flex-shrink-0">
         <div>
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-            <span className="text-orange-400">🔍</span> 图片反推 (Tagger)
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
+            图片反推 (Tagger)
           </h2>
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">上传图片，使用 WD14 模型提取特征标签，一键转化为提示词</p>
         </div>
@@ -134,6 +146,7 @@ export function Tagger() {
               <div className="flex gap-2">
                 <button 
                   disabled={results.length === 0}
+                  onClick={handleCopy}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] text-[11px] font-bold transition-colors disabled:opacity-50"
                 >
                   <Copy size={12} /> 复制文本

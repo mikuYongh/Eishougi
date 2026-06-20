@@ -36,9 +36,15 @@ export function Settings() {
     if (settings.llm.provider === 'ollama') {
       const fetchOllamaModels = async () => {
         try {
-          const res = await fetch('http://127.0.0.1:11434/api/tags');
-          if (res.ok) {
-            const data = await res.json();
+          let baseUrl = settings.llm.apiUrl;
+          if (baseUrl.endsWith('/v1')) baseUrl = baseUrl.slice(0, -3);
+          if (baseUrl.endsWith('/api')) baseUrl = baseUrl.slice(0, -4);
+          if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+          if (!baseUrl) baseUrl = 'http://127.0.0.1:11434';
+
+          const res = await invoke<string>('fetch_ollama_models', { url: `${baseUrl}/api/tags` });
+          if (res) {
+            const data = JSON.parse(res);
             if (data.models) {
               setOllamaModels(data.models.map((m: any) => ({ label: m.name, value: m.name })));
             }
@@ -49,7 +55,7 @@ export function Settings() {
       };
       fetchOllamaModels();
     }
-  }, [settings.llm.provider]);
+  }, [settings.llm.provider, settings.llm.apiUrl]);
 
   useEffect(() => {
     setLocalWallpaper(wallpaperPath);

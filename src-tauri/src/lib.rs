@@ -254,6 +254,7 @@ pub fn run() {
     let state = AppState::new(app_data_dir.clone()).expect("Failed to initialize app state");
 
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_log::Builder::new().build())
@@ -265,6 +266,7 @@ pub fn run() {
         .manage(comfy_ws::ComfyState::new())
         .invoke_handler(tauri::generate_handler![
             commands::greet,
+            commands::fetch_ollama_models,
             commands::prompts::create_prompt,
             commands::prompts::get_prompt,
             commands::prompts::update_prompt,

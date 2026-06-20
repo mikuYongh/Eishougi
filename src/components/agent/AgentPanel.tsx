@@ -8,6 +8,7 @@ import type { ChatAttachment } from "../../hooks/useAgent";
 import { invoke } from "@tauri-apps/api/core";
 import type { ChatMessage } from "../../hooks/useAgent";
 import ReactMarkdown from 'react-markdown';
+import { toast } from "sonner";
 import remarkGfm from 'remark-gfm';
 import { HistoryImagePicker } from "../ui/HistoryImagePicker";
 import { Virtuoso } from "react-virtuoso";
@@ -44,6 +45,7 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
+      urlTransform={(url) => url}
       components={{
         p: ({node, ...props}) => <div className="mb-2 last:mb-0" {...props} />,
         strong: ({node, ...props}) => <strong className="text-[var(--accent-1)] font-bold" {...props} />,
@@ -260,8 +262,8 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
           }]);
         }
       } catch (err) {
-        console.error("Failed to save uploaded file", err);
-        alert("上传失败: " + String(err));
+        console.error("Upload image error", err);
+        toast.error("上传失败: " + String(err));
       }
     };
     reader.readAsDataURL(file);

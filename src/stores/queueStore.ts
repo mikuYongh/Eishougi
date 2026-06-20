@@ -42,10 +42,12 @@ interface QueueStore {
   historyUpdateTick: number;
 }
 
+// Module-level state — must survive Vite HMR. Cleaned up via import.meta.hot.dispose.
+const _jobResolvers = new Map<string, (images: string[]) => void>();
+let _isSetup = false;
+let _unlisteners: UnlistenFn[] = [];
+
 export const useQueueStore = create<QueueStore>((set, get) => {
-  let _jobResolvers = new Map<string, (images: string[]) => void>();
-  let _isSetup = false;
-  let _unlisteners: UnlistenFn[] = [];
   const globalClientId = Math.random().toString(36).substring(2, 15);
 
   const setupCallbacks = async () => {
@@ -84,7 +86,6 @@ export const useQueueStore = create<QueueStore>((set, get) => {
 
     const u3 = await listen<any>('comfy-completed', (event) => {
       const payload = event.payload;
-      console.log("[Queue] complete from backend:", payload);
       const { job_id, images } = payload;
       
       const resolve = _jobResolvers.get(job_id);
@@ -343,3 +344,15 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     }
   };
 });
+
+// Vite HMR: clean up Tauri event listeners on hot reload.
+// Without this, the old module's listeners stay active but the new module
+// loses track of them, causing progress/completion events to be swallowed.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    console.log('[Queue] HMR dispose — cleaning up event listeners');
+    _unlisteners.forEach(u => u());
+    _unlisteners = [];
+    _isSetup = false;
+  });
+}

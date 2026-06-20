@@ -105,9 +105,11 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
     let state = app.state::<ComfyState>();
     let mut connected = state.ws_connected.lock().await;
     if *connected {
+        println!("[ComfyWS Backend] ensure_ws_connection: already connected, skipping. ws_url={}", ws_url);
         return;
     }
     *connected = true;
+    println!("[ComfyWS Backend] ensure_ws_connection: spawning WS task for {}", ws_url);
     drop(connected);
 
     let jobs_map = state.active_jobs.clone();
@@ -117,6 +119,8 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
     tokio::spawn(async move {
         let connect_url = format!("{}/ws?clientId={}", ws_url, client_id);
         println!("[ComfyWS Backend] Connecting to {}", connect_url);
+        let mut msg_count: u64 = 0;
+        let mut prog_count: u64 = 0;
         
         match connect_async(&connect_url).await {
             Ok((ws_stream, _)) => {
@@ -128,12 +132,20 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
                 while let Some(msg_result) = read.next().await {
                     match msg_result {
                         Ok(Message::Text(text)) => {
+                            msg_count += 1;
+                            if msg_count <= 3 || msg_count % 10 == 0 {
+                                println!("[ComfyWS Backend] WS msg #{}: len={}", msg_count, text.len());
+                            }
                             if let Ok(json) = serde_json::from_str::<Value>(&text) {
                                 let msg_type = json["type"].as_str().unwrap_or("");
                                 let data = &json["data"];
                                 let prompt_id = data["prompt_id"].as_str().unwrap_or("").to_string();
 
                                 if msg_type == "progress" {
+                                    prog_count += 1;
+                                    if prog_count <= 3 || prog_count % 10 == 0 {
+                                        println!("[ComfyWS Backend] Progress #{}: value={}/{} node={}", prog_count, data["value"], data["max"], data["node"]);
+                                    }
                                     emit_to_frontend(&app_clone, "comfy-progress", json.clone());
                                     
                                     let progress_val = data["value"].as_i64().unwrap_or(0);
@@ -204,6 +216,7 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
             }
         }
         
+        println!("[ComfyWS Backend] WS task exiting after {} msgs ({} progress). Resetting ws_connected.", msg_count, prog_count);
         let state = app_clone.state::<ComfyState>();
         let mut connected = state.ws_connected.lock().await;
         *connected = false;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders, Zap } from "lucide-react";
+import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders, Zap, BookmarkPlus } from "lucide-react";
 import { PhotoView } from 'react-photo-view';
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
@@ -17,6 +17,7 @@ import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
 import { ArtistSelector } from "../../components/prompt/ArtistSelector";
 import { comfyService } from "../../services/comfyService";
 import { getImgSrc } from "../../utils/imageUtils";
+import { toast } from "sonner";
 
 
 
@@ -238,6 +239,22 @@ export function Generate() {
   // Combine all images from completed jobs for this session (newest first)
   const results = useMemo(() => completedJobs.flatMap(j => j.images || []).reverse(), [completedJobs]);
 
+  const handleSetAsExample = async (imageUrl: string) => {
+    if (!project) return;
+    const existing = project.instanceImages || [];
+    if (!existing.includes(imageUrl)) {
+      const updatedImages = [...existing, imageUrl];
+      // Ensure prompt store triggers a state update
+      await usePromptStore.getState().updatePrompt(project.id, { instanceImages: updatedImages });
+      if (!project.coverImage) {
+        await usePromptStore.getState().updatePrompt(project.id, { coverImage: imageUrl });
+      }
+      toast.success('已设置为项目示范图！');
+    } else {
+      toast.info('该图已是示范图');
+    }
+  };
+
   useEffect(() => {
     connect();
   }, [connect]);
@@ -368,10 +385,13 @@ export function Generate() {
                 </PhotoView>
                 
                 <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-2xl px-4 absolute bottom-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => downloadImage(results[0], `generated_${Date.now()}.png`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-[var(--accent-1)]/50 cursor-pointer">
-                    <Download size={16} /> 下载原图
-                  </button>
-                </div>
+                    <button onClick={() => downloadImage(results[0], `generated_${Date.now()}.png`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-[var(--accent-1)]/50 cursor-pointer">
+                      <Download size={16} /> 下载原图
+                    </button>
+                    <button onClick={() => handleSetAsExample(results[0])} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-1)]/80 backdrop-blur-md text-white text-[13px] font-bold hover:bg-[var(--accent-1)] transition-colors shadow-lg border border-[var(--accent-2)]/50 cursor-pointer">
+                      <BookmarkPlus size={16} /> 设为示范图
+                    </button>
+                  </div>
               </div>
             ) : isGenerating ? (
               <div className="w-full max-w-lg space-y-6 flex flex-col items-center">

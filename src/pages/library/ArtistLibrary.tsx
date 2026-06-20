@@ -33,7 +33,7 @@ export function ArtistLibrary() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">风格画师</h1>
-          <p className="text-[var(--text-muted)] text-sm">探索并使用海量画师的独特风格</p>
+          <p className="text-[var(--text-muted)] text-sm">探索并使用海量画师的独特风格和人物</p>
         </div>
 
         <div className="flex items-center gap-3">

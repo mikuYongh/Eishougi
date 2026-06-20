@@ -71,7 +71,7 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
           <div key={artist.id} className="relative group rounded-xl overflow-hidden border border-pink-500/30 bg-[var(--glass-bg-hover)] flex items-center pr-3 shadow-md h-12">
             <div className="w-12 h-12 flex-shrink-0 bg-black/20 border-r border-pink-500/30">
               {artist.imgUrl ? (
-                <img src={getImgSrc(artist.imgUrl)} className={`w-full h-full object-cover ${privacyMode ? 'blur-md group-hover:blur-none' : ''}`} alt={artist.nameEn} />
+                <img src={`https://blobs.animadex.net/ArtistOutputs/thumbs/${encodeURIComponent(artist.imgUrl)}`} className={`w-full h-full object-cover ${privacyMode ? 'blur-md group-hover:blur-none' : ''}`} alt={artist.nameEn} />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]"><Paintbrush size={14}/></div>
               )}
@@ -151,7 +151,7 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
                 >
                   <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-black/20 border border-[var(--glass-border)]">
                     {artist.imgUrl ? (
-                      <img src={getImgSrc(artist.imgUrl)} className={`w-full h-full object-cover ${privacyMode ? 'blur-sm' : ''}`} alt={artist.nameEn} />
+                      <img src={`https://blobs.animadex.net/ArtistOutputs/thumbs/${encodeURIComponent(artist.imgUrl)}`} className={`w-full h-full object-cover ${privacyMode ? 'blur-sm' : ''}`} alt={artist.nameEn} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center"><Paintbrush size={12} className="opacity-50 text-[var(--text-muted)]"/></div>
                     )}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Play, Plus, Trash2, Image as ImageIcon, UploadCloud, Cpu, Layers, X, History, FileText, RefreshCw } from "lucide-react";
+import { ArrowLeft, Save, Play, Plus, Image as ImageIcon, UploadCloud, Cpu, Layers, X, Trash2, History, FileText, RefreshCw } from "lucide-react";
 import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
 import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -18,6 +18,7 @@ import { ArtistSelector } from "../../components/prompt/ArtistSelector";
 import { LoraSelectorUI } from "../../components/prompt/LoraSelectorUI";
 import { getImgSrc } from "../../utils/imageUtils";
 import { comfyService } from "../../services/comfyService";
+import { toast } from "sonner";
 
 export function PromptEdit() {
   const { id } = useParams();
@@ -94,9 +95,15 @@ export function PromptEdit() {
   }, []);
 
   const handleSave = async () => {
+    if (!project.title?.trim()) {
+      toast.warning('请输入项目名称');
+      return;
+    }
+
     if (id && id !== 'new') {
       console.log("[PromptEdit] saving positivePrompt:", project.positivePrompt?.substring(0, 50), "negativePrompt:", project.negativePrompt?.substring(0, 50));
       await updatePrompt(id, project);
+      toast.success('项目已更新');
       console.log("[PromptEdit] save complete");
     } else if (id === 'new') {
       // Create a new prompt project
@@ -136,9 +143,10 @@ export function PromptEdit() {
         loraConfigsLength: newProject.loraConfigs?.length,
       });
       await addPrompt(newProject);
+      toast.success('项目已创建');
+      navigate(`/prompts/${newId}/edit`, { replace: true });
       console.log("[PromptEdit] create complete");
     }
-    navigate('/prompts');
   };
 
   const updateField = (key: keyof PromptProject, value: any) => {
@@ -194,12 +202,13 @@ export function PromptEdit() {
           >
             <Save size={16} /> 保存项目
           </button>
-          <button 
-            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all text-[var(--text-primary)] cursor-pointer w-full sm:w-auto"
-            style={{ background: "linear-gradient(135deg, #42A5F5, #7E57C2)", border: "1px solid rgba(255,255,255,0.2)" }}
-          >
-            <Play size={16} fill="currentColor" /> 立即生成
-          </button>
+            <button 
+              onClick={() => { handleSave(); navigate(`/generate/${id}`); }}
+              className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all text-[var(--text-primary)] cursor-pointer w-full sm:w-auto"
+              style={{ background: "linear-gradient(135deg, #42A5F5, #7E57C2)", border: "1px solid rgba(255,255,255,0.2)" }}
+            >
+              <Play size={16} /> 立即生成
+            </button>
         </div>
       </div>
 

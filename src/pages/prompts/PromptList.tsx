@@ -7,6 +7,8 @@ import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import { aiService } from "../../services/aiService";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { getImgSrc } from "../../utils/imageUtils";
+import { Pagination } from "../../components/ui/Pagination";
+import { toast } from "sonner";
 
 
 
@@ -33,8 +35,9 @@ export function PromptList() {
         updatedAt: Date.now(),
       };
       await addPrompt(clone);
+      toast.success("项目已克隆");
     } catch (e: any) {
-      alert(`克隆失败: ${e.message}`);
+      toast.error(`克隆失败: ${e.message}`);
     }
   };
 
@@ -134,9 +137,9 @@ export function PromptList() {
         console.log
       );
       setTagProgress("");
-      alert(`🎉 自动打标完成！成功为 ${count} 个项目生成了标签。`);
+      toast.success(`自动打标完成！成功为 ${count} 个项目生成了标签。`);
     } catch (e: any) {
-      alert(`打标失败: ${e.message}`);
+      toast.error(`打标失败: ${e.message}`);
     } finally {
       setIsAutoTagging(false);
       setTagProgress("");
@@ -149,8 +152,8 @@ export function PromptList() {
       {/* PageHeader */}
       <div className="flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 gap-4">
         <div className="hidden md:block">
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-            <span className="text-blue-400 flex items-center justify-center"><FileText size={24} /></span> 提示词项目管理
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
+            提示词项目管理
           </h2>
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">管理生成配置项目，包含提示词、底模、LoRA及全部参数</p>
         </div>
@@ -339,13 +342,13 @@ export function PromptList() {
                   <div className="flex gap-2 mt-1">
                     <button 
                       onClick={() => navigate(`/prompts/${p.id}/edit`)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] text-[11px] font-bold transition-colors cursor-pointer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[var(--text-primary)] text-[11px] font-bold transition-all active:scale-95 cursor-pointer"
                     >
                       <Edit3 size={12} /> 编辑
                     </button>
                     <button 
                       onClick={() => navigate(`/generate/${p.id}`)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[var(--accent-2)]/20 hover:bg-[var(--accent-2)]/30 text-blue-400 text-[11px] font-bold transition-colors cursor-pointer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] hover:opacity-90 text-white text-[11px] font-bold shadow-md transition-all active:scale-95 cursor-pointer"
                     >
                       <Rocket size={12} /> 生成
                     </button>
@@ -416,13 +419,13 @@ export function PromptList() {
                   </button>
                   <button 
                     onClick={() => navigate(`/prompts/${p.id}/edit`)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] text-[12px] font-bold transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[var(--text-primary)] text-[12px] font-bold transition-all active:scale-95 cursor-pointer"
                   >
                     <Edit3 size={14} /> 配置
                   </button>
                   <button 
                     onClick={() => navigate(`/generate/${p.id}`)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-2)]/20 hover:bg-[var(--accent-2)]/30 text-blue-400 text-[12px] font-bold border border-[var(--accent-2)]/20 transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] hover:opacity-90 text-white text-[12px] font-bold shadow-md transition-all active:scale-95 cursor-pointer"
                   >
                     <Rocket size={14} /> 生成
                   </button>
@@ -434,35 +437,11 @@ export function PromptList() {
         )}
 
         {/* Pagination Controls */}
-        <div className="mt-auto pt-6 flex items-center justify-center">
-          <div className="glass-panel flex items-center gap-1 p-1 rounded-full border border-[var(--glass-border)] shadow-lg">
-            <button 
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`w-8 h-8 flex items-center justify-center rounded-full text-[12px] font-bold transition-colors cursor-pointer ${currentPage === page ? 'bg-[var(--accent-2)] text-[var(--text-primary)] shadow-[0_0_10px_rgba(59,130,246,0.5)]' : 'text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]'}`}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button 
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        </div>
+        <Pagination 
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
 
       </div>
     </div>

@@ -27,6 +27,7 @@ import { useDevice } from "./hooks/useDevice";
 import { DesktopLayout } from "./components/layout/DesktopLayout";
 import { MobileLayout } from "./components/layout/MobileLayout";
 import { GlobalPhotoProvider } from "./components/ui/GlobalPhotoProvider";
+import { ToastProvider } from "./components/ui/ToastProvider";
 
 export default function App() {
   const { isMobile } = useDevice();
@@ -79,6 +80,7 @@ export default function App() {
         {/* TitleBar for desktop window dragging (hidden on mobile naturally if not Tauri window, but we keep it) */}
         {!isMobile && <TitleBar />}
 
+        <ToastProvider />
         <GlobalPhotoProvider>
           {isMobile ? (
             <MobileLayout>

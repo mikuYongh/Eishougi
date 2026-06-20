@@ -13,3 +13,13 @@ pub mod workflows;
 pub fn greet(name: &str) -> String {
     format!("Hello, {}! Prompt Muse is ready.", name)
 }
+
+#[tauri::command]
+pub async fn fetch_ollama_models(url: String) -> Result<String, String> {
+    reqwest::get(&url)
+        .await
+        .map_err(|e| e.to_string())?
+        .text()
+        .await
+        .map_err(|e| e.to_string())
+}

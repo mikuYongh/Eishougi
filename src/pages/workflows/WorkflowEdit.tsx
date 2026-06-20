@@ -16,6 +16,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { comfyService } from "../../services/comfyService";
 import { getImgSrc } from "../../utils/imageUtils";
+import { toast } from "sonner";
 
 const SDXL_RESOLUTIONS = [
   { label: "1024x1024 (1:1 方幅)", value: "1024x1024" },
@@ -112,6 +113,15 @@ export function WorkflowEdit() {
   };
 
   const handleSave = async () => {
+    if (!workflow.name?.trim()) {
+      toast.warning('请输入工作流名称');
+      return;
+    }
+    if (!workflow.jsonContent?.trim()) {
+      toast.warning('工作流内容不能为空，请先导入 JSON');
+      return;
+    }
+
     let finalJson = workflow.jsonContent;
     if (finalJson) {
       try {
@@ -122,7 +132,7 @@ export function WorkflowEdit() {
         console.log("[WorkflowEdit] injectParameters completed, finalJson length:", finalJson?.length ?? 0);
       } catch (e) {
         console.error("[WorkflowEdit] injectParameters failed:", e);
-        alert(`保存失败：参数注入失败 — ${String(e).substring(0, 200)}`);
+        toast.error(`保存失败：参数注入失败 — ${String(e).substring(0, 200)}`);
         return;
       }
     }
@@ -136,18 +146,20 @@ export function WorkflowEdit() {
     try {
       if (id && id !== 'new') {
         await updateWorkflow(id, payload as WorkflowProject);
+        toast.success('工作流已更新');
       } else {
         await addWorkflow({
           ...payload as WorkflowProject,
           id: crypto.randomUUID(),
           createdAt: Date.now(),
         });
+        toast.success('工作流已创建');
       }
       console.log("[WorkflowEdit] save complete, navigating to /workflows");
       navigate('/workflows');
     } catch (e) {
       console.error("[WorkflowEdit] save failed:", e);
-      alert(`保存失败：${String(e).substring(0, 200)}`);
+      toast.error(`保存失败：${String(e).substring(0, 200)}`);
     }
   };
 

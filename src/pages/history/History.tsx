@@ -178,8 +178,8 @@ export function History() {
       {/* PageHeader */}
       <div className="flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 gap-4">
         <div className="hidden md:block">
-          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
-            <span className="text-green-400">📜</span> 生成历史 (History)
+          <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
+            生成历史 (History)
           </h2>
           <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">回顾所有的创造轨迹，支持查看详细参数与 Seed</p>
         </div>

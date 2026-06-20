@@ -32,6 +32,24 @@ export const getImgSrc = (url?: string): string => {
     return finalUrl;
   }
 
+  // At this point, it's considered a local file path.
+  // It might be URL-encoded (e.g., from Markdown parsing or previous encoding), decode it to raw path.
+  try {
+    finalUrl = decodeURIComponent(finalUrl);
+  } catch(e) {
+    // Ignore malformed URIs
+  }
+
+  // If it's a file:// URI (e.g. from markdown), strip it
+  if (finalUrl.startsWith('file://')) {
+    finalUrl = finalUrl.replace(/^file:\/\/\/?/, '');
+  }
+
+  // Always normalize backslashes to forward slashes. 
+  // Tauri's convertFileSrc handles forward slashes perfectly on Windows, 
+  // while backslashes often get double-encoded by the browser (e.g., %5C -> %255C) and break.
+  finalUrl = finalUrl.replace(/\\/g, '/');
+
   // Otherwise, it's a local file path. Use Tauri's convertFileSrc
   // Handle case where path might already contain asset://
   if (finalUrl.startsWith('asset://')) return finalUrl;

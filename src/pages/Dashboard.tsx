@@ -19,6 +19,7 @@ export function Dashboard() {
   const workflows = useWorkflowStore(state => state.workflows);
   const fetchWorkflows = useWorkflowStore(state => state.fetchWorkflows);
   const { jobs, isConnected, connect } = useQueueStore();
+  const historyUpdateTick = useQueueStore(state => state.historyUpdateTick);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
   const [totalGenerated, setTotalGenerated] = useState(0);
@@ -31,6 +32,10 @@ export function Dashboard() {
     connect();
     fetchHistory();
   }, []);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [historyUpdateTick]);
 
   const fetchHistory = async () => {
     try {

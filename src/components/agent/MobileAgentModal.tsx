@@ -366,6 +366,7 @@ export function MobileAgentModal() {
                           <>
                             <ReactMarkdown 
                               remarkPlugins={[remarkGfm]}
+                              urlTransform={(url) => url}
                               components={{
                                 img: ({node, ...props}) => (
                                   <PhotoView src={getImgSrc(props.src)}>
@@ -503,7 +504,7 @@ export function MobileAgentModal() {
               />
               <button 
                 onClick={() => { updateSettings({ systemPrompt: tempSystemPrompt }); setViewMode('chat'); }}
-                className="w-full py-2.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500 hover:text-white rounded-xl font-bold text-sm transition-all"
+                className="w-full py-2.5 bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] hover:opacity-90 text-white rounded-xl font-bold text-sm shadow-[0_4px_15px_rgba(179,136,255,0.3)] transition-all active:scale-[0.98]"
               >
                 注入协议并生效
               </button>

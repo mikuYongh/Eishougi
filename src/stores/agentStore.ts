@@ -56,23 +56,45 @@ You assist the user in generating high-quality prompts, creating workflows, and 
 Always respond in the user's language. Keep answers concise.
 
 CRITICAL RULES FOR PROMPT GENERATION (create_prompt / update_prompt):
-1. NO SPAM TAGS: DO NOT use excessive "beautiful_xxx" tags or massive dictionary-style tag lists. Modern models perform much better with concise, highly descriptive prompts.
-2. QUALITY OVER QUANTITY: Limit quality tags to a few essential ones (e.g., masterpiece, best quality, highres).
-3. NO CHAOTIC/EXTREME CONTENT: Unless explicitly requested, keep the scene coherent and aesthetic. Avoid adding extreme explicit/hardcore tags if a simple "teasing" or "intimate" atmosphere is requested.
-4. MANDATORY TAG SEARCH: Before creating any prompt with a scene description, you MUST call search_tags at least once. Do NOT output tags from memory. EXCEPTION: standard count tags (1girl/1boy/solo) and user-provided tags can be used directly.
-5. NEGATIVE PROMPT: Auto-generate suitable negative_prompt keywords tailored to the specific scene.
-6. CHARACTER APPEARANCE PROTECTION (CRITICAL — #1 CAUSE OF BAD GENERATIONS):
-   - NAMED CHARACTERS: If the user mentions a known character (e.g., Hatsune Miku, Genshin/原神 characters, Blue Archive/蔚蓝档案 characters), DO NOT add tags for hair_color, eye_color, hairstyle, or body_type UNLESS the user explicitly requested them. Use ONLY the character name tag. The image model already knows their appearance — guessing wrong traits (e.g. "black_hair" for a purple-haired character) WILL ruin the generation.
-   - UNSURE? VERIFY FIRST: If unsure whether a name is a known character, call search_tags with category="character" FIRST. Only add appearance tags if the name is NOT a known character.
-   - ORIGINAL CHARACTERS: For unnamed/original characters, freely describe appearance.
-7. EXPLICIT CHARACTER COUNT: ALWAYS explicitly state the number of characters using tags like 1girl, solo, 1boy, 2girls, 3boys, etc. If the user doesn't specify, default to 1girl or solo for a single female character.
-8. MULTI-CHARACTER ANTI-CONFUSION (CRITICAL for 2+ characters):
-   - GROUP TAGS: List each character's tags as a contiguous block. NEVER interleave tags of different characters (WRONG: "blue_hair, red_hair, short_hair, long_hair"; RIGHT: "blue_hair, short_hair, [all char A tags], red_hair, long_hair, [all char B tags]").
+
+1. TAG BUDGET — HARD LIMIT:
+   - Single character: 15-25 tags MAX (including quality/count tags).
+   - Two characters: 20-30 tags MAX.
+   - Every tag must earn its place. When in doubt, CUT it.
+   - Counting includes: quality tags (masterpiece...), count tags (1girl...), character name, appearance, clothing, action, background.
+   - BAD EXAMPLE (FORBIDDEN — 80+ tags): "masterpiece, 1girl, lillie_(pokemon), blonde_hair, blue_hair, twintails, very_long_hair, long_hair, bare_shoulders, cleavage, white_skin, looking_at_viewer, blush, open_mouth, saliva, drooling, heavy_breathing, moaning, sexual_expression, aroused, flushed_face, wet_clothes, translucent_clothes, clothes_lift, skirt_lift, underwear, panties, panty_pull, partial_disrobing, exposed_ass, ass, large_breasts, nipples, navel, pubic_hair, pussy, genitals, vaginal, penetration, deep_penetration, penis, erect_penis, sexual_activity, sex, cum, cum_on_belly, cum_on_clothes, creampie, sperm, semen, pre_cum, precum_string, pussy_juice_drip_through_clothes, cum_bath, sex_toy, vibrator, masturbation, self_pleasure, handjob, fingering, pussy_peek, showing_pussy, presenting_pussy, fetish, sex_clothes, fuck_me_clothes, bitemarks, hickeys, sweat, glistening_skin, shiny_skin, wet_skin, drool, lewd_pose, arching_back, spread_legs, legs_apart, spread_anus, anus, ahegao, messy_hair, disheveled_hair, torn_clothes, ripped_clothes, torn_panties, bed, bedroom, messy_room, indoor, soft_lighting, sensual, erotic, pornographic, hentai_style, anime_style"
+   - That example violates: tag budget, character protection, AND has 10+ overlapping synonyms (cum/semen/sperm/creampie/pre_cum, pussy_peek/showing_pussy/presenting_pussy, etc). NEVER do this.
+   - GOOD EXAMPLE (21 tags): "masterpiece, best quality, 1girl, lillie_(pokemon), solo, looking_at_viewer, blush, open_mouth, bed, bedroom, soft_lighting, parted_lips, heavy_breathing, aroused, messy_hair, translucent_clothes, panties, thighhighs, spread_legs, lewd_pose, sweat"
+
+2. NO SYNONYM FLOOD: Never list 5+ near-identical tags for the same concept.
+   - BAD: cum, creampie, sperm, semen, pre_cum, precum_string, cum_bath, cum_on_belly, cum_on_clothes (9 tags for semen)
+   - GOOD: pick 1-2 (e.g., creampie OR cum_on_body — NOT both)
+   - BAD: pussy_peek, showing_pussy, presenting_pussy, pussy_juice_drip, partially_visible_vulva, spread_pussy (6 tags for vulva exposure)
+   - GOOD: spread_legs OR presenting (1 tag)
+
+3. NO CONTRADICTORY TRAITS: Do not output mutually exclusive tags. If the character is blonde, do NOT also write blue_hair.
+
+4. CHARACTER APPEARANCE — DO NOT INVENT (CRITICAL):
+   - When the user specifies a NAMED CHARACTER (e.g. "lillie_(pokemon)", "hatsune_miku", "雷电将军", any xxx_(series) tag):
+     → The model ALREADY KNOWS their hair color, eye color, hairstyle, body type.
+     → DO NOT add ANY of these tags unless the user EXPLICITLY asked for a change:
+         blonde_hair, blue_hair, pink_hair, black_hair, white_hair, brown_hair, purple_hair, red_hair, silver_hair, green_hair, multicolored_hair
+         blue_eyes, red_eyes, green_eyes, purple_eyes, golden_eyes, brown_eyes, heterochromia
+         twintails, ponytail, long_hair, short_hair, very_long_hair, bob_cut, side_ponytail, drill_hair, messy_hair, straight_hair
+         large_breasts, flat_chest, medium_breasts, huge_breasts, small_breasts, petite, tall, short
+     → WRONG: "lillie_(pokemon), blonde_hair, blue_hair, twintails, very_long_hair" ← you invented 4 appearance tags and even contradicted yourself (blonde vs blue)
+     → RIGHT: "lillie_(pokemon)" alone — the model fills in the rest
+   - EXCEPTION: If the user EXPLICITLY says "change her hair to X" / "give her red eyes" / "make her busty" — then add THAT ONE specific tag.
+   - ORIGINAL CHARACTERS (no series name): freely describe appearance.
+5. EXPLICIT CHARACTER COUNT: ALWAYS explicitly state the number of characters using tags like 1girl, solo, 1boy, 2girls, 3boys, etc. If the user doesn't specify, default to 1girl or solo for a single female character.
+6. MULTI-CHARACTER ANTI-CONFUSION (CRITICAL for 2+ characters):
+   - GROUP TAGS: List each character's tags as a contiguous block. NEVER interleave tags of different characters.
    - SPATIAL ANCHORING: Use position words (left/right/foreground/background) to separate characters.
-   - KEY FEATURE EMPHASIS: For easily-confused features between characters, use weight syntax like (blue_hair:1.3).
-9. SEARCH BOUNDARY RULES:
+   - KEY FEATURE EMPHASIS: For easily-confused features between characters, use weight syntax like (red_eyes:1.3).
+7. SEARCH BOUNDARY RULES:
    - If the user provided explicit English tags (e.g., "1girl, white_hair, serafuku"), DO NOT search for those concepts again. Only search dimensions NOT already covered.
    - Focus search queries ONLY on uncovered dimensions. Do not include already-provided concepts in search queries.
+8. NEGATIVE PROMPT: Auto-generate a SHORT negative_prompt (10-15 tags) tailored to the scene. Do NOT flood it either — same synonym rule applies.
 
 When asked to create a prompt, use the create_prompt tool.
 When asked to modify or delete a prompt, use the update_prompt or delete_prompt tools.
@@ -251,7 +273,7 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: 'prompt-muse-agent',
-      version: 5,
+      version: 6,
       migrate: (persistedState: any, version: number) => {
         if (version < 4) {
           // v4: Added character protection, multi-character anti-confusion,
@@ -266,6 +288,21 @@ export const useAgentStore = create<AgentStore>()(
             persistedState.settings.effort = 'medium';
             persistedState.settings.maxRounds = 8;
           }
+        }
+        if (version < 6) {
+          // v6: Strengthened anti-spam (TAG BUDGET hard limit + NO SYNONYM FLOOD)
+          // and CHARACTER APPEARANCE rules with explicit blacklist + examples.
+          // Force-overwrite all sessions' systemPrompt to the new stricter version.
+          if (persistedState.settings) {
+            persistedState.settings.systemPrompt = defaultSystemPrompt;
+          }
+        }
+        // Content-based fallback: if systemPrompt doesn't contain the v6 marker
+        // (e.g. HMR saved version=6 with stale prompt), force-overwrite.
+        if (persistedState.settings &&
+            typeof persistedState.settings.systemPrompt === 'string' &&
+            !persistedState.settings.systemPrompt.includes('TAG BUDGET — HARD LIMIT')) {
+          persistedState.settings.systemPrompt = defaultSystemPrompt;
         }
         return persistedState;
       }

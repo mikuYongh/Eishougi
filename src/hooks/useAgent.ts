@@ -8,6 +8,23 @@ import { useWorkflowStore } from '../stores/workflowStore';
 import { useModelStore } from '../stores/modelStore';
 import { comfyService } from '../services/comfyService';
 import { buildOutputSpec, type PromptSyntax } from '../lib/agentPrompts';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+
+const smartFetch = async (input: RequestInfo | URL | string, init?: RequestInit) => {
+  const isAndroid = navigator.userAgent.toLowerCase().includes('android');
+  if (isAndroid && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    try {
+      return await tauriFetch(input as string, init);
+    } catch (e: any) {
+      if (e.message && e.message.includes('not allowed on the configured scope')) {
+        console.warn('tauriFetch scope error, falling back to window.fetch', e);
+      } else {
+        throw e;
+      }
+    }
+  }
+  return window.fetch(input, init);
+};
 
 export interface ChatMessage {
   id: string;
@@ -467,7 +484,7 @@ User input: ${userText}`;
     }
 
     try {
-      const resp = await fetch(apiUrl, {
+      const resp = await smartFetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -537,7 +554,10 @@ User input: ${userText}`;
       const isVideoExt = (p: string) => VIDEO_EXTS.has((p.split('?')[0].split('.').pop() || '').toLowerCase());
       const mappedMessages = await Promise.all(currentMessages.map(async (msg) => {
         const m: any = { role: msg.role };
-        const imageOnly = (msg.images || []).filter(p => !isVideoExt(p));
+        // Tool messages: don't send images back to LLM. The text content already
+        // contains the JSON result (status/images). Sending base64 images to a
+        // non-multimodal model causes "model does not support multimodal requests".
+        const imageOnly = msg.role === 'tool' ? [] : (msg.images || []).filter(p => !isVideoExt(p));
         if (imageOnly.length > 0) {
           const b64Images = await Promise.all(imageOnly.map(async (urlOrPath) => {
             if (urlOrPath.startsWith('data:')) return urlOrPath;
@@ -737,7 +757,7 @@ User input: ${userText}`;
         throw e;
       }
 
-      const response = await fetch(apiUrl, {
+      const response = await smartFetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

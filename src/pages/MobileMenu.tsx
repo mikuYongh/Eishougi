@@ -1,4 +1,4 @@
-import { FolderHeart, Users, Wand2, Settings, Workflow, History } from "lucide-react";
+import { FolderHeart, Users, Wand2, Settings, Workflow, History, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export function MobileMenu() {
@@ -12,8 +12,8 @@ export function MobileMenu() {
       border: "border-pink-500/20 hover:border-pink-500/50"
     },
     {
-      title: "风格库",
-      subtitle: "Styles",
+      title: "风格画师",
+      subtitle: "Characters",
       icon: <Wand2 size={24} className="text-purple-400" />,
       path: "/characters",
       color: "from-purple-500/20 to-fuchsia-500/5",
@@ -60,18 +60,23 @@ export function MobileMenu() {
         <p className="text-sm text-[var(--text-muted)] mt-1">管理你的资产、模型和引擎配置</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="flex flex-col gap-3">
         {menuItems.map((item, idx) => (
           <Link 
             key={idx}
             to={item.path}
-            className={`flex flex-col items-center justify-center p-6 rounded-3xl border bg-gradient-to-br ${item.color} ${item.border} backdrop-blur-xl shadow-lg transition-all active:scale-95`}
+            className={`flex items-center p-4 rounded-2xl border bg-gradient-to-r ${item.color} ${item.border} backdrop-blur-xl shadow-lg transition-all active:scale-[0.98] hover:-translate-y-0.5 group`}
           >
-            <div className="w-14 h-14 rounded-2xl bg-[var(--bg-layer-2)]/80 flex items-center justify-center mb-3 shadow-inner">
+            <div className="w-12 h-12 rounded-xl bg-[var(--glass-bg-hover)] flex items-center justify-center mr-4 shadow-inner group-hover:scale-110 transition-transform duration-300">
               {item.icon}
             </div>
-            <h3 className="text-[15px] font-bold text-[var(--text-primary)] mb-0.5">{item.title}</h3>
-            <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">{item.subtitle}</span>
+            <div className="flex-1 flex flex-col justify-center">
+              <h3 className="text-[16px] font-bold text-[var(--text-primary)] tracking-wide mb-0.5">{item.title}</h3>
+              <span className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-medium">{item.subtitle}</span>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-[var(--glass-bg)] flex items-center justify-center text-[var(--text-muted)] group-hover:text-[var(--text-primary)] group-hover:bg-[var(--glass-bg-hover)] transition-all">
+              <ChevronRight size={16} />
+            </div>
           </Link>
         ))}
       </div>
