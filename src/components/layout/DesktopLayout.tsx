@@ -15,7 +15,7 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
   const { uiScale } = useSettingsStore();
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden relative">
       <Sidebar />
 
       {/* Main Area */}

@@ -392,7 +392,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
         
       {/* Header */}
       <div
-        className={`flex items-center px-5 py-5 flex-shrink-0 transition-all duration-300 border-b border-[var(--glass-border)] ${isExpanded ? "justify-start" : "justify-center"}`}
+        className={`flex items-center flex-shrink-0 transition-all duration-300 border-b border-[var(--glass-border)] ${isExpanded ? "justify-start px-5 py-5" : "justify-center px-2 pt-3 pb-4"}`}
       >
         {isExpanded ? (
           <>
@@ -433,9 +433,9 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
             </div>
           </>
         ) : (
-          <div className="hidden md:flex flex-col gap-6 items-center pt-2 w-full">
+          <div className="hidden md:flex flex-col items-center w-full">
             <div 
-              className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-[var(--accent-1)]/20 to-[var(--accent-2)]/20 border border-[var(--accent-1)]/30 text-[var(--accent-1)] group relative cursor-pointer hover:shadow-[0_0_20px_rgba(var(--accent-1-rgb), 40)] hover:scale-105 transition-all duration-300" 
+              className="flex items-center justify-center w-12 h-12 mb-3 rounded-2xl bg-gradient-to-br from-[var(--accent-1)]/20 to-[var(--accent-2)]/20 border border-[var(--accent-1)]/30 text-[var(--accent-1)] group relative cursor-pointer hover:shadow-[0_0_20px_rgba(var(--accent-1-rgb), 40)] hover:scale-105 transition-all duration-300" 
               onClick={() => setIsExpanded(true)}
               title="唤出 NEXUS AGENT"
             >
@@ -443,16 +443,18 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
               <div className="absolute top-0 right-0 w-3 h-3 bg-[var(--accent-1)] rounded-full animate-ping opacity-75" />
               <div className="absolute top-0 right-0 w-3 h-3 bg-[var(--accent-1)] rounded-full" />
             </div>
-            <div className="w-8 h-px bg-gradient-to-r from-transparent via-[var(--glass-border)] to-transparent" />
-            <button onClick={handleNewChat} className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--accent-1)] transition-all cursor-pointer" title="新建对话">
-              <Plus size={20} />
-            </button>
-            <button onClick={() => { setIsExpanded(true); setViewMode('history'); }} className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)] transition-all cursor-pointer" title="历史记录">
-              <History size={20} />
-            </button>
-            <button onClick={() => { setIsExpanded(true); setViewMode('settings'); }} className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)] transition-all cursor-pointer" title="配置">
-              <Settings size={20} />
-            </button>
+            <div className="w-8 h-px bg-gradient-to-r from-transparent via-[var(--glass-border)] to-transparent mb-3" />
+            <div className="flex flex-col gap-4 items-center w-full">
+              <button onClick={handleNewChat} className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--accent-1)] transition-all cursor-pointer" title="新建对话">
+                <Plus size={20} />
+              </button>
+              <button onClick={() => { setIsExpanded(true); setViewMode('history'); }} className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)] transition-all cursor-pointer" title="历史记录">
+                <History size={20} />
+              </button>
+              <button onClick={() => { setIsExpanded(true); setViewMode('settings'); }} className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)] transition-all cursor-pointer" title="配置">
+                <Settings size={20} />
+              </button>
+            </div>
           </div>
         )}
       </div>
