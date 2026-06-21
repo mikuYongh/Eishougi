@@ -6,7 +6,6 @@ import { usePromptStore } from "../stores/promptStore";
 import { useWorkflowStore } from "../stores/workflowStore";
 import { useQueueStore } from "../stores/queueStore";
 import { useSettingsStore } from "../stores/settingsStore";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { getImgSrc, isVideoFile } from "../utils/imageUtils";
 import { toast } from "sonner";
 
