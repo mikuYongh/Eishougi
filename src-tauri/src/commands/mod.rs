@@ -1,3 +1,4 @@
+pub mod auto_deploy;
 pub mod data;
 pub mod favorites;
 pub mod files;

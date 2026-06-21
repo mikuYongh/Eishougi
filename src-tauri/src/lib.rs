@@ -257,7 +257,20 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .filter(|metadata| {
+                    !metadata.target().starts_with("tokio_tungstenite")
+                        && !metadata.target().starts_with("tungstenite")
+                })
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("app".to_string()),
+                    }
+                ))
+                .build()
+        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init());
 
@@ -266,6 +279,15 @@ pub fn run() {
         .manage(comfy_ws::ComfyState::new())
         .invoke_handler(tauri::generate_handler![
             commands::greet,
+            commands::auto_deploy::run_auto_deploy,
+            commands::auto_deploy::deploy_comfyui,
+            commands::auto_deploy::start_comfyui,
+            commands::auto_deploy::stop_comfyui,
+            commands::auto_deploy::install_custom_node,
+            commands::auto_deploy::check_comfyui_status,
+            commands::auto_deploy::download_model_file,
+            commands::auto_deploy::check_file_exists,
+            commands::auto_deploy::call_llm_proxy,
             commands::fetch_ollama_models,
             commands::prompts::create_prompt,
             commands::prompts::get_prompt,
