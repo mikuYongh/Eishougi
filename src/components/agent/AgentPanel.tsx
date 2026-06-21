@@ -353,11 +353,14 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
   };
 
   return (
-    <div
-      className={cn(
-        "flex flex-col relative z-50 transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] bg-[var(--glass-bg)] border-[var(--glass-border)] backdrop-blur-3xl",
-        "md:flex-shrink-0 md:h-full md:border-l md:shadow-[-10px_0_40px_rgba(0,0,0,0.5)]",
-        "fixed md:static inset-x-0 bottom-0 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-none border-t md:border-t-0 rounded-t-3xl md:rounded-t-none",
+    <>
+      {/* Placeholder to reserve space in flex layout when collapsed/expanded */}
+      <div className="hidden md:block w-[70px] flex-shrink-0 h-full" />
+      <div
+        className={cn(
+          "flex flex-col z-50 transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] bg-[var(--glass-bg)] border-[var(--glass-border)] backdrop-blur-3xl",
+          "md:flex-shrink-0 md:h-full md:border-l md:shadow-[-10px_0_40px_rgba(0,0,0,0.2)]",
+          "fixed md:absolute md:left-auto md:right-0 md:top-0 inset-x-0 bottom-0 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] md:shadow-none border-t md:border-t-0 rounded-t-3xl md:rounded-t-none",
         isExpanded ? "h-[90vh] md:h-full translate-y-0 opacity-100" : "h-0 md:h-full translate-y-full md:translate-y-0 opacity-0 md:opacity-100"
       )}
       style={{
@@ -389,7 +392,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
         
       {/* Header */}
       <div
-        className={`flex items-center px-5 py-5 flex-shrink-0 transition-all duration-300 border-b border-[var(--glass-border)] bg-gradient-to-r from-transparent via-[var(--accent-1)]/10 to-transparent ${isExpanded ? "justify-start" : "justify-center"}`}
+        className={`flex items-center px-5 py-5 flex-shrink-0 transition-all duration-300 border-b border-[var(--glass-border)] ${isExpanded ? "justify-start" : "justify-center"}`}
       >
         {isExpanded ? (
           <>
@@ -891,6 +894,8 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
       </div>
       
       </div> {/* END INNER WRAPPER */}
+      </div>
+
       
       {showHistoryPicker && (
         <HistoryImagePicker 
@@ -901,6 +906,6 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
           onClose={() => setShowHistoryPicker(false)} 
         />
       )}
-    </div>
+    </>
   );
 }

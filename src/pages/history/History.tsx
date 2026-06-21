@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { Download, Info, Trash2, CalendarDays, Maximize2, BookmarkPlus, Check, X, FileText, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PhotoView } from 'react-photo-view';
@@ -303,9 +304,9 @@ export function History() {
       </div>
 
       {/* Fullscreen Preview Modal */}
-      {previewImage && (
+      {previewImage && createPortal(
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 md:p-8 backdrop-blur-sm"
+          className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 md:p-8 backdrop-blur-sm"
           onClick={() => setPreviewImage(null)}
         >
           <div 
@@ -390,19 +391,20 @@ export function History() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.getElementById('main-content-area') || document.body
       )}
 
       {/* Add to Instance Images Modal */}
-      {addingToPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--glass-bg)] backdrop-blur-sm p-8">
+      {addingToPrompt && createPortal(
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-[var(--glass-bg)] backdrop-blur-sm p-8">
           <div className="bg-[#1A1020]/95 border border-[var(--accent-1)]/30 rounded-2xl shadow-2xl shadow-[var(--accent-1)]/20 w-full max-w-md flex flex-col max-h-[70vh]">
             <div className="p-5 border-b border-[var(--glass-border)] flex items-center justify-between flex-shrink-0">
               <div>
                 <h3 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
                   <BookmarkPlus size={16} className="text-[var(--accent-1)]" /> 添加为示范图
                 </h3>
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">选择要添加到哪个提示词项目</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">选择要添加到的提示词项目</p>
               </div>
               <button onClick={() => setAddingToPrompt(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
                 <X size={18} />
@@ -439,7 +441,8 @@ export function History() {
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.getElementById('main-content-area') || document.body
       )}
 
     </div>

@@ -179,7 +179,6 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
         baseModel: rustPayload.baseModel,
       });
       const result = await invoke('update_prompt', { prompt: rustPayload });
-      console.log("[updatePrompt] backend returned:", result ? "OK" : "empty", result);
       set((state) => ({
         prompts: state.prompts.map((p) => (p.id === id ? updatedPrompt : p)),
       }));

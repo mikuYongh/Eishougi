@@ -123,17 +123,17 @@ function MobileAgentInputArea({ isGenerating, stopGenerating, onSend }: InputAre
       )}
 
       <div className="flex items-center gap-1.5 bg-[var(--glass-bg)] backdrop-blur-2xl border border-[var(--glass-border)] p-1.5 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.4)] focus-within:border-[var(--accent-1)]/50 focus-within:shadow-[0_8px_32px_rgba(var(--accent-1-rgb),0.15)] transition-all pointer-events-auto">
-        <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors cursor-pointer" title="图片">
+        <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer" title="图片">
           <ImagePlus size={20} />
           <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
         </label>
-        <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors cursor-pointer" title="文件">
+        <label className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer" title="文件">
           <Paperclip size={20} />
           <input type="file" className="hidden" onChange={handleFileUpload} />
         </label>
         <button
           onClick={() => setShowHistoryPicker(true)}
-          className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors"
+          className="w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors"
         >
           <History size={20} />
         </button>
@@ -284,11 +284,11 @@ export function MobileAgentModal() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-white/5 rounded-full p-1 border border-white/5">
-          <button onClick={() => setViewMode('chat')} className={cn("p-2 rounded-full transition-all", viewMode === 'chat' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-muted)] hover:text-white")}><Bot size={16} /></button>
-          <button onClick={() => setViewMode('history')} className={cn("p-2 rounded-full transition-all", viewMode === 'history' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-muted)] hover:text-white")}><History size={16} /></button>
-          <button onClick={() => setViewMode('settings')} className={cn("p-2 rounded-full transition-all", viewMode === 'settings' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-muted)] hover:text-white")}><Settings size={16} /></button>
-          <div className="w-px h-6 bg-white/10 mx-1"></div>
+        <div className="flex items-center gap-2 bg-[var(--glass-bg)] rounded-full p-1 border border-[var(--glass-border)]">
+          <button onClick={() => setViewMode('chat')} className={cn("p-2 rounded-full transition-all", viewMode === 'chat' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]")}><Bot size={16} /></button>
+          <button onClick={() => setViewMode('history')} className={cn("p-2 rounded-full transition-all", viewMode === 'history' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]")}><History size={16} /></button>
+          <button onClick={() => setViewMode('settings')} className={cn("p-2 rounded-full transition-all", viewMode === 'settings' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]")}><Settings size={16} /></button>
+          <div className="w-px h-6 bg-[var(--glass-border)] mx-1"></div>
           <button 
             onClick={() => toggleMobileAgent(false)}
             className="p-2 rounded-full text-[var(--text-muted)] hover:text-red-400 transition-colors"
@@ -460,12 +460,12 @@ export function MobileAgentModal() {
                     "p-4 rounded-2xl border transition-all cursor-pointer flex flex-col gap-2 relative overflow-hidden",
                     activeSessionId === s.id 
                       ? "bg-gradient-to-r from-[var(--accent-1)]/20 to-transparent border-[var(--accent-1)]/50 shadow-[inset_0_0_20px_rgba(var(--accent-1-rgb),0.1)]" 
-                      : "bg-[var(--glass-bg)] border-[var(--glass-border)] hover:border-white/20"
+                      : "bg-[var(--glass-bg)] border-[var(--glass-border)] hover:border-[var(--accent-1)]/30"
                   )}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-[var(--text-primary)] text-sm">{s.title}</span>
-                    <span className="text-[10px] font-mono text-[var(--text-muted)] bg-black/20 px-2 py-1 rounded-full">
+                    <span className="text-[10px] font-mono text-[var(--text-muted)] bg-[var(--glass-bg)] px-2 py-1 rounded-full border border-[var(--glass-border)]">
                       {new Date(s.updatedAt).toLocaleDateString()}
                     </span>
                   </div>
@@ -499,7 +499,7 @@ export function MobileAgentModal() {
               <textarea 
                 value={tempSystemPrompt}
                 onChange={(e) => setTempSystemPrompt(e.target.value)}
-                className="w-full h-48 bg-black/30 border border-[var(--glass-border)] rounded-xl p-3 text-[12px] text-[var(--text-secondary)] font-mono outline-none focus:border-[var(--accent-1)]/50 custom-scrollbar"
+                className="w-full h-48 bg-[var(--bg-layer-0)] border border-[var(--glass-border)] rounded-xl p-3 text-[12px] text-[var(--text-secondary)] font-mono outline-none focus:border-[var(--accent-1)]/50 custom-scrollbar"
                 placeholder="在此输入系统指令..."
               />
               <button 
@@ -521,7 +521,7 @@ export function MobileAgentModal() {
               ) : (
                 <div className="space-y-3">
                   {mcp.map((server, idx) => (
-                    <div key={idx} className="bg-black/20 border border-[var(--glass-border)] p-3 rounded-xl flex items-center justify-between">
+                    <div key={idx} className="bg-[var(--glass-bg)] border border-[var(--glass-border)] p-3 rounded-xl flex items-center justify-between">
                       <div className="flex items-center gap-3 overflow-hidden">
                         <div className={cn("w-2 h-2 rounded-full flex-shrink-0 shadow-[0_0_8px_currentColor]", server.enabled ? "bg-green-400 text-green-400" : "bg-red-400 text-red-400")} />
                         <div className="truncate">

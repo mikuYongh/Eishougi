@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Copy, Check, Flame, Heart } from 'lucide-react';
 import type { Character, Artist } from '../../stores/libraryStore';
 
@@ -42,8 +43,8 @@ export function ItemDetailModal({ item, onClose, onToggleFavorite, isArtist }: I
     ? `${imgBaseUrl}/${encodeURIComponent(item.imgUrl)}`
     : null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
+  return createPortal(
+    <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
       <div 
         className="bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col md:flex-row overflow-hidden shadow-2xl relative"
         onClick={(e) => e.stopPropagation()}
@@ -161,6 +162,7 @@ export function ItemDetailModal({ item, onClose, onToggleFavorite, isArtist }: I
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.getElementById('main-content-area') || document.body
   );
 }

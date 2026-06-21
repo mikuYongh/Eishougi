@@ -295,10 +295,8 @@ export function Generate() {
     
     // Auto-save generation choices back to the project database
     try {
-      console.log("[Generate] auto-saving positivePrompt:", positivePrompt?.substring(0, 50), "negativePrompt:", negativePrompt?.substring(0, 50));
       await updatePrompt(project.id, mergedProject);
-      console.log("[Generate] auto-save complete");
-    } catch(e) {
+      } catch(e) {
       console.warn("Failed to auto-save prompt configurations:", e);
     }
 

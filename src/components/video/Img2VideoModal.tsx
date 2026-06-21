@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useQueueStore } from '../../stores/queueStore';
 import { comfyService } from '../../services/comfyService';
@@ -70,7 +71,6 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
         baseModel
       );
       
-      console.log('Video job queued');
       onClose();
     } catch (e: any) {
       console.error(e);
@@ -80,8 +80,8 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="absolute inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={!isGenerating ? onClose : undefined} />
       <div className="relative bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-2xl p-6 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col md:flex-row gap-6">
         
@@ -196,6 +196,7 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.getElementById('main-content-area') || document.body
   );
 }

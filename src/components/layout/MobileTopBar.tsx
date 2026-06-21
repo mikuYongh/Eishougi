@@ -21,8 +21,8 @@ export function MobileTopBar() {
         </h1>
       </div>
 
-      <Link to="/settings" className="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 text-[var(--text-secondary)] hover:text-white transition-colors">
-        <Settings size={16} />
+      <Link to="/settings" className="w-8 h-8 rounded-full flex items-center justify-center bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors border border-[var(--glass-border)]">
+        <Settings size={18} />
       </Link>
     </div>
   );

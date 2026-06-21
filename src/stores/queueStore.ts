@@ -55,7 +55,6 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     _isSetup = true;
 
     const u1 = await listen<string>('comfy-status', (event) => {
-      console.log("[Queue] backend status:", event.payload);
       set({ isConnected: event.payload === 'connected' });
     });
     _unlisteners.push(u1);
@@ -155,7 +154,6 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     },
 
     disconnect: () => {
-      console.log("[Queue] disconnect");
       _unlisteners.forEach(unlisten => unlisten());
       _unlisteners = [];
       _isSetup = false;
@@ -305,8 +303,6 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           seed: tempProject.seed
         });
 
-        console.log("[Queue] queued video prompt_id:", res.prompt_id);
-
         set(state => ({
           jobs: state.jobs.map(j => j.id === job.id ? { ...j, comfyPromptId: res.prompt_id } : j)
         }));
@@ -350,7 +346,6 @@ export const useQueueStore = create<QueueStore>((set, get) => {
 // loses track of them, causing progress/completion events to be swallowed.
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    console.log('[Queue] HMR dispose — cleaning up event listeners');
     _unlisteners.forEach(u => u());
     _unlisteners = [];
     _isSetup = false;

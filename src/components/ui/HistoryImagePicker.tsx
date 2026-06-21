@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { History, X, CheckCircle2 } from "lucide-react";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -27,8 +28,10 @@ export function HistoryImagePicker({ onSelect, onClose, title = "选择生成历
     });
   }, []);
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center animate-in fade-in duration-300">
+  const target = document.getElementById('main-content-area') || document.body;
+
+  return createPortal(
+    <div className="absolute inset-0 z-[100] flex items-center justify-center animate-in fade-in duration-300">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-[var(--glass-bg)] backdrop-blur-md cursor-pointer"
@@ -109,6 +112,7 @@ export function HistoryImagePicker({ onSelect, onClose, title = "选择生成历
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    target
   );
 }

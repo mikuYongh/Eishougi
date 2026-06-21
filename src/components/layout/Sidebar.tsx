@@ -36,7 +36,7 @@ export function Sidebar() {
       {/* Section label */}
       <div className="px-3 pb-2 pt-1.5 flex items-center gap-2">
         <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent-1)]" />
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--text-muted)]">
+        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--text-secondary)]">
           导航菜单
         </span>
       </div>
@@ -116,10 +116,10 @@ export function Sidebar() {
             }}
           />
           
-          <div className={`flex-1 flex items-center justify-center z-10 transition-colors duration-500 ${appTheme === "dark" ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
+          <div className={`flex-1 flex items-center justify-center z-10 transition-colors duration-500 ${appTheme === "dark" ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>
             <Moon size={16} className={appTheme === "dark" ? "animate-[pulse_4s_ease-in-out_infinite]" : ""} />
           </div>
-          <div className={`flex-1 flex items-center justify-center z-10 transition-colors duration-500 ${appTheme === "light" ? "text-yellow-500" : "text-[var(--text-muted)]"}`}>
+          <div className={`flex-1 flex items-center justify-center z-10 transition-colors duration-500 ${appTheme === "light" ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"}`}>
             <Sun size={16} className={appTheme === "light" ? "animate-[spin_10s_linear_infinite]" : ""} />
           </div>
         </div>

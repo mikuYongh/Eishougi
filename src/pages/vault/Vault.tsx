@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { createPortal } from "react-dom";
 import { Sparkles, HeartOff, Video, Download, X, Maximize2 } from "lucide-react";
 import { PhotoView } from 'react-photo-view';
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -159,9 +160,9 @@ export function Vault() {
         )}
       </div>
 
-      {previewImage && (
+      {previewImage && createPortal(
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 md:p-8 backdrop-blur-sm"
+          className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 md:p-8 backdrop-blur-sm"
           onClick={() => setPreviewImage(null)}
         >
           <div 
@@ -228,7 +229,8 @@ export function Vault() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.getElementById('main-content-area') || document.body
       )}
     </div>
   );

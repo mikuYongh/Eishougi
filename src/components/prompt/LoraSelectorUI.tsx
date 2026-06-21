@@ -95,9 +95,9 @@ export function LoraSelectorUI({ selectedLoras, onChange, availableLoras }: Lora
 
       {/* Mobile-friendly Bottom Sheet for adjusting active LoRA */}
       {activeChipIndex !== null && selectedLoras[activeChipIndex] && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setActiveChipIndex(null)}>
+        <div className="absolute inset-0 z-[200] flex items-end sm:items-center justify-center bg-[var(--bg-layer-0)]/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setActiveChipIndex(null)}>
           <div 
-            className="w-full max-w-sm relative bg-[var(--bg-layer-2)]/95 backdrop-blur-xl border border-[var(--glass-border)] rounded-t-3xl sm:rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.05)] p-5 flex flex-col gap-5 animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 overflow-hidden"
+            className="w-full max-w-sm relative bg-[var(--bg-layer-2)]/85 backdrop-blur-3xl border border-[var(--glass-border)] rounded-t-3xl sm:rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5),inset_0_0_0_1px_var(--glass-border)] p-5 flex flex-col gap-5 animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300 overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Glow effect */}
@@ -137,14 +137,14 @@ export function LoraSelectorUI({ selectedLoras, onChange, availableLoras }: Lora
             </button>
           </div>
         </div>,
-        document.body
+        document.getElementById('main-content-area') || document.body
       )}
 
       {/* Modal / Bottom Sheet for Adding LoRA */}
       {isModalOpen && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsModalOpen(false)}>
+        <div className="absolute inset-0 z-[200] flex items-center justify-center bg-[var(--bg-layer-0)]/60 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setIsModalOpen(false)}>
           <div 
-            className="w-[95%] max-w-2xl relative bg-[var(--bg-layer-2)]/95 backdrop-blur-xl border border-[var(--glass-border)] rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5),inset_0_0_0_1px_rgba(255,255,255,0.05)] flex flex-col h-[85vh] animate-in zoom-in-95 duration-300 overflow-hidden"
+            className="w-[95%] max-w-2xl relative bg-[var(--bg-layer-2)]/85 backdrop-blur-3xl border border-[var(--glass-border)] rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5),inset_0_0_0_1px_var(--glass-border)] flex flex-col h-[85vh] animate-in zoom-in-95 duration-300 overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Glow effect */}
@@ -174,7 +174,7 @@ export function LoraSelectorUI({ selectedLoras, onChange, availableLoras }: Lora
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent relative z-10">
+            <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-[var(--glass-border)] scrollbar-track-transparent relative z-10">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-24">
                 {filteredLoras.map(lora => {
                   const isSelected = selectedLoras.some(l => l.name === lora);
@@ -206,17 +206,17 @@ export function LoraSelectorUI({ selectedLoras, onChange, availableLoras }: Lora
               </div>
             </div>
             
-            <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-[var(--bg-layer-2)] via-[var(--bg-layer-2)]/95 to-transparent shrink-0 z-20">
+            <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-[var(--bg-layer-2)] via-[var(--bg-layer-2)]/85 to-transparent shrink-0 z-20 pointer-events-none">
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="w-full max-w-sm mx-auto flex items-center justify-center py-3.5 bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] text-white rounded-2xl text-sm font-bold shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.3)] hover:shadow-[0_0_30px_rgba(var(--accent-1-rgb),0.5)] hover:from-[var(--accent-1)] hover:to-[var(--accent-2)] transition-all active:scale-[0.98] cursor-pointer"
+                className="w-full max-w-sm mx-auto flex items-center justify-center py-3.5 bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] text-white rounded-2xl text-sm font-bold shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.3)] hover:shadow-[0_0_30px_rgba(var(--accent-1-rgb),0.5)] hover:from-[var(--accent-1)] hover:to-[var(--accent-2)] transition-all active:scale-[0.98] cursor-pointer pointer-events-auto"
               >
                 完成选择
               </button>
             </div>
           </div>
         </div>,
-        document.body
+        document.getElementById('main-content-area') || document.body
       )}
     </div>
   );

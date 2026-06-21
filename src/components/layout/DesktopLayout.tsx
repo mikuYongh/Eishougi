@@ -19,7 +19,7 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
       <Sidebar />
 
       {/* Main Area */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-transparent relative">
+      <div id="main-content-area" className="flex-1 flex flex-col overflow-hidden bg-transparent relative">
         <TopBar />
         <CompletionToast />
         <div 

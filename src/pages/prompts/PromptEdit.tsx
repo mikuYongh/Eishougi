@@ -101,11 +101,9 @@ export function PromptEdit() {
     }
 
     if (id && id !== 'new') {
-      console.log("[PromptEdit] saving positivePrompt:", project.positivePrompt?.substring(0, 50), "negativePrompt:", project.negativePrompt?.substring(0, 50));
       await updatePrompt(id, project);
       toast.success('项目已更新');
-      console.log("[PromptEdit] save complete");
-    } else if (id === 'new') {
+      } else if (id === 'new') {
       // Create a new prompt project
       const newId = "p_" + Date.now().toString();
       const now = Date.now();
@@ -135,18 +133,10 @@ export function PromptEdit() {
         updatedAt: now,
         instanceImages: project.instanceImages || [],
       };
-      console.log("[PromptEdit] creating new prompt:", {
-        id: newId,
-        title: newProject.title,
-        workflowId: newProject.workflowId,
-        baseModel: newProject.baseModel,
-        loraConfigsLength: newProject.loraConfigs?.length,
-      });
-      await addPrompt(newProject);
+await addPrompt(newProject);
       toast.success('项目已创建');
       navigate(`/prompts/${newId}/edit`, { replace: true });
-      console.log("[PromptEdit] create complete");
-    }
+      }
   };
 
   const updateField = (key: keyof PromptProject, value: any) => {

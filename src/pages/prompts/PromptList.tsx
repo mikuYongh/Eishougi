@@ -58,6 +58,7 @@ export function PromptList() {
   );
   const [isAutoTagging, setIsAutoTagging] = useState(false);
   const [tagProgress, setTagProgress] = useState("");
+  const [taggingItemId, setTaggingItemId] = useState<string | null>(null);
 
   // Persist filter state so it survives navigation away and back
   useEffect(() => { sessionStorage.setItem('pl_viewMode', viewMode); }, [viewMode]);
@@ -133,16 +134,21 @@ export function PromptList() {
     setIsAutoTagging(true);
     try {
       const count = await aiService.batchAutoTagPrompts(
-        (curr, total) => setTagProgress(`${curr}/${total}`),
+        (curr, total, id) => {
+          setTagProgress(`${curr}/${total}`);
+          if (id) setTaggingItemId(id);
+        },
         console.log
       );
       setTagProgress("");
+      setTaggingItemId(null);
       toast.success(`自动打标完成！成功为 ${count} 个项目生成了标签。`);
     } catch (e: any) {
       toast.error(`打标失败: ${e.message}`);
     } finally {
       setIsAutoTagging(false);
       setTagProgress("");
+      setTaggingItemId(null);
     }
   };
 
@@ -321,12 +327,17 @@ export function PromptList() {
 
                   {/* Tags */}
                   <div className="flex flex-wrap gap-1.5">
+                    {taggingItemId === p.id && (
+                      <span className="px-1.5 py-0.5 rounded bg-[var(--accent-1)]/20 text-[var(--accent-1)] text-[9px] font-bold flex items-center gap-1 whitespace-nowrap">
+                        <Sparkles size={8} className="animate-pulse" /> 打标中...
+                      </span>
+                    )}
                     {p.tags.slice(0, 3).map(tag => (
-                      <span key={tag} className="px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] text-[9px] font-bold truncate max-w-[60px]">
+                      <span key={tag} className="px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] text-[9px] font-bold truncate max-w-[60px]">
                         {tag}
                       </span>
                     ))}
-                    {p.tags.length > 3 && <span className="px-1 py-0.5 text-[var(--text-muted)] text-[9px]">+{p.tags.length - 3}</span>}
+                    {p.tags.length > 3 && <span className="px-1 py-0.5 text-[var(--text-secondary)] text-[9px]">+{p.tags.length - 3}</span>}
                   </div>
 
                   {/* Meta Badges */}
@@ -380,12 +391,18 @@ export function PromptList() {
                 <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                   <div className="flex items-center gap-3">
                     <h3 className="text-[14px] font-bold text-[var(--text-primary)] truncate">{p.title}</h3>
-                    <div className="flex gap-1.5">
-                      {p.tags.map(tag => (
-                        <span key={tag} className="px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] text-[9px] font-bold">
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {taggingItemId === p.id && (
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--accent-1)]/20 text-[var(--accent-1)] text-[9px] font-bold flex items-center gap-1 whitespace-nowrap">
+                          <Sparkles size={8} className="animate-pulse" /> 打标中...
+                        </span>
+                      )}
+                      {p.tags.slice(0, 5).map(tag => (
+                        <span key={tag} className="px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] text-[9px] font-bold whitespace-nowrap truncate max-w-[80px]">
                           {tag}
                         </span>
                       ))}
+                      {p.tags.length > 5 && <span className="px-1 py-0.5 text-[var(--text-secondary)] text-[9px]">+{p.tags.length - 5}</span>}
                     </div>
                   </div>
                   <p className="text-[11px] text-[var(--text-muted)] line-clamp-1">{p.positivePrompt}</p>

@@ -51,7 +51,7 @@ export const aiService = {
   },
 
   async batchAutoTagPrompts(
-    onProgress?: (current: number, total: number) => void,
+    onProgress?: (current: number, total: number, currentId?: string) => void,
     onLog?: (msg: string) => void
   ): Promise<number> {
     const prompts = usePromptStore.getState().prompts;
@@ -62,7 +62,7 @@ export const aiService = {
     
     for (const project of prompts) {
       index++;
-      if (onProgress) onProgress(index, prompts.length);
+      if (onProgress) onProgress(index, prompts.length, project.id);
       
       const textToAnalyze = [project.title, project.positivePrompt].filter(Boolean).join("\n");
       if (!textToAnalyze.trim()) {
