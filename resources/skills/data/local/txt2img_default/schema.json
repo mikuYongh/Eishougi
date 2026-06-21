@@ -1,0 +1,48 @@
+{
+  "description": "",
+  "enabled": true,
+  "parameters": {
+    "filename_prefix": {
+      "node_id": "12",
+      "field": "filename_prefix",
+      "required": false,
+      "type": "string",
+      "description": "Output file prefix"
+    },
+    "batch_size": {
+      "node_id": "16",
+      "field": "batch_size",
+      "required": false,
+      "type": "int",
+      "description": "Batch size"
+    },
+    "prompt": {
+      "node_id": "18",
+      "field": "text",
+      "required": true,
+      "type": "string",
+      "description": "Text prompt"
+    },
+    "steps": {
+      "node_id": "62",
+      "field": "steps",
+      "required": false,
+      "type": "int",
+      "description": "Generation steps"
+    },
+    "prompt_2": {
+      "node_id": "66",
+      "field": "prompt",
+      "required": true,
+      "type": "int",
+      "description": "Text prompt"
+    },
+    "seed": {
+      "node_id": "66",
+      "field": "seed",
+      "required": false,
+      "type": "string",
+      "description": "Random seed"
+    }
+  }
+}

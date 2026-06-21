@@ -1,0 +1,12 @@
+{
+  "servers": [
+    {
+      "id": "local",
+      "name": "local",
+      "url": "http://127.0.0.1:8188",
+      "enabled": true,
+      "output_dir": "./outputs"
+    }
+  ],
+  "default_server": "local"
+}
