@@ -13,23 +13,25 @@ interface ArtistSelectorProps {
 }
 
 export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorProps) {
-  const { artists, loadMoreArtists, setArtistSearch } = useLibraryStore();
+  const { artists, loadMoreArtists, setArtistSearch, isArtistsLoading } = useLibraryStore();
   const privacyMode = useSettingsStore(s => s.settings.privacyMode);
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    // Only load initial if empty
     if (artists.length === 0) {
       loadMoreArtists();
     }
-  }, [loadMoreArtists, artists.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Parse selected triggers into an array (assuming comma-separated for simplicity)
+  // Parse selected triggers into an array
   const selectedList = selectedTriggers.split(",").map(s => s.trim()).filter(Boolean);
 
-  // When search changes, update the store
+  // When search changes, update the store (debounced, skip initial mount)
+  const mountedRef = useState(false);
   useEffect(() => {
+    if (!mountedRef[0]) { mountedRef[1](true); return; }
     const timer = setTimeout(() => {
       setArtistSearch(search);
     }, 300);
@@ -123,8 +125,8 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
 
       {/* Picker Drawer */}
       {isOpen && (
-        <div className="absolute inset-x-0 bottom-full mb-2 bg-[#1A1625]/95 backdrop-blur-xl z-50 rounded-2xl border border-[var(--glass-border)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 h-[300px] shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
-          <div className="p-3 border-b border-[var(--glass-border)] flex items-center gap-2 bg-black/20">
+        <div className="absolute inset-x-0 bottom-full mb-2 bg-[var(--bg-layer-2)]/85 backdrop-blur-3xl z-50 rounded-2xl border border-[var(--glass-border)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 h-[300px] shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+          <div className="p-3 border-b border-[var(--glass-border)] flex items-center gap-2 bg-[var(--bg-layer-1)]">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
               <input 
@@ -132,24 +134,24 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="搜索画师名或触发词..."
-                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-[12px] text-white outline-none focus:border-pink-500/50 transition-colors"
+                className="w-full bg-[var(--bg-base)] border border-[var(--glass-border)] rounded-lg pl-9 pr-3 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-pink-500/50 transition-colors"
               />
             </div>
-            <button onClick={() => setIsOpen(false)} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center text-[var(--text-muted)] cursor-pointer transition-colors">
+            <button onClick={() => setIsOpen(false)} className="w-8 h-8 rounded-lg hover:bg-[var(--glass-bg-hover)] flex items-center justify-center text-[var(--text-muted)] cursor-pointer transition-colors">
               <X size={16} />
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-3 grid grid-cols-1 md:grid-cols-2 gap-2 scrollbar-thin scrollbar-thumb-white/10">
+          <div className="flex-1 overflow-y-auto p-3 grid grid-cols-1 md:grid-cols-2 gap-2 scrollbar-thin scrollbar-thumb-[var(--glass-border)]">
             {artists.map(artist => {
               const isSelected = selectedList.includes(artist.trigger.trim());
               return (
                 <div 
                   key={artist.id} 
                   onClick={() => toggleArtist(artist)}
-                  className={`flex items-center p-2 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-pink-500/20 border-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.15)]' : 'bg-white/5 border-transparent hover:bg-white/10'}`}
+                  className={`flex items-center p-2 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-pink-500/20 border-pink-500/50 shadow-[0_0_15px_rgba(236,72,153,0.15)]' : 'bg-[var(--glass-bg)] border-[var(--glass-border)] hover:border-[var(--accent-1)]/50'}`}
                 >
-                  <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-black/20 border border-[var(--glass-border)]">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-[var(--bg-base)] border border-[var(--glass-border)]">
                     {artist.imgUrl ? (
                       <img src={`https://blobs.animadex.net/ArtistOutputs/thumbs/${encodeURIComponent(artist.imgUrl)}`} className={`w-full h-full object-cover ${privacyMode ? 'blur-sm' : ''}`} alt={artist.nameEn} />
                     ) : (
@@ -157,7 +159,7 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
                     )}
                   </div>
                   <div className="ml-3 min-w-0 flex-1">
-                    <div className="text-[12px] font-bold text-white truncate">{artist.nameZh || artist.nameEn}</div>
+                    <div className="text-[12px] font-bold text-[var(--text-primary)] truncate">{artist.nameZh || artist.nameEn}</div>
                     <div className="text-[10px] text-[var(--text-muted)] truncate">{artist.trigger}</div>
                   </div>
                   {isSelected && <Check size={14} className="text-pink-400 flex-shrink-0 mx-2" />}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLibraryStore } from "../../stores/libraryStore";
-import { Search, Star, Heart, Flame } from "lucide-react";
+import { Search, Star, Heart, Flame, Loader2, AlertCircle } from "lucide-react";
 import { VirtuosoGrid } from "react-virtuoso";
 
 import { ItemDetailModal } from "../../components/library/ItemDetailModal";
@@ -13,6 +13,7 @@ export function CharacterLibrary() {
     characters,
     characterSearch,
     characterShowFavorites,
+    isCharactersLoading,
     setCharacterSearch,
     toggleCharacterFavoriteFilter,
     loadMoreCharacters,
@@ -73,6 +74,18 @@ export function CharacterLibrary() {
 
       {/* Grid View using Virtuoso */}
       <div className="flex-1 min-h-0 relative">
+        {isCharactersLoading && characters.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+            <Loader2 size={32} className="animate-spin text-[var(--accent-1)]" />
+            <span className="text-sm">正在加载角色数据...</span>
+          </div>
+        ) : characters.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+            <AlertCircle size={32} className="text-yellow-500" />
+            <span className="text-sm">没有角色数据</span>
+            <button onClick={() => loadMoreCharacters()} className="px-4 py-1.5 rounded-lg bg-[var(--accent-1)]/20 text-[var(--accent-1)] text-sm hover:bg-[var(--accent-1)]/30 transition-colors">重新加载</button>
+          </div>
+        ) : (
         <VirtuosoGrid
           style={{ height: "100%", width: "100%" }}
           data={characters}
@@ -143,6 +156,7 @@ export function CharacterLibrary() {
             </div>
           )}
         />
+        )}
       </div>
 
       {selectedItem && (
