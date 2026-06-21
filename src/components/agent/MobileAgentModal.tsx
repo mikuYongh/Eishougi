@@ -146,7 +146,7 @@ function MobileAgentInputArea({ isGenerating, stopGenerating, onSend }: InputAre
           onKeyDown={handleKeyDown}
           onFocus={handleFocus}
           placeholder="输入指令..."
-          className="flex-1 min-w-0 bg-transparent border-none text-[var(--text-primary)] px-2 py-2 outline-none text-sm placeholder:text-[var(--text-muted)] font-medium"
+          className="flex-1 min-w-0 bg-transparent border-none text-[var(--text-primary)] px-2 py-2 outline-none text-sm placeholder:text-[var(--text-secondary)] font-medium"
         />
 
         {isGenerating ? (
@@ -160,7 +160,7 @@ function MobileAgentInputArea({ isGenerating, stopGenerating, onSend }: InputAre
           <button
             onClick={handleSend}
             disabled={!input.trim() && !hasAttachments}
-            className="w-10 h-10 rounded-full bg-[var(--accent-1)] text-[var(--bg-base)] flex items-center justify-center disabled:opacity-50 disabled:bg-[var(--glass-border)] disabled:text-[var(--text-muted)] disabled:shadow-none transition-all active:scale-95 shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.4)] flex-shrink-0"
+            className="w-10 h-10 rounded-full bg-[var(--accent-1)] text-[var(--bg-base)] flex items-center justify-center disabled:opacity-50 disabled:bg-[var(--glass-border)] disabled:text-[var(--text-secondary)] disabled:shadow-none transition-all active:scale-95 shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.4)] flex-shrink-0"
           >
             <Send size={16} className="ml-0.5" />
           </button>
@@ -285,13 +285,13 @@ export function MobileAgentModal() {
         </div>
 
         <div className="flex items-center gap-2 bg-[var(--glass-bg)] rounded-full p-1 border border-[var(--glass-border)]">
-          <button onClick={() => setViewMode('chat')} className={cn("p-2 rounded-full transition-all", viewMode === 'chat' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]")}><Bot size={16} /></button>
-          <button onClick={() => setViewMode('history')} className={cn("p-2 rounded-full transition-all", viewMode === 'history' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]")}><History size={16} /></button>
-          <button onClick={() => setViewMode('settings')} className={cn("p-2 rounded-full transition-all", viewMode === 'settings' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]")}><Settings size={16} /></button>
+          <button onClick={() => setViewMode('chat')} className={cn("p-2 rounded-full transition-all", viewMode === 'chat' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]")}><Bot size={16} /></button>
+          <button onClick={() => setViewMode('history')} className={cn("p-2 rounded-full transition-all", viewMode === 'history' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]")}><History size={16} /></button>
+          <button onClick={() => setViewMode('settings')} className={cn("p-2 rounded-full transition-all", viewMode === 'settings' ? "bg-[var(--accent-1)] text-white shadow-md" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]")}><Settings size={16} /></button>
           <div className="w-px h-6 bg-[var(--glass-border)] mx-1"></div>
           <button 
             onClick={() => toggleMobileAgent(false)}
-            className="p-2 rounded-full text-[var(--text-muted)] hover:text-red-400 transition-colors"
+            className="p-2 rounded-full text-[var(--text-secondary)] hover:text-red-400 transition-colors"
           >
             <X size={18} />
           </button>
@@ -310,7 +310,7 @@ export function MobileAgentModal() {
               className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar pb-32"
             >
               {(!session?.messages || session.messages.length === 0) && !isGenerating && (
-                <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] space-y-4 opacity-50 px-8 text-center">
+                <div className="h-full flex flex-col items-center justify-center text-[var(--text-secondary)] space-y-4 opacity-50 px-8 text-center">
                   <div className="relative">
                     <div className="absolute inset-0 bg-[var(--accent-1)] blur-3xl opacity-20 rounded-full"></div>
                     <Bot size={80} className="relative z-10 text-[var(--accent-1)] opacity-80" />
@@ -465,12 +465,12 @@ export function MobileAgentModal() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-[var(--text-primary)] text-sm">{s.title}</span>
-                    <span className="text-[10px] font-mono text-[var(--text-muted)] bg-[var(--glass-bg)] px-2 py-1 rounded-full border border-[var(--glass-border)]">
+                    <span className="text-[10px] font-mono text-[var(--text-secondary)] bg-[var(--glass-bg)] px-2 py-1 rounded-full border border-[var(--glass-border)]">
                       {new Date(s.updatedAt).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-xs text-[var(--text-muted)] line-clamp-1 flex-1 pr-4">
+                    <span className="text-xs text-[var(--text-secondary)] line-clamp-1 flex-1 pr-4">
                       {s.messages.length} 条记录
                     </span>
                     <button 
@@ -515,7 +515,7 @@ export function MobileAgentModal() {
                 <Zap size={16} className="text-[var(--accent-1)]" /> MCP 外挂子系统
               </h3>
               {mcp.length === 0 ? (
-                <div className="text-center py-6 text-[var(--text-muted)] text-sm">
+                <div className="text-center py-6 text-[var(--text-secondary)] text-sm">
                   未配置 MCP 协议端点。<br/>请前往全局设置中心配置。
                 </div>
               ) : (
@@ -526,7 +526,7 @@ export function MobileAgentModal() {
                         <div className={cn("w-2 h-2 rounded-full flex-shrink-0 shadow-[0_0_8px_currentColor]", server.enabled ? "bg-green-400 text-green-400" : "bg-red-400 text-red-400")} />
                         <div className="truncate">
                           <p className="text-sm font-bold text-[var(--text-primary)] truncate">{server.name}</p>
-                          <p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{server.url}</p>
+                          <p className="text-[10px] text-[var(--text-secondary)] font-mono truncate">{server.url}</p>
                         </div>
                       </div>
                     </div>

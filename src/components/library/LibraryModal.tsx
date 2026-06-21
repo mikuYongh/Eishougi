@@ -148,7 +148,7 @@ export function LibraryModal({ isOpen, onClose, onSelect, title = "召唤图库"
 
             {/* Search Input */}
             <div className="relative group w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent-1)] transition-colors" size={16} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-1)] transition-colors" size={16} />
               <input
                 type="text"
                 placeholder="搜索..."
@@ -163,12 +163,12 @@ export function LibraryModal({ isOpen, onClose, onSelect, title = "召唤图库"
         {/* Content */}
         <div className="flex-1 min-h-0 bg-[var(--bg-layer-2)] relative">
           {isLoading && data.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-secondary)]">
               <Loader2 size={32} className="animate-spin text-[var(--accent-1)]" />
               <span className="text-sm">正在加载...</span>
             </div>
           ) : data.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-secondary)]">
               <AlertCircle size={32} className="text-yellow-500" />
               <span className="text-sm">没有数据</span>
               <button onClick={loadMore} className="px-4 py-1.5 rounded-lg bg-[var(--accent-1)]/20 text-[var(--accent-1)] text-sm hover:bg-[var(--accent-1)]/30 transition-colors">重新加载</button>
@@ -272,7 +272,7 @@ export function LibraryModal({ isOpen, onClose, onSelect, title = "召唤图库"
               className={`flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold shadow-lg transition-all ${
                 selectedTags.length > 0 
                   ? 'bg-[var(--accent-1)] hover:bg-[var(--accent-2)] text-white hover:scale-105'
-                  : 'bg-[var(--glass-bg)] text-[var(--text-muted)] cursor-not-allowed border border-[var(--glass-border)]'
+                  : 'bg-[var(--glass-bg)] text-[var(--text-secondary)] cursor-not-allowed border border-[var(--glass-border)]'
               }`}
             >
               <Check size={16} /> 确认插入

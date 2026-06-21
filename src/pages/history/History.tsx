@@ -182,7 +182,7 @@ export function History() {
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
             生成历史 (History)
           </h2>
-          <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">回顾所有的创造轨迹，支持查看详细参数与 Seed</p>
+          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">回顾所有的创造轨迹，支持查看详细参数与 Seed</p>
         </div>
         <button 
           onClick={handleClearHistory}
@@ -258,10 +258,10 @@ export function History() {
                       <span className="text-[10px] font-bold text-[var(--accent-1)]/80 bg-[var(--accent-1)]/10 border border-[var(--accent-1)]/20 px-1.5 py-0.5 rounded-md truncate w-fit max-w-full">
                         {img.promptTitle}
                       </span>
-                      <p className="text-[11px] text-[var(--text-muted)] line-clamp-1 font-mono">{img.prompt}</p>
+                      <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1 font-mono">{img.prompt}</p>
                     </div>
                     
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-[var(--text-muted)] font-bold">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-[var(--text-secondary)] font-bold">
                       <span className="px-1.5 py-0.5 rounded bg-white/5 truncate max-w-[120px]">{img.model}</span>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span>{img.resolution}</span>
@@ -277,7 +277,7 @@ export function History() {
                       <button onClick={(e) => { e.stopPropagation(); downloadImage(img.url, `history_${img.id}.png`); }} className="w-7 h-7 rounded-full bg-blue-500/10 text-[var(--accent-1)] flex items-center justify-center">
                         <Download size={14} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleToggleSave(img); }} className={`w-7 h-7 rounded-full flex items-center justify-center ${img.isSaved ? 'bg-[var(--accent-1)] text-white' : 'bg-white/10 text-[var(--text-muted)]'}`}>
+                      <button onClick={(e) => { e.stopPropagation(); handleToggleSave(img); }} className={`w-7 h-7 rounded-full flex items-center justify-center ${img.isSaved ? 'bg-[var(--accent-1)] text-white' : 'bg-white/10 text-[var(--text-secondary)]'}`}>
                         <Sparkles size={14} className={img.isSaved ? 'fill-white' : ''} />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }} className="w-7 h-7 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
@@ -332,18 +332,18 @@ export function History() {
             <div className="w-full md:w-[350px] flex-1 md:flex-none min-h-0 bg-[var(--bg-layer-1)] p-6 flex flex-col gap-5 border-t md:border-t-0 md:border-l border-[var(--glass-border)] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-[var(--text-primary)]">生成详情</h3>
-                <button onClick={() => setPreviewImage(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                <button onClick={() => setPreviewImage(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors">
                   <X size={20} />
                 </button>
               </div>
               
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">所属项目</label>
+                <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">所属项目</label>
                 <div className="text-[13px] font-bold text-[var(--accent-1)]">{previewImage.promptTitle}</div>
               </div>
 
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">正向提示词</label>
+                <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">正向提示词</label>
                 <div className="text-[12px] text-[var(--text-primary)] font-mono leading-relaxed bg-[var(--glass-bg)] p-3 rounded-xl border border-[var(--glass-border)] max-h-40 overflow-y-auto custom-scrollbar">
                   {previewImage.prompt}
                 </div>
@@ -351,15 +351,15 @@ export function History() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">基础模型</label>
+                  <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">基础模型</label>
                   <div className="text-[12px] font-bold text-[var(--text-primary)] truncate" title={previewImage.model}>{previewImage.model}</div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">分辨率</label>
+                  <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">分辨率</label>
                   <div className="text-[12px] font-bold text-[var(--text-primary)]">{previewImage.resolution}</div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">生成时间</label>
+                  <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">生成时间</label>
                   <div className="text-[12px] font-bold text-[var(--text-primary)]">{previewImage.time}</div>
                 </div>
               </div>
@@ -404,9 +404,9 @@ export function History() {
                 <h3 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
                   <BookmarkPlus size={16} className="text-[var(--accent-1)]" /> 添加为示范图
                 </h3>
-                <p className="text-[11px] text-[var(--text-muted)] mt-1">选择要添加到的提示词项目</p>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-1">选择要添加到的提示词项目</p>
               </div>
-              <button onClick={() => setAddingToPrompt(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
+              <button onClick={() => setAddingToPrompt(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
                 <X size={18} />
               </button>
             </div>
@@ -415,7 +415,7 @@ export function History() {
               <img src={getImgSrc(addingToPrompt.url)} className="w-20 h-20 object-cover rounded-lg border border-[var(--glass-border)]" />
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-[var(--accent-1)] font-bold mb-1">{addingToPrompt.promptTitle}</p>
-                <p className="text-[10px] text-[var(--text-muted)] font-mono line-clamp-3 leading-relaxed">{addingToPrompt.prompt}</p>
+                <p className="text-[10px] text-[var(--text-secondary)] font-mono line-clamp-3 leading-relaxed">{addingToPrompt.prompt}</p>
               </div>
             </div>
 
@@ -434,7 +434,7 @@ export function History() {
                   {!p.coverImage && <div className="w-10 h-10 rounded-lg bg-[var(--accent-1)]/20 flex items-center justify-center flex-shrink-0 text-[var(--accent-1)]"><FileText size={18} /></div>}
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-bold text-[var(--text-primary)] truncate">{p.title}</p>
-                    <p className="text-[10px] text-[var(--text-muted)] truncate">{p.positivePrompt?.slice(0, 60)}...</p>
+                    <p className="text-[10px] text-[var(--text-secondary)] truncate">{p.positivePrompt?.slice(0, 60)}...</p>
                   </div>
                   {addSuccess === p.id && <Check size={16} className="text-green-400 flex-shrink-0" />}
                 </button>

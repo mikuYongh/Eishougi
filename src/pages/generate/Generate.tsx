@@ -304,7 +304,7 @@ export function Generate() {
   };
 
   if (!project) {
-    return <div className="p-10 text-[var(--text-muted)] text-center">请先选择或创建一个提示词项目</div>;
+    return <div className="p-10 text-[var(--text-secondary)] text-center">请先选择或创建一个提示词项目</div>;
   }
 
   return (
@@ -323,7 +323,7 @@ export function Generate() {
             <h2 className="text-lg md:text-xl font-bold text-[var(--text-primary)] drop-shadow-md flex items-center gap-2">
               <span className="text-[var(--accent-1)] flex items-center justify-center"><Zap size={20} className="md:w-6 md:h-6" /></span> 渲染控制台
             </h2>
-            <p className="text-[11px] md:text-[12px] text-[var(--text-muted)] truncate whitespace-nowrap overflow-hidden text-ellipsis">当前项目: {project.title}</p>
+            <p className="text-[11px] md:text-[12px] text-[var(--text-secondary)] truncate whitespace-nowrap overflow-hidden text-ellipsis">当前项目: {project.title}</p>
           </div>
         </div>
         
@@ -405,15 +405,15 @@ export function Generate() {
                 
                 <div className="w-full space-y-2 text-center">
                   <p className="text-[14px] font-bold text-[var(--text-primary)] animate-pulse">正在与 ComfyUI 进行量子纠缠...</p>
-                  <p className="text-[11px] text-[var(--text-muted)] font-mono tracking-widest uppercase">
+                  <p className="text-[11px] text-[var(--text-secondary)] font-mono tracking-widest uppercase">
                     {progress ? `Processing Node: ${progress.node}` : 'Initializing workflow...'}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="text-[var(--text-muted)] flex flex-col items-center">
+              <div className="text-[var(--text-secondary)] flex flex-col items-center">
                 <ImageIcon size={64} className="mb-6 opacity-50" />
-                <p className="text-[14px] font-bold uppercase tracking-widest text-[var(--text-muted)]">点击右上角开始渲染</p>
+                <p className="text-[14px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">点击右上角开始渲染</p>
               </div>
             )}
           </div>
@@ -445,7 +445,7 @@ export function Generate() {
             
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
+                <label className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
                   <Cpu size={12} className="text-[var(--accent-2)]" /> 基础模型
                 </label>
                 <div className="relative z-50">
@@ -464,7 +464,7 @@ export function Generate() {
               </div>
 
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
+                <label className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
                   <Layers size={12} className="text-[var(--accent-1)]" /> 工作流
                 </label>
                 <div className="relative z-40">
@@ -486,7 +486,7 @@ export function Generate() {
               </div>
 
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
+                <label className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
                   <Cpu size={12} className="text-[var(--accent-2)]" /> VAE 模型
                 </label>
                 <div className="relative z-30">
@@ -506,7 +506,7 @@ export function Generate() {
               {/* Dynamic Resolution Block */}
               {hasSizePicker ? (
                 <div>
-                  <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block">SDXL 尺寸规格</label>
+                  <label className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 block">SDXL 尺寸规格</label>
                   <div className="relative z-20">
                     <GlassDropdown
                       value={overrideResolution}
@@ -525,10 +525,10 @@ export function Generate() {
                 </div>
               ) : (
                 <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)]">
-                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">自定义分辨率</label>
+                  <label className="text-[9px] text-[var(--text-secondary)] uppercase font-bold block mb-1">自定义分辨率</label>
                   <div className="flex items-center gap-1 justify-center">
                     <input type="number" value={overrideWidth} onChange={e => setOverrideWidth(Number(e.target.value))} className="w-16 bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                    <span className="text-[12px] text-[var(--text-muted)] font-mono">x</span>
+                    <span className="text-[12px] text-[var(--text-secondary)] font-mono">x</span>
                     <input type="number" value={overrideHeight} onChange={e => setOverrideHeight(Number(e.target.value))} className="w-16 bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                   </div>
                 </div>
@@ -536,15 +536,15 @@ export function Generate() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)]">
-                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">Steps</label>
+                  <label className="text-[9px] text-[var(--text-secondary)] uppercase font-bold block mb-1">Steps</label>
                   <input type="number" value={overrideSteps} onChange={e => setOverrideSteps(Number(e.target.value))} className="w-full bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                 </div>
                 <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)]">
-                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">CFG</label>
+                  <label className="text-[9px] text-[var(--text-secondary)] uppercase font-bold block mb-1">CFG</label>
                   <input type="number" step="0.1" value={overrideCfgScale} onChange={e => setOverrideCfgScale(Number(e.target.value))} className="w-full bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
                 </div>
                 <div className="bg-[var(--glass-bg-hover)] p-2.5 rounded-lg border border-[var(--glass-border)] relative group col-span-2">
-                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">Seed (-1 随机)</label>
+                  <label className="text-[9px] text-[var(--text-secondary)] uppercase font-bold block mb-1">Seed (-1 随机)</label>
                   <div className="flex items-center">
                     <input type="text" value={overrideSeed} onChange={e => setOverrideSeed(e.target.value)} className="w-full bg-transparent text-[12px] text-[var(--text-primary)] font-mono font-bold outline-none border-b border-[var(--glass-border)] focus:border-[var(--accent-1)] transition-colors" />
                     <button onClick={() => setOverrideSeed("-1")} className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-[var(--accent-1)] hover:text-white cursor-pointer px-1 rounded bg-[var(--glass-bg)] border border-[var(--accent-1)]/30">
@@ -557,7 +557,7 @@ export function Generate() {
               {/* Sampler & Scheduler Overrides */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">采样器 (Sampler)</label>
+                  <label className="text-[9px] text-[var(--text-secondary)] uppercase font-bold block mb-1">采样器 (Sampler)</label>
                   <GlassDropdown 
                     value={overrideSampler}
                     onChange={setOverrideSampler}
@@ -574,7 +574,7 @@ export function Generate() {
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] text-[var(--text-muted)] uppercase font-bold block mb-1">调度器 (Scheduler)</label>
+                  <label className="text-[9px] text-[var(--text-secondary)] uppercase font-bold block mb-1">调度器 (Scheduler)</label>
                   <GlassDropdown 
                     value={overrideScheduler}
                     onChange={setOverrideScheduler}

@@ -21,11 +21,11 @@ export function MobileBottomNav() {
         
         {/* Left Links */}
         <div className="flex flex-1 justify-around">
-          <Link to="/" className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${path === '/' ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+          <Link to="/" className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${path === '/' ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
             <LayoutDashboard size={18} />
             <span className="text-[8px] font-bold">主页</span>
           </Link>
-          <Link to="/generate" className={`relative flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${isActive('/generate') ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+          <Link to="/generate" className={`relative flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${isActive('/generate') ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
             <Sparkles size={18} />
             {activeJobsCount > 0 && (
               <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-green-500 text-white text-[8px] font-bold flex items-center justify-center shadow-[0_0_10px_#22c55e]">
@@ -55,11 +55,11 @@ export function MobileBottomNav() {
 
         {/* Right Links */}
         <div className="flex flex-1 justify-around">
-          <Link to="/history" className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${isActive('/history') ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+          <Link to="/history" className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${isActive('/history') ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
             <Clock size={18} />
             <span className="text-[8px] font-bold">历史</span>
           </Link>
-          <Link to="/menu" className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${isActive('/menu') ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+          <Link to="/menu" className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${isActive('/menu') ? 'text-[var(--accent-1)] scale-110' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
             <Menu size={18} />
             <span className="text-[8px] font-bold">更多</span>
           </Link>

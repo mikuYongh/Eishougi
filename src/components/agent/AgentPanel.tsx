@@ -59,7 +59,7 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
         h1: ({node, ...props}) => <h1 className="text-lg font-bold text-[var(--text-primary)] mt-4 mb-2" {...props} />,
         h2: ({node, ...props}) => <h2 className="text-md font-bold text-[var(--text-primary)] mt-3 mb-2" {...props} />,
         h3: ({node, ...props}) => <h3 className="text-sm font-bold text-[var(--text-primary)] mt-2 mb-1" {...props} />,
-        blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-[var(--accent-1)]/30 pl-3 py-1 text-[var(--text-muted)] italic my-2" {...props} />,
+        blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-[var(--accent-1)]/30 pl-3 py-1 text-[var(--text-secondary)] italic my-2" {...props} />,
         img: ({node, ...props}) => (
           <PhotoView src={getImgSrc(props.src)}>
             <img {...props} src={getImgSrc(props.src)} className="max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in" />
@@ -343,7 +343,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                   <Zap size={14} className="animate-pulse" />
                   <span className="font-bold tracking-widest uppercase">Requesting Protocol: {tc.function.name}</span>
                 </div>
-                <div className="ml-2 text-[var(--text-muted)] whitespace-pre-wrap break-all custom-scrollbar overflow-x-auto">{tc.function.arguments}</div>
+                <div className="ml-2 text-[var(--text-secondary)] whitespace-pre-wrap break-all custom-scrollbar overflow-x-auto">{tc.function.arguments}</div>
               </div>
             ))}
           </div>
@@ -407,7 +407,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
             </div>
             
             {/* Actions */}
-            <div className="flex items-center gap-3 ml-auto text-[var(--text-muted)]">
+            <div className="flex items-center gap-3 ml-auto text-[var(--text-secondary)]">
               <button 
                 onClick={() => setViewMode(viewMode === 'history' ? 'chat' : 'history')} 
                 className={`p-1.5 rounded-lg transition-all cursor-pointer ${viewMode === 'history' ? 'bg-[var(--accent-1)]/20 text-[var(--accent-1)]' : 'hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]'}`} 
@@ -445,13 +445,13 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
             </div>
             <div className="w-8 h-px bg-gradient-to-r from-transparent via-[var(--glass-border)] to-transparent mb-3" />
             <div className="flex flex-col gap-4 items-center w-full">
-              <button onClick={handleNewChat} className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--accent-1)] transition-all cursor-pointer" title="新建对话">
+              <button onClick={handleNewChat} className="p-2 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--accent-1)] transition-all cursor-pointer" title="新建对话">
                 <Plus size={20} />
               </button>
-              <button onClick={() => { setIsExpanded(true); setViewMode('history'); }} className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)] transition-all cursor-pointer" title="历史记录">
+              <button onClick={() => { setIsExpanded(true); setViewMode('history'); }} className="p-2 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)] transition-all cursor-pointer" title="历史记录">
                 <History size={20} />
               </button>
-              <button onClick={() => { setIsExpanded(true); setViewMode('settings'); }} className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)] transition-all cursor-pointer" title="配置">
+              <button onClick={() => { setIsExpanded(true); setViewMode('settings'); }} className="p-2 rounded-xl text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)] transition-all cursor-pointer" title="配置">
                 <Settings size={20} />
               </button>
             </div>
@@ -477,7 +477,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
         </div>
         <button 
           onClick={() => setIsExpanded(false)}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--glass-bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         >
           <X size={16} />
         </button>
@@ -500,14 +500,14 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
         {viewMode === 'history' && (
           <div className="absolute inset-0 z-20 bg-[var(--glass-bg)] backdrop-blur-md flex flex-col overflow-hidden animate-in fade-in duration-300">
             <div className="p-4 border-b border-[var(--glass-border)] flex items-center gap-3">
-              <button onClick={() => setViewMode('chat')} className="p-2 rounded-lg hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
+              <button onClick={() => setViewMode('chat')} className="p-2 rounded-lg hover:bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
                 <ArrowLeft size={16} />
               </button>
-              <h3 className="font-bold text-[var(--text-primary)] tracking-wide">神经网络日志 <span className="text-xs text-[var(--text-muted)] ml-2 font-mono">{sessions.length} RECORD(S)</span></h3>
+              <h3 className="font-bold text-[var(--text-primary)] tracking-wide">神经网络日志 <span className="text-xs text-[var(--text-secondary)] ml-2 font-mono">{sessions.length} RECORD(S)</span></h3>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
               {sessions.length === 0 ? (
-                <div className="text-center text-[var(--text-muted)] mt-10 text-sm">暂无记录</div>
+                <div className="text-center text-[var(--text-secondary)] mt-10 text-sm">暂无记录</div>
               ) : (
                 sessions.map(session => (
                   <div 
@@ -523,13 +523,13 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                       <h4 className="font-bold text-[14px] text-[var(--text-primary)] line-clamp-1 flex-1 group-hover:text-[var(--accent-1)] transition-colors">{session.title}</h4>
                       <button 
                         onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
-                        className="p-1 rounded bg-[var(--bg-layer-0)] text-[var(--text-muted)] hover:text-red-400 hover:bg-red-400/20 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                        className="p-1 rounded bg-[var(--bg-layer-0)] text-[var(--text-secondary)] hover:text-red-400 hover:bg-red-400/20 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
                     <div className="flex justify-between items-center text-xs font-mono">
-                      <span className="text-[var(--text-muted)]">{session.messages.length} msgs</span>
+                      <span className="text-[var(--text-secondary)]">{session.messages.length} msgs</span>
                       <span className="text-[var(--accent-1)]/40">{new Date(session.updatedAt).toLocaleTimeString()}</span>
                     </div>
                   </div>
@@ -544,7 +544,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
           <div className="absolute inset-0 z-20 bg-[var(--glass-bg)] backdrop-blur-md flex flex-col overflow-hidden animate-in fade-in duration-300">
             <div className="p-4 border-b border-[var(--glass-border)] flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <button onClick={() => setViewMode('chat')} className="p-2 rounded-lg hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
+                <button onClick={() => setViewMode('chat')} className="p-2 rounded-lg hover:bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
                   <ArrowLeft size={16} />
                 </button>
                 <h3 className="font-bold text-[var(--text-primary)] tracking-wide">核心控制面板</h3>
@@ -564,7 +564,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                     } catch (e) {}
                   }}
                   id="debug-copy-btn"
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-layer-0)] border border-[var(--glass-border)] text-[var(--text-muted)] hover:text-white hover:bg-white/10 transition-colors text-sm cursor-pointer"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-layer-0)] border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors text-sm cursor-pointer"
                   title="复制当前会话完整信息用于DEBUG"
                 >
                   <History size={14} /> 复制调试信息
@@ -581,13 +581,13 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-bold text-[var(--accent-1)] mb-2">系统人格 (System Prompt)</label>
-                  <p className="text-xs text-[var(--text-muted)] mb-3 leading-relaxed">
+                  <p className="text-xs text-[var(--text-secondary)] mb-3 leading-relaxed">
                     定义 Agent 的身份、性格以及默认行为准则。NEXUS 默认拥有调用本地工具库的能力，修改此项将影响其对话风格。
                   </p>
                   <textarea 
                     value={tempSystemPrompt}
                     onChange={(e) => setTempSystemPrompt(e.target.value)}
-                    className="w-full h-48 bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--accent-1)]/50 focus:shadow-[0_0_20px_rgba(var(--accent-1-rgb), 15)] outline-none resize-none font-mono leading-relaxed custom-scrollbar"
+                    className="w-full h-48 bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-4 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:border-[var(--accent-1)]/50 focus:shadow-[0_0_20px_rgba(var(--accent-1-rgb), 15)] outline-none resize-none font-mono leading-relaxed custom-scrollbar"
                     placeholder="输入系统提示词..."
                   />
                 </div>
@@ -597,7 +597,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                     <Zap size={14} className="text-[var(--accent-1)]" />
                     思考深度 (Reasoning Effort)
                   </label>
-                  <p className="text-xs text-[var(--text-muted)] mb-3 leading-relaxed">
+                  <p className="text-xs text-[var(--text-secondary)] mb-3 leading-relaxed">
                     调整支持此参数的模型（如 o1, o3, DeepSeek-R1）的推理深度。较深推理可获得更好的提示词结构，但生成更慢。
                   </p>
                   <div className="flex bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-1 gap-1">
@@ -608,7 +608,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                         className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                           tempReasoningEffort === effort
                             ? 'bg-[var(--accent-1)] text-black shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.4)]'
-                            : 'text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)]'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)]'
                         }`}
                       >
                         {effort.toUpperCase()}
@@ -622,7 +622,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                     <Zap size={14} className="text-[var(--accent-1)]" />
                     执行模式 (Effort)
                   </label>
-                  <p className="text-xs text-[var(--text-muted)] mb-3 leading-relaxed">
+                  <p className="text-xs text-[var(--text-secondary)] mb-3 leading-relaxed">
                     弱模型建议选 LOW：只允许一轮工具调用，避免多轮决策跑飞。强模型可选 HIGH 做深度探索。
                   </p>
                   <div className="flex bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-1 gap-1">
@@ -633,7 +633,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                         className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
                           tempEffort === ef
                             ? 'bg-[var(--accent-1)] text-black shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.4)]'
-                            : 'text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)]'
+                            : 'text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)]'
                         }`}
                       >
                         {ef === 'low' ? 'LOW (弱模型)' : ef === 'medium' ? 'MEDIUM' : 'HIGH (强模型)'}
@@ -642,7 +642,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                   </div>
                   {tempEffort !== 'low' && (
                     <div className="mt-3">
-                      <label className="text-xs text-[var(--text-muted)] mb-1.5 block">最大工具调用轮次: {tempMaxRounds}</label>
+                      <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">最大工具调用轮次: {tempMaxRounds}</label>
                       <input
                         type="range"
                         min={1}
@@ -726,7 +726,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                   <span className="font-bold text-[var(--accent-1)] text-lg tracking-wide">NEXUS 系统已就绪</span>
                 </div>
                 <p className="text-[var(--text-secondary)] mb-4">我是您的专属创意中枢。您可以通过自然语言向我下达以下指令：</p>
-                <ul className="space-y-2 text-[var(--text-muted)] font-mono text-xs">
+                <ul className="space-y-2 text-[var(--text-secondary)] font-mono text-xs">
                   <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-1)]" /> 检索本地提示词库</li>
                   <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-2)]" /> 自动构建并保存 Prompt</li>
                   <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-1)] opacity-70" /> 一键触发引擎生成图片</li>
@@ -776,7 +776,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                         )}
                         {renderMessageContent(msg)}
                       </div>
-                      <span className="text-[10px] text-[var(--text-muted)] mt-1.5 font-mono px-1">
+                      <span className="text-[10px] text-[var(--text-secondary)] mt-1.5 font-mono px-1">
                         {msg.role.toUpperCase()}
                       </span>
                     </div>
@@ -836,7 +836,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full resize-none bg-transparent px-3 py-2 text-[14px] outline-none font-sans min-h-[44px] max-h-[120px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] custom-scrollbar"
+              className="w-full resize-none bg-transparent px-3 py-2 text-[14px] outline-none font-sans min-h-[44px] max-h-[120px] text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] custom-scrollbar"
               placeholder="输入神经指令... (Ctrl+Enter 执行)"
               rows={1}
               style={{

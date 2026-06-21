@@ -55,7 +55,7 @@ export function GlassDropdown({
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="font-bold tracking-wide truncate pr-2">{selectedLabel}</span>
-        <ChevronDown size={small ? 14 : 16} className={`text-[var(--text-muted)] transition-transform duration-300 group-hover:text-[var(--text-primary)] flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={small ? 14 : 16} className={`text-[var(--text-secondary)] transition-transform duration-300 group-hover:text-[var(--text-primary)] flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </div>
 
       {isOpen && (

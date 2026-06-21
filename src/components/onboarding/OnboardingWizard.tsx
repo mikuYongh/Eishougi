@@ -47,7 +47,7 @@ export function OnboardingWizard() {
             <h1 className="text-xl font-bold tracking-wider text-[var(--text-primary)]">詠唱机 EISHOUGI</h1>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-sm text-[var(--text-muted)] font-mono">
+            <div className="text-sm text-[var(--text-secondary)] font-mono">
               {step === 0 && '1/3 欢迎与检测'}
               {step === 1 && '2/3 硬件报告'}
               {step === 2 && '3/3 配置向导'}
@@ -94,13 +94,13 @@ export function OnboardingWizard() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                 <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm">
-                  <div className="text-[var(--text-muted)] text-sm mb-1">显卡型号</div>
+                  <div className="text-[var(--text-secondary)] text-sm mb-1">显卡型号</div>
                   <div className="font-mono text-lg truncate" title={hardware.gpuRenderer}>
                     {hardware.gpuRenderer || '未知'}
                   </div>
                 </div>
                 <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-2xl p-5 shadow-sm">
-                  <div className="text-[var(--text-muted)] text-sm mb-1">性能评估</div>
+                  <div className="text-[var(--text-secondary)] text-sm mb-1">性能评估</div>
                   <div className="font-bold text-lg flex items-center gap-2">
                     {hardware.hasNvidiaGpu ? (
                       <span className="text-green-400 flex items-center gap-2"><CheckCircle2 size={18} /> 适合本地运行</span>
@@ -121,7 +121,7 @@ export function OnboardingWizard() {
                   <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent-1)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <Server size={32} className="text-[var(--accent-1)] mb-4" />
                   <h4 className="text-lg font-bold mb-2">手动本地配置</h4>
-                  <p className="text-[var(--text-muted)] text-sm mb-4 line-clamp-3">
+                  <p className="text-[var(--text-secondary)] text-sm mb-4 line-clamp-3">
                     您已经自己下载好了 ComfyUI？只需跟着图文教程添加一个参数即可连接。
                   </p>
                   <div className="mt-auto px-3 py-1 bg-[var(--accent-1)]/10 text-[var(--accent-1)] rounded-full text-xs font-bold border border-[var(--accent-1)]/20">适合老手</div>
@@ -135,7 +135,7 @@ export function OnboardingWizard() {
                   <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent-2)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <Cloud size={32} className="text-[var(--accent-2)] mb-4" />
                   <h4 className="text-lg font-bold mb-2">CNB 云端白嫖</h4>
-                  <p className="text-[var(--text-muted)] text-sm mb-4 line-clamp-3">
+                  <p className="text-[var(--text-secondary)] text-sm mb-4 line-clamp-3">
                     没有高端显卡？没关系，免费使用云端顶级 GPU 算力。跟着教程三步启动。
                   </p>
                   {!hardware.hasNvidiaGpu && <div className="mt-auto px-3 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-bold border border-yellow-500/30">推荐配置</div>}
@@ -154,7 +154,7 @@ export function OnboardingWizard() {
                   <h4 className="text-lg font-bold mb-2 text-[var(--text-primary)] relative z-10 flex items-center gap-2">
                     一键自动部署 <span className="px-1.5 py-0.5 rounded text-[9px] bg-[var(--accent-1)] text-white font-black uppercase">NEW</span>
                   </h4>
-                  <p className="text-[var(--text-muted)] text-sm mb-4 relative z-10">
+                  <p className="text-[var(--text-secondary)] text-sm mb-4 relative z-10">
                     纯 Rust 引擎，全自动安装 ComfyUI + PyTorch + 默认工作流，无需外部依赖。
                   </p>
                   {hardware.hasNvidiaGpu && <div className="mt-auto px-3 py-1 bg-[var(--accent-1)]/20 text-[var(--accent-1)] rounded-full text-xs font-bold border border-[var(--accent-1)]/30 relative z-10">新手强烈推荐</div>}

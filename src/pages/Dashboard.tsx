@@ -99,7 +99,7 @@ export function Dashboard() {
             <Sparkles size={20} className="text-[var(--accent-1)]" />
             <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">欢迎回来</h2>
           </div>
-          <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">
+          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">
             今天已生成 <span className="text-[var(--accent-1)] font-bold">{todayGenerated}</span> 张图 · 共 <span className="text-[var(--accent-2)] font-bold">{totalGenerated}</span> 张历史记录
           </p>
         </div>
@@ -143,7 +143,7 @@ export function Dashboard() {
             >
               {s.num}
             </div>
-            <p className="text-xs font-semibold mt-1 text-[var(--text-muted)]">{s.lbl}</p>
+            <p className="text-xs font-semibold mt-1 text-[var(--text-secondary)]">{s.lbl}</p>
           </div>
         ))}
       </div>
@@ -157,13 +157,13 @@ export function Dashboard() {
               <Clock size={16} className="text-blue-400" />
               最近提示词项目
             </div>
-            <button onClick={() => navigate('/prompts')} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1">
+            <button onClick={() => navigate('/prompts')} className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1">
               查看全部 <ChevronRight size={12} />
             </button>
           </div>
           <div className="flex-1 overflow-y-auto space-y-2 pr-1">
             {recentPrompts.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-muted)] py-8">
+              <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-secondary)] py-8">
                 <FileText size={32} className="mb-2 opacity-50" />
                 <p className="text-[12px]">还没有提示词，快去创建吧</p>
               </div>
@@ -183,7 +183,7 @@ export function Dashboard() {
                   )}
                   <div className="min-w-0">
                     <h4 className="text-[13px] font-bold text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors truncate">{p.title}</h4>
-                    <p className="text-[10px] text-[var(--text-muted)]">{getTimeAgo(p.updatedAt)}</p>
+                    <p className="text-[10px] text-[var(--text-secondary)]">{getTimeAgo(p.updatedAt)}</p>
                   </div>
                 </div>
                 <button
@@ -204,13 +204,13 @@ export function Dashboard() {
               <Activity size={16} className="text-orange-400" />
               当前生成队列
             </div>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${activeJobs.length > 0 ? 'bg-orange-500/20 text-orange-400 border-orange-500/20' : 'bg-white/5 text-[var(--text-muted)] border-[var(--glass-border)]'}`}>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${activeJobs.length > 0 ? 'bg-orange-500/20 text-orange-400 border-orange-500/20' : 'bg-white/5 text-[var(--text-secondary)] border-[var(--glass-border)]'}`}>
               {activeJobs.length > 0 ? `${activeJobs.length} 个任务进行中` : (isConnected ? '队列空闲' : '未连接引擎')}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {activeJobs.length === 0 && completedJobs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-[var(--text-muted)]">
+              <div className="flex flex-col items-center justify-center py-8 text-[var(--text-secondary)]">
                 <ImageIcon size={32} className="mb-2 opacity-50" />
                 <p className="text-[12px]">{isConnected ? '队列为空，去生成一张图吧' : '请先在设置中配置 ComfyUI 地址'}</p>
               </div>
@@ -223,7 +223,7 @@ export function Dashboard() {
                         <Loader2 size={12} className="animate-spin" />
                         {job.status === 'generating' ? '正在渲染' : '等待中'}: {job.projectTitle}
                       </span>
-                      <span className="text-[11px] font-mono text-[var(--text-muted)]">{job.progress}%</span>
+                      <span className="text-[11px] font-mono text-[var(--text-secondary)]">{job.progress}%</span>
                     </div>
                     <div className="relative z-10 w-full h-1.5 bg-[var(--glass-bg)] rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-orange-400 to-yellow-400 transition-all duration-300 rounded-full" style={{ width: `${job.progress}%` }} />
@@ -265,7 +265,7 @@ export function Dashboard() {
               <ImageIcon size={16} className="text-green-400" />
               最近生成的文件
             </div>
-            <button onClick={() => navigate('/history')} className="text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1">
+            <button onClick={() => navigate('/history')} className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1">
               查看全部历史 <ChevronRight size={12} />
             </button>
           </div>
@@ -337,11 +337,11 @@ export function Dashboard() {
               className={`glass-panel p-4 text-center transition-all duration-300 group ${a.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 hover:shadow-[0_8px_30px_rgba(179,136,255,0.2)]'}`}
               style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.05)" }}
             >
-              <span className={`flex justify-center mb-3 transition-colors group-hover:scale-110 duration-300 ${a.disabled ? 'text-[var(--text-muted)]' : 'text-[var(--text-muted)] group-hover:text-[var(--accent-1)] group-hover:drop-shadow-[0_0_8px_rgba(var(--accent-1-rgb), 0.5)]'}`}>
+              <span className={`flex justify-center mb-3 transition-colors group-hover:scale-110 duration-300 ${a.disabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--accent-1)] group-hover:drop-shadow-[0_0_8px_rgba(var(--accent-1-rgb), 0.5)]'}`}>
                 {a.icon}
               </span>
               <div className="text-[13px] font-bold text-[var(--text-primary)]">{a.label}</div>
-              <div className="text-[11px] mt-1 text-[var(--text-muted)] font-medium truncate">{a.desc}</div>
+              <div className="text-[11px] mt-1 text-[var(--text-secondary)] font-medium truncate">{a.desc}</div>
             </div>
           ))}
         </div>

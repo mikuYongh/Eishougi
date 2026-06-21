@@ -55,7 +55,7 @@ export function HistoryImagePicker({ onSelect, onClose, title = "选择生成历
           </h2>
           <button 
             onClick={onClose} 
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-[var(--text-muted)] hover:bg-white/10 hover:text-[var(--text-primary)] transition-all cursor-pointer"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-[var(--text-secondary)] hover:bg-white/10 hover:text-[var(--text-primary)] transition-all cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -67,11 +67,11 @@ export function HistoryImagePicker({ onSelect, onClose, title = "选择生成历
             <div className="h-full flex items-center justify-center">
               <div className="flex flex-col items-center gap-3">
                 <div className="w-8 h-8 border-2 border-[var(--accent-1)]/30 border-t-[var(--accent-1)] rounded-full animate-spin" />
-                <span className="text-xs text-[var(--text-muted)] font-mono uppercase tracking-widest animate-pulse">Loading Matrix...</span>
+                <span className="text-xs text-[var(--text-secondary)] font-mono uppercase tracking-widest animate-pulse">Loading Matrix...</span>
               </div>
             </div>
           ) : history.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] gap-4">
+            <div className="h-full flex flex-col items-center justify-center text-[var(--text-secondary)] gap-4">
               <div className="p-4 rounded-2xl bg-white/5">
                 <History size={32} className="opacity-50" />
               </div>

@@ -57,7 +57,7 @@ export function MobileMenu() {
     <div className="flex flex-col h-full overflow-y-auto pb-[20vh] px-4 pt-4 custom-scrollbar">
       <div className="mb-6">
         <h2 className="text-xl font-bold text-[var(--text-primary)]">更多功能</h2>
-        <p className="text-sm text-[var(--text-muted)] mt-1">管理你的资产、模型和引擎配置</p>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">管理你的资产、模型和引擎配置</p>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -72,9 +72,9 @@ export function MobileMenu() {
             </div>
             <div className="flex-1 flex flex-col justify-center">
               <h3 className="text-[16px] font-bold text-[var(--text-primary)] tracking-wide mb-0.5">{item.title}</h3>
-              <span className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-medium">{item.subtitle}</span>
+              <span className="text-[11px] text-[var(--text-secondary)] uppercase tracking-wider font-medium">{item.subtitle}</span>
             </div>
-            <div className="w-8 h-8 rounded-full bg-[var(--glass-bg)] flex items-center justify-center text-[var(--text-muted)] group-hover:text-[var(--text-primary)] group-hover:bg-[var(--glass-bg-hover)] transition-all">
+            <div className="w-8 h-8 rounded-full bg-[var(--glass-bg)] flex items-center justify-center text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] group-hover:bg-[var(--glass-bg-hover)] transition-all">
               <ChevronRight size={16} />
             </div>
           </Link>

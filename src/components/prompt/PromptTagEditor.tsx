@@ -167,7 +167,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
           {/* Tag Chips Container */}
           <div className="flex flex-wrap gap-2 min-h-[80px] p-3 rounded-xl bg-[var(--bg-layer-0)] border border-[var(--glass-border)] max-h-[220px] overflow-y-auto custom-scrollbar">
             {tags.length === 0 ? (
-              <span className="text-xs text-[var(--text-muted)] italic m-auto">暂无标签，在下方输入或从收藏夹添加</span>
+              <span className="text-xs text-[var(--text-secondary)] italic m-auto">暂无标签，在下方输入或从收藏夹添加</span>
             ) : (
               tags.map((tag, index) => {
                 const colorClass = getTagColor(tag);
@@ -187,14 +187,14 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
                           handleAddFavoriteTag(tag);
                         }
                       }}
-                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-yellow-400 opacity-40 group-hover:opacity-100 transition-all cursor-pointer"
+                      className="p-0.5 rounded text-[var(--text-secondary)] hover:text-yellow-400 opacity-40 group-hover:opacity-100 transition-all cursor-pointer"
                       title={isFav ? "取消收藏" : "收藏该标签"}
                     >
                       <Star size={10} className={isFav ? "text-yellow-400 fill-yellow-400" : ""} />
                     </button>
                     <button
                       onClick={() => handleRemoveTag(index)}
-                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-red-400 hover:bg-[var(--glass-bg-hover)] transition-all cursor-pointer"
+                      className="p-0.5 rounded text-[var(--text-secondary)] hover:text-red-400 hover:bg-[var(--glass-bg-hover)] transition-all cursor-pointer"
                     >
                       <X size={10} />
                     </button>
@@ -272,7 +272,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
             {/* Favorites List */}
             <div className="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto custom-scrollbar">
               {favorites.length === 0 ? (
-                <span className="text-xs text-[var(--text-muted)] italic">收藏夹空空如也，快去收藏一些吧</span>
+                <span className="text-xs text-[var(--text-secondary)] italic">收藏夹空空如也，快去收藏一些吧</span>
               ) : (
                 favorites.map((fav) => (
                   <div
@@ -288,7 +288,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
                     </button>
                     <button
                       onClick={() => deleteFavorite(fav.id)}
-                      className="p-0.5 rounded text-[var(--text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-0.5 rounded text-[var(--text-secondary)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
                       title="删除收藏"
                     >
                       <X size={10} />

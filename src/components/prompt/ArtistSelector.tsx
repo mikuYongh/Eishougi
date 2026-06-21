@@ -75,12 +75,12 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
               {artist.imgUrl ? (
                 <img src={`https://blobs.animadex.net/ArtistOutputs/thumbs/${encodeURIComponent(artist.imgUrl)}`} className={`w-full h-full object-cover ${privacyMode ? 'blur-md group-hover:blur-none' : ''}`} alt={artist.nameEn} />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]"><Paintbrush size={14}/></div>
+                <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)]"><Paintbrush size={14}/></div>
               )}
             </div>
             <div className="pl-3 flex flex-col justify-center min-w-[80px]">
               <span className="text-[11px] font-bold text-[var(--text-primary)] line-clamp-1 leading-tight">{artist.nameZh || artist.nameEn}</span>
-              <span className="text-[9px] text-[var(--text-muted)] line-clamp-1 leading-tight opacity-80">{artist.trigger}</span>
+              <span className="text-[9px] text-[var(--text-secondary)] line-clamp-1 leading-tight opacity-80">{artist.trigger}</span>
             </div>
             <button 
               onClick={() => toggleArtist(artist)}
@@ -106,7 +106,7 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
         ))}
 
         {selectedList.length === 0 && (
-          <div className="w-full h-12 flex items-center justify-center border border-dashed border-[var(--glass-border)] rounded-xl text-[11px] text-[var(--text-muted)] font-bold tracking-widest">
+          <div className="w-full h-12 flex items-center justify-center border border-dashed border-[var(--glass-border)] rounded-xl text-[11px] text-[var(--text-secondary)] font-bold tracking-widest">
             暂未选择任何画风
           </div>
         )}
@@ -114,7 +114,7 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
 
       {/* Manual Input (for artists not in DB) */}
       <div className="mt-auto">
-        <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">手动输入 (逗号分隔)</label>
+        <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">手动输入 (逗号分隔)</label>
         <textarea 
           value={selectedTriggers}
           onChange={(e) => onChange(e.target.value)}
@@ -128,7 +128,7 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
         <div className="absolute inset-x-0 bottom-full mb-2 bg-[var(--bg-layer-2)]/85 backdrop-blur-3xl z-50 rounded-2xl border border-[var(--glass-border)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 h-[300px] shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
           <div className="p-3 border-b border-[var(--glass-border)] flex items-center gap-2 bg-[var(--bg-layer-1)]">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={14} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={14} />
               <input 
                 type="text" 
                 value={search}
@@ -137,7 +137,7 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
                 className="w-full bg-[var(--bg-base)] border border-[var(--glass-border)] rounded-lg pl-9 pr-3 py-1.5 text-[12px] text-[var(--text-primary)] outline-none focus:border-pink-500/50 transition-colors"
               />
             </div>
-            <button onClick={() => setIsOpen(false)} className="w-8 h-8 rounded-lg hover:bg-[var(--glass-bg-hover)] flex items-center justify-center text-[var(--text-muted)] cursor-pointer transition-colors">
+            <button onClick={() => setIsOpen(false)} className="w-8 h-8 rounded-lg hover:bg-[var(--glass-bg-hover)] flex items-center justify-center text-[var(--text-secondary)] cursor-pointer transition-colors">
               <X size={16} />
             </button>
           </div>
@@ -155,19 +155,19 @@ export function ArtistSelector({ selectedTriggers, onChange }: ArtistSelectorPro
                     {artist.imgUrl ? (
                       <img src={`https://blobs.animadex.net/ArtistOutputs/thumbs/${encodeURIComponent(artist.imgUrl)}`} className={`w-full h-full object-cover ${privacyMode ? 'blur-sm' : ''}`} alt={artist.nameEn} />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center"><Paintbrush size={12} className="opacity-50 text-[var(--text-muted)]"/></div>
+                      <div className="w-full h-full flex items-center justify-center"><Paintbrush size={12} className="opacity-50 text-[var(--text-secondary)]"/></div>
                     )}
                   </div>
                   <div className="ml-3 min-w-0 flex-1">
                     <div className="text-[12px] font-bold text-[var(--text-primary)] truncate">{artist.nameZh || artist.nameEn}</div>
-                    <div className="text-[10px] text-[var(--text-muted)] truncate">{artist.trigger}</div>
+                    <div className="text-[10px] text-[var(--text-secondary)] truncate">{artist.trigger}</div>
                   </div>
                   {isSelected && <Check size={14} className="text-pink-400 flex-shrink-0 mx-2" />}
                 </div>
               )
             })}
             {artists.length === 0 && (
-              <div className="col-span-full h-20 flex items-center justify-center text-[12px] text-[var(--text-muted)]">
+              <div className="col-span-full h-20 flex items-center justify-center text-[12px] text-[var(--text-secondary)]">
                 没有找到匹配的画师
               </div>
             )}

@@ -18,7 +18,7 @@ export function AgentPanel() {
       {/* Collapse/Expand Handle */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="absolute top-1/2 -translate-y-1/2 -left-[18px] w-[18px] h-[60px] flex items-center justify-center bg-[var(--glass-bg)] hover:bg-[var(--accent-1)]/20 border border-[var(--glass-border)] border-r-transparent hover:border-[var(--accent-1)]/30 text-[var(--text-muted)] hover:text-[var(--accent-1)] rounded-l-md cursor-pointer transition-all duration-300 backdrop-blur-xl z-20 shadow-[-2px_0_10px_rgba(0,0,0,0.2)]"
+        className="absolute top-1/2 -translate-y-1/2 -left-[18px] w-[18px] h-[60px] flex items-center justify-center bg-[var(--glass-bg)] hover:bg-[var(--accent-1)]/20 border border-[var(--glass-border)] border-r-transparent hover:border-[var(--accent-1)]/30 text-[var(--text-secondary)] hover:text-[var(--accent-1)] rounded-l-md cursor-pointer transition-all duration-300 backdrop-blur-xl z-20 shadow-[-2px_0_10px_rgba(0,0,0,0.2)]"
       >
         {isExpanded ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
@@ -37,7 +37,7 @@ export function AgentPanel() {
             </div>
             
             {/* Actions */}
-            <div className="flex items-center gap-2.5 ml-auto text-[var(--text-muted)]">
+            <div className="flex items-center gap-2.5 ml-auto text-[var(--text-secondary)]">
               <button className="hover:text-[var(--text-primary)] transition-colors cursor-pointer" title="历史记录">
                 <History size={14} />
               </button>
@@ -55,13 +55,13 @@ export function AgentPanel() {
               <Bot size={16} />
             </div>
             <div className="w-6 h-px bg-white/10" />
-            <button className="text-[var(--text-muted)] hover:text-[var(--accent-1)] transition-colors cursor-pointer" title="新建对话">
+            <button className="text-[var(--text-secondary)] hover:text-[var(--accent-1)] transition-colors cursor-pointer" title="新建对话">
               <Plus size={18} />
             </button>
-            <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer" title="历史记录">
+            <button className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer" title="历史记录">
               <History size={16} />
             </button>
-            <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer" title="配置">
+            <button className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer" title="配置">
               <Settings size={16} />
             </button>
           </div>
@@ -99,7 +99,7 @@ export function AgentPanel() {
         >
           <div className="flex items-end gap-2 p-1.5 rounded-xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] shadow-[inset_0_2px_10px_rgba(0,0,0,0.1)] focus-within:border-[var(--accent-1)]/30 focus-within:bg-white/5 transition-all">
             <textarea
-              className="flex-1 resize-none bg-transparent px-3 py-2 text-xs outline-none font-sans h-9 text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+              className="flex-1 resize-none bg-transparent px-3 py-2 text-xs outline-none font-sans h-9 text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]"
               placeholder="输入消息... (Ctrl+Enter 发送)"
               rows={1}
             />

@@ -71,7 +71,7 @@ export function Tagger() {
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
             图片反推 (Tagger)
           </h2>
-          <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">上传图片，使用 WD14 模型提取特征标签，一键转化为提示词</p>
+          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">上传图片，使用 WD14 模型提取特征标签，一键转化为提示词</p>
         </div>
       </div>
 
@@ -101,8 +101,8 @@ export function Tagger() {
                   <UploadCloud size={32} className="text-orange-400/80" />
                 </div>
                 <h3 className="text-lg font-bold text-[var(--text-primary)] mb-1">拖拽或点击上传图片</h3>
-                <p className="text-xs text-[var(--text-muted)] mb-3">支持 JPG, PNG, WEBP (最大 10MB)</p>
-                <div className="text-[10px] text-[var(--text-muted)] px-4 text-center">
+                <p className="text-xs text-[var(--text-secondary)] mb-3">支持 JPG, PNG, WEBP (最大 10MB)</p>
+                <div className="text-[10px] text-[var(--text-secondary)] px-4 text-center">
                   * 反推模型将调用本地或云端的 agnes-2.0-flash 多模态视觉模型进行高精度特征提取。
                 </div>
               </div>
@@ -112,7 +112,7 @@ export function Tagger() {
 
           <div className="glass-panel p-5 rounded-2xl flex items-center gap-4">
             <div className="flex-1 relative z-20">
-              <label className="text-[10px] text-[var(--text-muted)] mb-1.5 block uppercase tracking-wider font-bold">输出格式 (Format)</label>
+              <label className="text-[10px] text-[var(--text-secondary)] mb-1.5 block uppercase tracking-wider font-bold">输出格式 (Format)</label>
               <GlassDropdown 
                 value={format}
                 onChange={setFormat}
@@ -171,7 +171,7 @@ export function Tagger() {
                   ))}
                 </div>
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-muted)]">
+                <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-secondary)]">
                   <ImageIcon size={48} className="mb-4 opacity-20" />
                   <p className="text-[13px] font-bold uppercase tracking-widest">等待上传与反推</p>
                 </div>
@@ -183,7 +183,7 @@ export function Tagger() {
                 <textarea 
                   readOnly 
                   value={results.map(r => r.tag).join(", ")}
-                  className="w-full h-24 bg-transparent border-none outline-none text-[var(--text-muted)] text-[12px] font-mono resize-none leading-relaxed"
+                  className="w-full h-24 bg-transparent border-none outline-none text-[var(--text-secondary)] text-[12px] font-mono resize-none leading-relaxed"
                 />
               </div>
             )}

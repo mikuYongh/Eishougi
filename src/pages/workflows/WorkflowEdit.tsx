@@ -212,7 +212,7 @@ export function WorkflowEdit() {
             <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md truncate">
               {id === 'new' ? '新建工作流配置' : '编辑工作流配置'}
             </h2>
-            <p className="text-[12px] text-[var(--text-muted)] truncate">{workflow.name || "未命名工作流"}</p>
+            <p className="text-[12px] text-[var(--text-secondary)] truncate">{workflow.name || "未命名工作流"}</p>
           </div>
         </div>
         
@@ -233,7 +233,7 @@ export function WorkflowEdit() {
           {/* Metadata */}
           <div className="glass-panel p-5 space-y-5 relative z-50">
             <div>
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">工作流名称</label>
+              <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">工作流名称</label>
               <input 
                 type="text" value={workflow.name} onChange={e => updateField('name', e.target.value)}
                 className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-[var(--text-primary)] text-sm outline-none focus:border-yellow-500/50 transition-colors font-bold"
@@ -242,16 +242,16 @@ export function WorkflowEdit() {
             </div>
             
             <div>
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">用途描述</label>
+              <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">用途描述</label>
               <textarea 
                 value={workflow.description} onChange={e => updateField('description', e.target.value)}
-                className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-[var(--text-muted)] text-xs outline-none focus:border-yellow-500/50 transition-colors h-24 resize-none"
+                className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-[var(--text-secondary)] text-xs outline-none focus:border-yellow-500/50 transition-colors h-24 resize-none"
                 placeholder="工作流的具体用途和使用场景..."
               />
             </div>
 
             <div className="relative z-50">
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">工作流类型</label>
+              <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">工作流类型</label>
               <GlassDropdown 
                 value={workflow.type || "text2img"}
                 onChange={v => updateField('type', v as WorkflowType)}
@@ -263,7 +263,7 @@ export function WorkflowEdit() {
 
           {/* Thumbnail Uploader */}
           <div className="glass-panel p-5 relative z-40">
-            <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3 block">缩略图</label>
+            <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-3 block">缩略图</label>
             <div className="h-40 w-full rounded-xl border-2 border-dashed border-[var(--glass-border)] hover:border-yellow-400/50 bg-[var(--glass-bg-hover)] flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer transition-colors">
               {workflow.thumbnail ? (
                 <div className="absolute inset-0 z-0 group-hover/cover:bg-[var(--bg-layer-2)] transition-colors flex items-center justify-center cursor-pointer">
@@ -272,9 +272,9 @@ export function WorkflowEdit() {
               ) : (
                 <>
                   <div className="w-10 h-10 rounded-full bg-[var(--glass-bg)] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                    <UploadCloud size={16} className="text-[var(--text-muted)] group-hover:text-yellow-400 transition-colors" />
+                    <UploadCloud size={16} className="text-[var(--text-secondary)] group-hover:text-yellow-400 transition-colors" />
                   </div>
-                  <span className="text-[11px] font-bold text-[var(--text-muted)]">上传缩略图 (可选)</span>
+                  <span className="text-[11px] font-bold text-[var(--text-secondary)]">上传缩略图 (可选)</span>
                 </>
               )}
             </div>
@@ -298,10 +298,10 @@ export function WorkflowEdit() {
           {!workflow.jsonContent ? (
             <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">
               <div className="w-20 h-20 rounded-full bg-[var(--glass-bg)] flex items-center justify-center mb-6 border-2 border-dashed border-[var(--glass-border-active)]">
-                <FileJson size={32} className="text-[var(--text-muted)]" />
+                <FileJson size={32} className="text-[var(--text-secondary)]" />
               </div>
               <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">尚未导入工作流</h3>
-              <p className="text-sm text-[var(--text-muted)] max-w-md">
+              <p className="text-sm text-[var(--text-secondary)] max-w-md">
                 请先导入 ComfyUI API 格式的 JSON 文件。导入后，系统将自动解析模型、分辨率等参数，供您设置默认值。
               </p>
               <button 
@@ -315,12 +315,12 @@ export function WorkflowEdit() {
             <div className="flex-1 xl:overflow-y-auto overflow-visible p-6 space-y-8">
               {/* Models */}
               <div className="space-y-4">
-                <h4 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
+                <h4 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
                   <Cpu size={14} /> 模型设定
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="relative z-[60]">
-                    <label className="text-[11px] font-bold text-[var(--text-muted)] mb-1.5 block">基础模型 (Base Model)</label>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">基础模型 (Base Model)</label>
                     <SearchableDropdown 
                       value={draftParams.baseModel || ""}
                       onChange={v => updateDraft('baseModel', v)}
@@ -329,7 +329,7 @@ export function WorkflowEdit() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-[var(--text-muted)] mb-1.5 block">采样步数 (Steps)</label>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">采样步数 (Steps)</label>
                     <input 
                       type="number" value={draftParams.steps || ""} onChange={e => updateDraft('steps', parseInt(e.target.value) || undefined)}
                       className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-sm outline-none text-[var(--text-primary)]"
@@ -340,12 +340,12 @@ export function WorkflowEdit() {
 
               {/* Resolution */}
               <div className="space-y-4">
-                <h4 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
+                <h4 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
                   <Maximize2 size={14} /> 分辨率与尺寸
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="relative z-[50]">
-                    <label className="text-[11px] font-bold text-[var(--text-muted)] mb-1.5 block">预设分辨率</label>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">预设分辨率</label>
                     <GlassDropdown 
                       value={SDXL_RESOLUTIONS.some(r => r.value.startsWith(currentResStr)) ? SDXL_RESOLUTIONS.find(r => r.value.startsWith(currentResStr))?.value || "" : ""}
                       onChange={v => updateResolution(v)}
@@ -354,14 +354,14 @@ export function WorkflowEdit() {
                   </div>
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <label className="text-[11px] font-bold text-[var(--text-muted)] mb-1.5 block">宽 (Width)</label>
+                      <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">宽 (Width)</label>
                       <input 
                         type="number" value={draftParams.width || ""} onChange={e => updateDraft('width', parseInt(e.target.value) || undefined)}
                         className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2 text-sm outline-none text-[var(--text-primary)]"
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="text-[11px] font-bold text-[var(--text-muted)] mb-1.5 block">高 (Height)</label>
+                      <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">高 (Height)</label>
                       <input 
                         type="number" value={draftParams.height || ""} onChange={e => updateDraft('height', parseInt(e.target.value) || undefined)}
                         className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2 text-sm outline-none text-[var(--text-primary)]"
@@ -374,7 +374,7 @@ export function WorkflowEdit() {
               {/* LoRAs */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center border-b border-[var(--glass-border)] pb-2">
-                  <h4 className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2">
+                  <h4 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-2">
                     <Layers size={14} /> 内置 LoRA
                   </h4>
                   <button 
@@ -387,7 +387,7 @@ export function WorkflowEdit() {
                 
                 <div className="space-y-3">
                   {draftParams.loraConfigs.length === 0 ? (
-                    <div className="text-center py-6 text-[12px] text-[var(--text-muted)] bg-[var(--glass-bg)] rounded-xl border border-[var(--glass-border)]">
+                    <div className="text-center py-6 text-[12px] text-[var(--text-secondary)] bg-[var(--glass-bg)] rounded-xl border border-[var(--glass-border)]">
                       此工作流尚未配置默认 LoRA
                     </div>
                   ) : (
@@ -398,10 +398,10 @@ export function WorkflowEdit() {
                         style={{ zIndex: 100 - i }}
                       >
                         <div className="flex items-center justify-between">
-                          <h5 className={`text-[12px] font-bold flex items-center gap-2 ${lora.enabled !== false ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
+                          <h5 className={`text-[12px] font-bold flex items-center gap-2 ${lora.enabled !== false ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
                             <div className={`w-2 h-2 rounded-full ${lora.enabled !== false ? (lora.name ? 'bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)]' : 'bg-gray-500') : 'bg-gray-600'}`}></div> 
                             LoRA 节点 {i + 1}
-                            {lora.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-muted)] ml-2">已禁用</span>}
+                            {lora.enabled === false && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] ml-2">已禁用</span>}
                           </h5>
                           <div className="flex gap-1">
                             <button 
@@ -410,7 +410,7 @@ export function WorkflowEdit() {
                                 newList[i].enabled = lora.enabled === false ? true : false;
                                 updateDraft('loraConfigs', newList);
                               }}
-                              className={`p-1.5 rounded-lg cursor-pointer transition-colors ${lora.enabled !== false ? 'text-green-400 hover:bg-green-400/10' : 'text-[var(--text-muted)] hover:bg-[var(--glass-bg-hover)]'}`}
+                              className={`p-1.5 rounded-lg cursor-pointer transition-colors ${lora.enabled !== false ? 'text-green-400 hover:bg-green-400/10' : 'text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)]'}`}
                               title={lora.enabled !== false ? "点击禁用" : "点击启用"}
                             >
                               <div className={`w-3.5 h-3.5 rounded-sm border ${lora.enabled !== false ? 'border-green-400 bg-green-400/20' : 'border-[var(--text-muted)]'}`}></div>
@@ -431,7 +431,7 @@ export function WorkflowEdit() {
 
                         <div className="flex gap-4 items-start relative" style={{ zIndex: 50 }}>
                           <div className="flex-1 min-w-0 relative">
-                            <label className="text-[10px] font-bold text-[var(--text-muted)] mb-1.5 block uppercase tracking-wider">选择模型 (Model)</label>
+                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1.5 block uppercase tracking-wider">选择模型 (Model)</label>
                             <SearchableDropdown 
                               value={lora.name}
                               onChange={v => {
@@ -444,7 +444,7 @@ export function WorkflowEdit() {
                             />
                           </div>
                           <div className="w-24 flex-shrink-0">
-                            <label className="text-[10px] font-bold text-[var(--text-muted)] mb-1.5 block uppercase tracking-wider text-center">权重</label>
+                            <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1.5 block uppercase tracking-wider text-center">权重</label>
                             <div className="flex items-center bg-[var(--bg-layer-2)] border border-[var(--glass-border)] rounded-xl overflow-hidden">
                               <input 
                                 type="number" step="0.05" value={lora.strength} 
@@ -460,7 +460,7 @@ export function WorkflowEdit() {
                         </div>
 
                         <div className="flex items-center gap-3 pt-1">
-                          <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider w-8">微调</span>
+                          <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider w-8">微调</span>
                           <input 
                             type="range" min="-2" max="2" step="0.05" value={lora.strength}
                             onChange={e => {

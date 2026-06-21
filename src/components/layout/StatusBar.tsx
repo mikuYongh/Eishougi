@@ -9,7 +9,7 @@ export function StatusBar() {
   const activeCount = pendingJobs.length + generatingJobs.length;
   return (
     <div
-      className="h-[var(--spacing-statusbar-h)] flex-shrink-0 flex items-center gap-4 px-4 text-[11px] relative z-20 bg-[var(--glass-bg)] text-[var(--text-muted)] border-t border-[var(--glass-border)]"
+      className="h-[var(--spacing-statusbar-h)] flex-shrink-0 flex items-center gap-4 px-4 text-[11px] relative z-20 bg-[var(--glass-bg)] text-[var(--text-secondary)] border-t border-[var(--glass-border)]"
       style={{
         backdropFilter: "blur(24px)",
       }}
@@ -30,7 +30,7 @@ export function StatusBar() {
                 border: "1px solid var(--glass-border)",
               }}
             >
-              <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1 flex items-center gap-1.5">
+              <div className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1 flex items-center gap-1.5">
                 <Server size={10} /> 服务连接状态
               </div>
               
@@ -72,7 +72,7 @@ export function StatusBar() {
         <span className="w-px h-3" style={{ background: "var(--glass-border)" }} />
         
         <div className="group relative flex items-center gap-1.5 px-2 py-0.5 rounded border border-transparent cursor-pointer hover:bg-[var(--glass-border)] hover:border-[var(--glass-border)] transition-colors">
-          <Activity size={12} className={`transition-colors ${activeCount > 0 ? 'text-[var(--accent-1)] animate-pulse' : 'text-[var(--text-muted)] group-hover:text-[var(--accent-1)]'}`} />
+          <Activity size={12} className={`transition-colors ${activeCount > 0 ? 'text-[var(--accent-1)] animate-pulse' : 'text-[var(--text-secondary)] group-hover:text-[var(--accent-1)]'}`} />
           <span className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">队列: {activeCount} 个任务</span>
           
           {/* Tooltip Popup */}
@@ -85,12 +85,12 @@ export function StatusBar() {
                 border: "1px solid var(--glass-border)",
               }}
             >
-              <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1 flex items-center justify-between">
+              <div className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1 flex items-center justify-between">
                 <span className="flex items-center gap-1.5"><Activity size={10} /> 任务队列</span>
                 {jobs.length > 0 && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); useQueueStore.getState().clearCompleted(); }}
-                    className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                    className="text-[var(--text-secondary)] hover:text-[var(--text-secondary)] transition-colors"
                   >
                     清除已完成
                   </button>
@@ -100,10 +100,10 @@ export function StatusBar() {
               {jobs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-4 text-center">
                   <div className="w-8 h-8 rounded-full bg-[var(--glass-border)] flex items-center justify-center mb-2">
-                    <Sparkles size={14} className="text-[var(--text-muted)]" />
+                    <Sparkles size={14} className="text-[var(--text-secondary)]" />
                   </div>
                   <span className="text-[var(--text-secondary)] text-xs">当前队列为空</span>
-                  <span className="text-[var(--text-muted)] text-[9px] mt-1">随时准备接受生成指令</span>
+                  <span className="text-[var(--text-secondary)] text-[9px] mt-1">随时准备接受生成指令</span>
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -139,7 +139,7 @@ export function StatusBar() {
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-1.5 text-[var(--text-muted)]">
+      <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
         <Sparkles size={12} className="text-[var(--accent-1)]" />
         <span className="font-bold tracking-widest text-[9px] uppercase">詠唱机 EISHOUGI v0.1</span>
       </div>

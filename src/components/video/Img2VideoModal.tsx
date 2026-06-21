@@ -105,7 +105,7 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
         {/* Right: Parameters */}
         <div className="w-full md:w-1/2 flex flex-col gap-4">
           <div className="hidden md:flex justify-end">
-            <button onClick={onClose} disabled={isGenerating} className="p-1.5 hover:bg-white/10 rounded-lg text-[var(--text-muted)] hover:text-white transition-colors">
+            <button onClick={onClose} disabled={isGenerating} className="p-1.5 hover:bg-white/10 rounded-lg text-[var(--text-secondary)] hover:text-white transition-colors">
               <X size={18} />
             </button>
           </div>
@@ -117,7 +117,7 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
           )}
 
           <div className="relative z-[60]">
-            <label className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 flex items-center gap-1.5">
+            <label className="text-[11px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 flex items-center gap-1.5">
               <Layers size={12} className="text-[var(--accent-1)]" /> 工作流
             </label>
             <div className="relative z-50">
@@ -136,7 +136,7 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
           </div>
 
           <div className="relative z-[50]">
-            <label className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 flex items-center gap-1.5">
+            <label className="text-[11px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 flex items-center gap-1.5">
               <Cpu size={12} className="text-[var(--accent-1)]" /> 基础模型
             </label>
             <div className="relative z-50">
@@ -150,7 +150,7 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
           </div>
 
           <div className="relative z-[40]">
-            <label className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 flex items-center gap-1.5">
+            <label className="text-[11px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 flex items-center gap-1.5">
               提示词 (选填)
             </label>
             <textarea 
@@ -163,7 +163,7 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[11px] text-[var(--text-muted)] font-bold mb-1.5 block">视频帧率 (FPS)</label>
+              <label className="text-[11px] text-[var(--text-secondary)] font-bold mb-1.5 block">视频帧率 (FPS)</label>
               <input 
                 type="number" 
                 value={fps} 
@@ -172,7 +172,7 @@ export function Img2VideoModal({ isOpen, onClose, imageSrc }: Img2VideoModalProp
               />
             </div>
             <div>
-              <label className="text-[11px] text-[var(--text-muted)] font-bold mb-1.5 block">总帧数 (Duration)</label>
+              <label className="text-[11px] text-[var(--text-secondary)] font-bold mb-1.5 block">总帧数 (Duration)</label>
               <input 
                 type="number" 
                 value={duration} 

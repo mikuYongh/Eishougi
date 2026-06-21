@@ -98,7 +98,7 @@ export function VideoGenerate() {
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
             图生视频 (Image to Video)
           </h2>
-          <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">使用 AnimateDiff 或 SVD 将静态图片转化为丝滑的动态视频</p>
+          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">使用 AnimateDiff 或 SVD 将静态图片转化为丝滑的动态视频</p>
         </div>
         <button 
           onClick={handleGenerate}
@@ -137,7 +137,7 @@ export function VideoGenerate() {
                   <UploadCloud size={32} className="text-[var(--accent-2)]/80" />
                 </div>
                 <h3 className="text-lg font-bold text-[var(--text-primary)] mb-1">拖拽图片至此</h3>
-                <p className="text-xs text-[var(--text-muted)]">支持 JPG, PNG 作为首帧参考</p>
+                <p className="text-xs text-[var(--text-secondary)]">支持 JPG, PNG 作为首帧参考</p>
               </div>
             )}
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
@@ -150,7 +150,7 @@ export function VideoGenerate() {
 
             <div className="space-y-4">
               <div className="relative z-[60]">
-                <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><Layers size={12}/> 工作流 (Workflow)</label>
+                <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><Layers size={12}/> 工作流 (Workflow)</label>
                 <GlassDropdown 
                   value={selectedWorkflowId}
                   onChange={v => setSelectedWorkflowId(v || '')}
@@ -163,7 +163,7 @@ export function VideoGenerate() {
               </div>
 
               <div className="relative z-[50]">
-                <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><Cpu size={12}/> 基础模型 (Checkpoint)</label>
+                <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><Cpu size={12}/> 基础模型 (Checkpoint)</label>
                 <SearchableDropdown 
                   value={baseModel}
                   onChange={v => setBaseModel(v)}
@@ -173,7 +173,7 @@ export function VideoGenerate() {
               </div>
 
               <div className="relative z-[40]">
-                <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5">提示词 (Prompt)</label>
+                <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 flex items-center gap-1.5">提示词 (Prompt)</label>
                 <textarea 
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
@@ -184,7 +184,7 @@ export function VideoGenerate() {
               
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1.5"><FastForward size={12}/> 帧率 (FPS)</label>
+                  <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-1.5"><FastForward size={12}/> 帧率 (FPS)</label>
                   <span className="text-[12px] font-mono text-[var(--accent-2)] font-bold">{fps} fps</span>
                 </div>
                 <input type="range" min="8" max="24" step="2" value={fps} onChange={e => setFps(parseInt(e.target.value))} className="w-full h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-[var(--accent-2)]" />
@@ -192,14 +192,14 @@ export function VideoGenerate() {
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-1.5"><Clock size={12}/> 时长 (Duration)</label>
+                  <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-1.5"><Clock size={12}/> 时长 (Duration)</label>
                   <span className="text-[12px] font-mono text-[var(--accent-2)] font-bold">{duration} 秒 ({fps * duration} 帧)</span>
                 </div>
                 <input type="range" min="1" max="4" step="1" value={duration} onChange={e => setDuration(parseInt(e.target.value))} className="w-full h-1 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer accent-[var(--accent-2)]" />
               </div>
 
               <div className="relative z-20 pt-2">
-                <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><Maximize size={12}/> 视频分辨率</label>
+                <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 flex items-center gap-1.5"><Maximize size={12}/> 视频分辨率</label>
                 <GlassDropdown 
                   value={resolution}
                   onChange={setResolution}
@@ -234,7 +234,7 @@ export function VideoGenerate() {
                   <div className="h-1.5 w-full bg-[var(--bg-layer-1)] rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-[var(--accent-2)] to-[var(--accent-1)] transition-all duration-300" style={{ width: `${activeJob.progress}%` }}></div>
                   </div>
-                  <p className="text-[11px] text-[var(--text-muted)] text-center font-mono">{activeJob.status === 'pending' ? '等待排队...' : '生成中'}</p>
+                  <p className="text-[11px] text-[var(--text-secondary)] text-center font-mono">{activeJob.status === 'pending' ? '等待排队...' : '生成中'}</p>
                 </div>
               ) : completedJob && completedJob.images && completedJob.images.length > 0 ? (
                 <div className="relative w-full h-full flex items-center justify-center">
@@ -245,7 +245,7 @@ export function VideoGenerate() {
                   )}
                 </div>
               ) : (
-                <div className="text-[var(--text-muted)] flex flex-col items-center">
+                <div className="text-[var(--text-secondary)] flex flex-col items-center">
                   <Video size={48} className="mb-4 opacity-20" />
                   <p className="text-[13px] font-bold uppercase tracking-widest">渲染完成后在此播放</p>
                 </div>

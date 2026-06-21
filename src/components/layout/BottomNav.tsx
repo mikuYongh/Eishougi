@@ -33,7 +33,7 @@ export function BottomNav() {
             onClick={() => handleNav(item.id, item.path)}
             className={cn(
               "flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all duration-300 relative",
-              isActive ? "text-[var(--text-primary)]" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              isActive ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             )}
           >
             {isActive && (

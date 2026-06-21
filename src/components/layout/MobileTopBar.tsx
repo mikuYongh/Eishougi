@@ -17,7 +17,7 @@ export function MobileTopBar() {
       <div className="flex items-center gap-2">
         <img src="/icon.png" alt="Logo" className="w-5 h-5 object-contain drop-shadow-[0_0_8px_rgba(var(--accent-1-rgb),0.5)]" />
         <h1 className="text-sm font-bold text-[var(--text-primary)] tracking-wider">
-          {title} <span className="text-[10px] text-[var(--text-muted)] font-normal uppercase tracking-widest ml-1">Eishougi</span>
+          {title} <span className="text-[10px] text-[var(--text-secondary)] font-normal uppercase tracking-widest ml-1">Eishougi</span>
         </h1>
       </div>
 

@@ -61,7 +61,7 @@ export function LoraSelectorUI({ selectedLoras, onChange, availableLoras }: Lora
       {/* Selected Chips */}
       <div className="flex flex-wrap gap-2">
         {selectedLoras.length === 0 ? (
-          <div className="text-[11px] text-[var(--text-muted)] w-full text-center py-6 border border-dashed border-[var(--glass-border)] rounded-xl bg-[var(--glass-bg)] backdrop-blur-sm">
+          <div className="text-[11px] text-[var(--text-secondary)] w-full text-center py-6 border border-dashed border-[var(--glass-border)] rounded-xl bg-[var(--glass-bg)] backdrop-blur-sm">
             暂未添加 LoRA，点击右上角添加
           </div>
         ) : (
@@ -72,7 +72,7 @@ export function LoraSelectorUI({ selectedLoras, onChange, availableLoras }: Lora
                 <div 
                   className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[11px] font-bold cursor-pointer transition-all duration-300 ${
                     lora.enabled ? (isActive ? 'bg-gradient-to-br from-[var(--accent-1)]/20 to-[var(--accent-2)]/10 border-[var(--accent-1)]/50 text-[var(--accent-1)] shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.15)] scale-105' : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-primary)] hover:border-[var(--accent-1)]/30 hover:bg-[var(--glass-bg-hover)]') 
-                    : 'bg-[var(--glass-bg)] border-transparent text-[var(--text-muted)] opacity-60 hover:opacity-100'
+                    : 'bg-[var(--glass-bg)] border-transparent text-[var(--text-secondary)] opacity-60 hover:opacity-100'
                   }`}
                   onClick={() => setActiveChipIndex(isActive ? null : i)}
                 >
@@ -156,14 +156,14 @@ export function LoraSelectorUI({ selectedLoras, onChange, availableLoras }: Lora
                 <Layers size={18} className="text-[var(--accent-1)]" />
                 选择 LoRA
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] rounded-full transition-colors p-2 cursor-pointer">
+              <button onClick={() => setIsModalOpen(false)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] rounded-full transition-colors p-2 cursor-pointer">
                 <X size={20} />
               </button>
             </div>
             
             <div className="p-4 border-b border-[var(--glass-border)] shrink-0 relative z-10 bg-[var(--glass-bg)]">
               <div className="relative group">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent-1)] transition-colors" />
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-1)] transition-colors" />
                 <input
                   type="text"
                   placeholder="输入关键字搜索 LoRA..."
@@ -189,14 +189,14 @@ export function LoraSelectorUI({ selectedLoras, onChange, availableLoras }: Lora
                       }`}
                     >
                       <span className={`text-sm font-bold truncate pr-3 leading-relaxed transition-colors ${isSelected ? 'text-[var(--accent-1)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`} title={lora}>{lora}</span>
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-[var(--accent-1)] text-white shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.5)]' : 'bg-[var(--glass-bg)] text-transparent group-hover:bg-[var(--glass-bg-hover)] group-hover:text-[var(--text-muted)] border border-[var(--glass-border)]'}`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-[var(--accent-1)] text-white shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.5)]' : 'bg-[var(--glass-bg)] text-transparent group-hover:bg-[var(--glass-bg-hover)] group-hover:text-[var(--text-secondary)] border border-[var(--glass-border)]'}`}>
                         <Check size={12} />
                       </div>
                     </button>
                   );
                 })}
                 {filteredLoras.length === 0 && (
-                  <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center py-20 text-[var(--text-muted)] gap-4">
+                  <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center py-20 text-[var(--text-secondary)] gap-4">
                     <div className="w-16 h-16 rounded-full bg-[var(--glass-bg)] flex items-center justify-center">
                       <Search size={24} className="opacity-50" />
                     </div>

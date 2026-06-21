@@ -58,17 +58,17 @@ export function Vault() {
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
             典藏库
           </h2>
-          <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">您收藏的精彩创作 (图像与视频)</p>
+          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">您收藏的精彩创作 (图像与视频)</p>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto pr-2 pb-4 custom-scrollbar">
         {loading ? (
-          <div className="h-full flex items-center justify-center text-[var(--text-muted)]">
+          <div className="h-full flex items-center justify-center text-[var(--text-secondary)]">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent-1)]" />
           </div>
         ) : images.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-[var(--text-muted)] gap-4">
+          <div className="h-full flex flex-col items-center justify-center text-[var(--text-secondary)] gap-4">
             <Sparkles size={48} className="opacity-20" />
             <p>暂无收藏，快去生成历史里发现并收藏您的得意之作吧！</p>
           </div>
@@ -125,7 +125,7 @@ export function Vault() {
 
                   {/* Mobile Actions */}
                   <div className="md:hidden p-2 flex items-center justify-between border-t border-[var(--glass-border)] bg-[var(--bg-layer-1)]">
-                    <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                    <span className="text-[10px] text-[var(--text-secondary)] font-mono">
                       {/* @ts-ignore */}
                       {new Date(img.createdAt || img.created_at || Date.now()).toLocaleDateString()}
                     </span>
@@ -190,13 +190,13 @@ export function Vault() {
             <div className="w-full md:w-[350px] flex-1 md:flex-none min-h-0 bg-[var(--bg-layer-1)] p-6 flex flex-col gap-5 border-t md:border-t-0 md:border-l border-[var(--glass-border)] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-[var(--text-primary)]">典藏详情</h3>
-                <button onClick={() => setPreviewImage(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
+                <button onClick={() => setPreviewImage(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
                   <X size={20} />
                 </button>
               </div>
 
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">正向提示词</label>
+                <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">正向提示词</label>
                 <div className="text-[12px] text-[var(--text-primary)] font-mono leading-relaxed bg-[var(--glass-bg)] p-3 rounded-xl border border-[var(--glass-border)] max-h-40 overflow-y-auto custom-scrollbar">
                   {(previewImage as any).prompt || previewImage.prompt_id || "暂无对应的提示词记录"}
                 </div>
@@ -204,11 +204,11 @@ export function Vault() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">基础模型</label>
+                  <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">基础模型</label>
                   <div className="text-[12px] font-bold text-[var(--text-primary)] truncate" title={(previewImage as any).model || "未知"}>{(previewImage as any).model || "未知"}</div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-[var(--text-muted)] font-bold uppercase block mb-1">分辨率 / Seed</label>
+                  <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">分辨率 / Seed</label>
                   <div className="text-[12px] font-bold text-[var(--text-primary)]">{(previewImage as any).resolution || previewImage.seed || "未知"}</div>
                 </div>
               </div>

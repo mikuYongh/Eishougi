@@ -161,7 +161,7 @@ export function PromptList() {
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
             提示词项目管理
           </h2>
-          <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">管理生成配置项目，包含提示词、底模、LoRA及全部参数</p>
+          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">管理生成配置项目，包含提示词、底模、LoRA及全部参数</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-start md:justify-end">
           <button 
@@ -195,7 +195,7 @@ export function PromptList() {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold transition-all flex-shrink-0 border ${
               showFavoritesOnly 
                 ? "bg-[var(--accent-1)]/20 text-[var(--accent-1)] border-[var(--accent-1)] shadow-[0_0_15px_rgba(255,100,100,0.3)]" 
-                : "bg-[var(--bg-layer-1)] text-[var(--text-muted)] border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)]"
+                : "bg-[var(--bg-layer-1)] text-[var(--text-secondary)] border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)]"
             }`}
           >
             <Star size={14} className={showFavoritesOnly ? "fill-[var(--accent-1)]" : ""} /> 收藏
@@ -232,14 +232,14 @@ export function PromptList() {
           <div className="flex bg-[var(--bg-layer-1)] p-1 rounded-lg border border-[var(--glass-border)]">
             <button 
               onClick={() => { setViewMode('grid'); setCurrentPage(1); }}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'grid' ? 'bg-[var(--glass-bg-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'grid' ? 'bg-[var(--glass-bg-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
               title="网格视图"
             >
               <LayoutGrid size={16} />
             </button>
             <button 
               onClick={() => { setViewMode('list'); setCurrentPage(1); }}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'list' ? 'bg-[var(--glass-bg-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === 'list' ? 'bg-[var(--glass-bg-hover)] text-[var(--text-primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
               title="列表视图"
             >
               <ListIcon size={16} />
@@ -248,13 +248,13 @@ export function PromptList() {
 
           {/* SearchBar */}
           <div className="glass-panel flex items-center gap-2 px-3 py-1.5 w-full md:w-64 focus-within:border-blue-400/50 transition-colors rounded-full flex-shrink-0">
-            <Search size={14} className="text-[var(--text-muted)]" />
+            <Search size={14} className="text-[var(--text-secondary)]" />
             <input 
               type="text" 
               placeholder="搜索项目名称/标签..." 
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="bg-transparent border-none outline-none text-[12px] text-[var(--text-primary)] w-full placeholder:text-[var(--text-muted)]"
+              className="bg-transparent border-none outline-none text-[12px] text-[var(--text-primary)] w-full placeholder:text-[var(--text-secondary)]"
             />
           </div>
         </div>
@@ -277,7 +277,7 @@ export function PromptList() {
                       <div className="w-10 h-10 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.2)] mb-2">
                         <Sparkles size={18} className="text-[var(--accent-1)] opacity-50 group-hover:opacity-100 group-hover:animate-pulse transition-all" />
                       </div>
-                      <span className="text-[10px] text-[var(--text-muted)] font-mono tracking-widest uppercase">EISHOUGI PROJECT</span>
+                      <span className="text-[10px] text-[var(--text-secondary)] font-mono tracking-widest uppercase">EISHOUGI PROJECT</span>
                     </div>
                   )}
                   
@@ -321,7 +321,7 @@ export function PromptList() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <h3 className="text-[14px] font-bold text-[var(--text-primary)] truncate mb-1" title={p.title}>{p.title}</h3>
-                      <p className="text-[11px] text-[var(--text-muted)] line-clamp-1">{p.description || "暂无描述"}</p>
+                      <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1">{p.description || "暂无描述"}</p>
                     </div>
                   </div>
 
@@ -405,9 +405,9 @@ export function PromptList() {
                       {p.tags.length > 5 && <span className="px-1 py-0.5 text-[var(--text-secondary)] text-[9px]">+{p.tags.length - 5}</span>}
                     </div>
                   </div>
-                  <p className="text-[11px] text-[var(--text-muted)] line-clamp-1">{p.positivePrompt}</p>
+                  <p className="text-[11px] text-[var(--text-secondary)] line-clamp-1">{p.positivePrompt}</p>
                   
-                  <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)] font-mono mt-0.5">
+                  <div className="flex items-center gap-3 text-[10px] text-[var(--text-secondary)] font-mono mt-0.5">
                     <span className="flex items-center gap-1"><Cpu size={10} className="text-[var(--accent-2)]"/> {p.baseModel}</span>
                     <span className="flex items-center gap-1"><Maximize size={10} className="text-green-400"/> {p.width}x{p.height}</span>
                     <span className="flex items-center gap-1"><Layers size={10} className="text-orange-400"/> {p.loraConfigs?.length || 0} LoRAs</span>
@@ -417,10 +417,10 @@ export function PromptList() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-3 flex-shrink-0 md:border-l md:border-[var(--glass-border)] md:pl-4 md:ml-2 w-full md:w-auto justify-end mt-2 md:mt-0 pt-2 md:pt-0 border-t border-[var(--glass-border)] md:border-t-0">
-                  <button onClick={() => toggleFavorite(p.id)} className="p-2 rounded-full hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer text-[var(--text-muted)] hover:text-yellow-400">
+                  <button onClick={() => toggleFavorite(p.id)} className="p-2 rounded-full hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer text-[var(--text-secondary)] hover:text-yellow-400">
                     <Star size={16} className={p.isFavorite ? "text-yellow-400 fill-yellow-400" : ""} />
                   </button>
-                  <button onClick={() => handleClone(p)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--glass-bg)] hover:bg-blue-500/20 text-[var(--text-muted)] hover:text-blue-400 transition-colors cursor-pointer" title="克隆项目">
+                  <button onClick={() => handleClone(p)} className="w-8 h-8 flex items-center justify-center rounded-lg bg-[var(--glass-bg)] hover:bg-blue-500/20 text-[var(--text-secondary)] hover:text-blue-400 transition-colors cursor-pointer" title="克隆项目">
                     <Copy size={14} />
                   </button>
                   <button 

@@ -165,7 +165,7 @@ export function AutoDeployGuide({ onComplete, onBack }: Props) {
       case 'running': return <Loader2 size={18} className="animate-spin text-[var(--accent-1)]" />;
       case 'success': return <CheckCircle2 size={18} className="text-green-500" />;
       case 'error': return <AlertTriangle size={18} className="text-red-500" />;
-      default: return <Circle size={18} className="text-[var(--text-muted)] opacity-50" />;
+      default: return <Circle size={18} className="text-[var(--text-secondary)] opacity-50" />;
     }
   };
 
@@ -276,7 +276,7 @@ export function AutoDeployGuide({ onComplete, onBack }: Props) {
                       {step.message}
                     </span>
                   </div>
-                  <span className="text-xs text-[var(--text-muted)] shrink-0 font-medium bg-[var(--bg-layer-1)] px-2 py-1 rounded-md">
+                  <span className="text-xs text-[var(--text-secondary)] shrink-0 font-medium bg-[var(--bg-layer-1)] px-2 py-1 rounded-md">
                     {i + 1} / 10
                   </span>
                 </div>
@@ -325,7 +325,7 @@ export function AutoDeployGuide({ onComplete, onBack }: Props) {
             <div className="w-full max-w-3xl space-y-4">
               <div className="p-5 bg-[var(--bg-base)] border border-[var(--glass-border)] rounded-2xl flex items-center justify-between shadow-sm">
                 <div className="flex flex-col">
-                  <span className="text-[var(--text-muted)] text-sm mb-1">本地服务地址</span>
+                  <span className="text-[var(--text-secondary)] text-sm mb-1">本地服务地址</span>
                   {comfyUrl ? (
                     <span className="text-green-500 font-mono text-lg">{comfyUrl}</span>
                   ) : (
@@ -334,7 +334,7 @@ export function AutoDeployGuide({ onComplete, onBack }: Props) {
                 </div>
                 {deployResult?.comfy_dir && (
                   <div className="flex flex-col text-right border-l border-[var(--glass-border)] pl-6">
-                    <span className="text-[var(--text-muted)] text-sm mb-1">安装目录</span>
+                    <span className="text-[var(--text-secondary)] text-sm mb-1">安装目录</span>
                     <span className="text-[var(--text-primary)] font-mono text-sm max-w-[250px] truncate" title={deployResult.comfy_dir}>{deployResult.comfy_dir}</span>
                   </div>
                 )}
@@ -345,7 +345,7 @@ export function AutoDeployGuide({ onComplete, onBack }: Props) {
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h4 className="text-[var(--text-primary)] font-bold text-lg">基础模型依赖</h4>
-                      <p className="text-[var(--text-muted)] text-sm mt-1">检测到 {deployResult.models_count} 个推荐模型未安装，建议立即补齐以确保功能正常</p>
+                      <p className="text-[var(--text-secondary)] text-sm mt-1">检测到 {deployResult.models_count} 个推荐模型未安装，建议立即补齐以确保功能正常</p>
                     </div>
                     <button
                       onClick={downloadSelected}
@@ -395,7 +395,7 @@ export function AutoDeployGuide({ onComplete, onBack }: Props) {
                             </div>
                           )}
                           {ds?.status === 'downloading' && ds.mb && (
-                            <div className="text-xs text-[var(--text-muted)] mt-1.5 font-mono text-right">{ds.mb}</div>
+                            <div className="text-xs text-[var(--text-secondary)] mt-1.5 font-mono text-right">{ds.mb}</div>
                           )}
                         </div>
                       );

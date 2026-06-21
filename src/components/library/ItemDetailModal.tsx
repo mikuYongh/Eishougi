@@ -69,7 +69,7 @@ export function ItemDetailModal({ item, onClose, onToggleFavorite, isArtist }: I
               }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
+            <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)]">
               No Image Available
             </div>
           )}
@@ -100,7 +100,7 @@ export function ItemDetailModal({ item, onClose, onToggleFavorite, isArtist }: I
           </div>
           
           <h2 className="text-3xl font-bold text-[var(--text-primary)] mb-1 leading-tight">{nameZh}</h2>
-          <div className="text-xl text-[var(--text-muted)] font-medium mb-6">{nameEn}</div>
+          <div className="text-xl text-[var(--text-secondary)] font-medium mb-6">{nameEn}</div>
           
           <div className="space-y-6">
             <div className="bg-[var(--bg-layer-2)] border border-[var(--glass-border)] rounded-xl p-4 transition-all hover:border-[var(--glass-border-hover)] group">
@@ -109,7 +109,7 @@ export function ItemDetailModal({ item, onClose, onToggleFavorite, isArtist }: I
                 <div className="text-[var(--text-primary)] text-lg font-bold break-all flex-1">{nameZh}</div>
                 <button 
                   onClick={() => copyToClipboard(nameZh, true)}
-                  className={`p-2 rounded-lg transition-colors flex-shrink-0 ${copiedZh ? 'bg-green-500/20 text-green-400' : 'bg-[var(--bg-layer-1)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-1)]/20'}`}
+                  className={`p-2 rounded-lg transition-colors flex-shrink-0 ${copiedZh ? 'bg-green-500/20 text-green-400' : 'bg-[var(--bg-layer-1)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-1)]/20'}`}
                   title="复制中文名"
                 >
                   {copiedZh ? <Check size={18} /> : <Copy size={18} />}
@@ -125,7 +125,7 @@ export function ItemDetailModal({ item, onClose, onToggleFavorite, isArtist }: I
                 </div>
                 <button 
                   onClick={() => copyToClipboard(tagName, false)}
-                  className={`p-2 rounded-lg transition-colors flex-shrink-0 ${copiedEn ? 'bg-green-500/20 text-green-400' : 'bg-[var(--bg-layer-1)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-1)]/20'}`}
+                  className={`p-2 rounded-lg transition-colors flex-shrink-0 ${copiedEn ? 'bg-green-500/20 text-green-400' : 'bg-[var(--bg-layer-1)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--accent-1)]/20'}`}
                   title="复制英文提示词"
                 >
                   {copiedEn ? <Check size={18} /> : <Copy size={18} />}

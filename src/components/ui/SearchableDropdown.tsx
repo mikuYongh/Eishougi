@@ -95,10 +95,10 @@ export function SearchableDropdown({
             : `w-full px-3 py-2 rounded-lg bg-[var(--glass-bg)] border ${isOpen ? theme.border + ' ' + theme.shadow : 'border-[var(--glass-border)] hover:border-[var(--glass-border-active)]'}`
         }`}
       >
-        <span className={`text-[12px] truncate ${selectedOption ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}`}>
+        <span className={`text-[12px] truncate ${selectedOption ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 ' + theme.text : 'text-[var(--text-muted)]'}`} />
+        <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 ' + theme.text : 'text-[var(--text-secondary)]'}`} />
       </button>
 
       {isOpen && (
@@ -106,7 +106,7 @@ export function SearchableDropdown({
           
           <div className="p-2 border-b border-[var(--glass-border)] flex-shrink-0">
             <div className="relative flex items-center">
-              <Search size={14} className="absolute left-2.5 text-[var(--text-muted)]" />
+              <Search size={14} className="absolute left-2.5 text-[var(--text-secondary)]" />
               <input
                 ref={inputRef}
                 type="text"
@@ -135,7 +135,7 @@ export function SearchableDropdown({
                 </button>
               ))
             ) : (
-              <div className="px-3 py-4 text-center text-[11px] text-[var(--text-muted)]">
+              <div className="px-3 py-4 text-center text-[11px] text-[var(--text-secondary)]">
                 未找到匹配项
               </div>
             )}

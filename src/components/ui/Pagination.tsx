@@ -62,7 +62,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
         {pageNumbers.map((page, index) => {
           if (page === '...') {
             return (
-              <div key={`ellipsis-${index}`} className="flex items-center justify-center w-6 sm:w-8 text-[var(--text-muted)]">
+              <div key={`ellipsis-${index}`} className="flex items-center justify-center w-6 sm:w-8 text-[var(--text-secondary)]">
                 <MoreHorizontal size={16} />
               </div>
             );

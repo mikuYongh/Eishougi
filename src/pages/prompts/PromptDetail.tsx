@@ -42,7 +42,7 @@ export function PromptDetail() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate("/prompts")}
-            className="p-2 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
+            className="p-2 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]"
           >
             <ArrowLeft size={18} />
           </button>
@@ -50,13 +50,13 @@ export function PromptDetail() {
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">{prompt.title}</h2>
               <button className="cursor-pointer">
-                <Star size={20} className={prompt.is_favorite ? "text-yellow-400 fill-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" : "text-[var(--text-muted)] hover:text-[var(--text-muted)]"} />
+                <Star size={20} className={prompt.is_favorite ? "text-yellow-400 fill-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]" : "text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"} />
               </button>
-              <button className={`cursor-pointer ${prompt.is_pinned ? "text-[var(--accent-2)]" : "text-[var(--text-muted)] hover:text-[var(--text-muted)]"}`}>
+              <button className={`cursor-pointer ${prompt.is_pinned ? "text-[var(--accent-2)]" : "text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"}`}>
                 <Pin size={18} />
               </button>
             </div>
-            <p className="text-sm mt-1 text-[var(--text-muted)]">{prompt.description}</p>
+            <p className="text-sm mt-1 text-[var(--text-secondary)]">{prompt.description}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -73,7 +73,7 @@ export function PromptDetail() {
           >
             <Settings size={16} /> 编辑
           </button>
-          <button className="p-2.5 rounded-xl bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]" title="克隆项目">
+          <button className="p-2.5 rounded-xl bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)]" title="克隆项目">
             <Copy size={16} />
           </button>
           <button className="p-2.5 rounded-xl bg-[var(--glass-bg)] hover:bg-red-500/20 text-red-500 hover:text-red-400 transition-colors cursor-pointer border border-[var(--glass-border)]" title="删除项目">
@@ -145,7 +145,7 @@ export function PromptDetail() {
                 { label: "调度器", value: prompt.scheduler },
               ].map(p => (
                 <div key={p.label} className="flex items-center justify-between py-1.5 border-b border-white/[0.03]">
-                  <span className="text-[var(--text-muted)]">{p.label}</span>
+                  <span className="text-[var(--text-secondary)]">{p.label}</span>
                   <span className="text-[var(--text-primary)] font-mono font-bold">{p.value}</span>
                 </div>
               ))}
@@ -163,7 +163,7 @@ export function PromptDetail() {
               </div>
               <h3 className="text-sm font-bold text-[var(--text-primary)]">参考图片</h3>
             </div>
-            <div className="flex items-center justify-center h-32 rounded-lg border border-dashed border-[var(--glass-border)] bg-[var(--bg-layer-1)] text-[var(--text-muted)] text-xs">
+            <div className="flex items-center justify-center h-32 rounded-lg border border-dashed border-[var(--glass-border)] bg-[var(--bg-layer-1)] text-[var(--text-secondary)] text-xs">
               暂无参考图片
             </div>
           </div>
@@ -195,12 +195,12 @@ export function PromptDetail() {
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-[var(--text-muted)]">基础模型</span>
+                <span className="text-[var(--text-secondary)]">基础模型</span>
                 <span className="text-[var(--text-primary)] font-mono text-xs">{prompt.base_model}</span>
               </div>
               {prompt.vae_model && (
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-[var(--text-muted)]">VAE</span>
+                  <span className="text-[var(--text-secondary)]">VAE</span>
                   <span className="text-[var(--text-primary)] font-mono text-xs">{prompt.vae_model}</span>
                 </div>
               )}
@@ -208,7 +208,7 @@ export function PromptDetail() {
 
             {prompt.lora_configs && prompt.lora_configs.length > 0 && (
               <div className="mt-4 pt-4 border-t border-[var(--glass-border)]">
-                <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3">LoRA 配置</div>
+                <div className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-3">LoRA 配置</div>
                 <div className="space-y-2">
                   {prompt.lora_configs.filter(l => l.enabled).map((lora, i) => (
                     <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--bg-layer-1)] border border-[var(--glass-border)]">
@@ -226,11 +226,11 @@ export function PromptDetail() {
 
           {/* Meta */}
           <div className="glass-panel p-5">
-            <div className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2">元信息</div>
-            <div className="space-y-2 text-xs text-[var(--text-muted)]">
+            <div className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2">元信息</div>
+            <div className="space-y-2 text-xs text-[var(--text-secondary)]">
               <div className="flex justify-between"><span>创建时间</span><span>{new Date(prompt.created_at).toLocaleDateString()}</span></div>
               <div className="flex justify-between"><span>更新时间</span><span>{new Date(prompt.updated_at).toLocaleDateString()}</span></div>
-              <div className="flex justify-between"><span>ID</span><span className="font-mono text-[10px] text-[var(--text-muted)]">{prompt.id}</span></div>
+              <div className="flex justify-between"><span>ID</span><span className="font-mono text-[10px] text-[var(--text-secondary)]">{prompt.id}</span></div>
             </div>
           </div>
         </div>

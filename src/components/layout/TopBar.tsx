@@ -46,11 +46,11 @@ export function TopBar() {
             boxShadow: "inset 0 1px 4px rgba(0,0,0,0.1)",
           }}
         >
-          <Search size={14} className="text-[var(--text-muted)] group-focus-within:text-[var(--accent-1)] transition-colors" />
+          <Search size={14} className="text-[var(--text-secondary)] group-focus-within:text-[var(--accent-1)] transition-colors" />
           <input
             type="text"
             placeholder="Search prompt muse..."
-            className="border-none bg-transparent outline-none text-[13px] text-[var(--text-primary)] w-full font-sans placeholder:text-[var(--text-muted)]"
+            className="border-none bg-transparent outline-none text-[13px] text-[var(--text-primary)] w-full font-sans placeholder:text-[var(--text-secondary)]"
           />
         </div>
         {/* Queue button */}

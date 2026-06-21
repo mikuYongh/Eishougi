@@ -58,7 +58,7 @@ function ToastItem({ item }: { item: CompletionNotification }) {
 
       <button
         onClick={handleDismiss}
-        className="flex-shrink-0 w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+        className="flex-shrink-0 w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
       >
         <X size={14} />
       </button>

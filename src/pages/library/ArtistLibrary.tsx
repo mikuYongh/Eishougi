@@ -34,7 +34,7 @@ export function ArtistLibrary() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">风格画师</h1>
-          <p className="text-[var(--text-muted)] text-sm">探索并使用海量画师的独特风格和人物</p>
+          <p className="text-[var(--text-secondary)] text-sm">探索并使用海量画师的独特风格和人物</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -49,7 +49,7 @@ export function ArtistLibrary() {
           </div>
 
           <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent-1)] transition-colors" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-1)] transition-colors" size={16} />
             <input
               type="text"
               placeholder="搜索画师 (英文/拼音/中文)..."
@@ -75,12 +75,12 @@ export function ArtistLibrary() {
       {/* Grid View using Virtuoso */}
       <div className="flex-1 min-h-0 relative">
         {isArtistsLoading && artists.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-secondary)]">
             <Loader2 size={32} className="animate-spin text-[var(--accent-1)]" />
             <span className="text-sm">正在加载画师数据...</span>
           </div>
         ) : artists.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-[var(--text-secondary)]">
             <AlertCircle size={32} className="text-yellow-500" />
             <span className="text-sm">没有画师数据</span>
             <button onClick={() => loadMoreArtists()} className="px-4 py-1.5 rounded-lg bg-[var(--accent-1)]/20 text-[var(--accent-1)] text-sm hover:bg-[var(--accent-1)]/30 transition-colors">重新加载</button>
@@ -111,7 +111,7 @@ export function ArtistLibrary() {
                     }}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)] opacity-50">
+                  <div className="w-full h-full flex items-center justify-center text-[var(--text-secondary)] opacity-50">
                     No Image
                   </div>
                 )}

@@ -93,7 +93,7 @@ export function LocalGuide({ onComplete, onBack }: Props) {
                 </div>
                 <p className="text-[var(--text-secondary)] text-sm leading-relaxed mb-4 h-16">{s.desc}</p>
                 <div className="w-full aspect-video bg-black/40 rounded-lg overflow-hidden border border-[var(--glass-border)] relative flex items-center justify-center">
-                  <span className="text-xs text-[var(--text-muted)] absolute z-0">截图位置: A{i+1}</span>
+                  <span className="text-xs text-[var(--text-secondary)] absolute z-0">截图位置: A{i+1}</span>
                   <img src={s.img} alt={s.title} className="w-full h-full object-cover relative z-10" onError={(e) => e.currentTarget.style.display = 'none'} />
                 </div>
               </div>

@@ -181,7 +181,7 @@ await addPrompt(newProject);
             <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md">
               {id === 'new' ? '新建提示词项目' : '编辑提示词项目'}
             </h2>
-            <p className="text-[12px] text-[var(--text-muted)]">{project.title || "未命名项目"}</p>
+            <p className="text-[12px] text-[var(--text-secondary)]">{project.title || "未命名项目"}</p>
           </div>
         </div>
         
@@ -209,7 +209,7 @@ await addPrompt(newProject);
           
           <div className="glass-panel p-5 space-y-4 relative z-[60]">
             <div>
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">项目名称</label>
+              <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">项目名称</label>
               <input 
                 type="text" value={project.title} onChange={e => updateField('title', e.target.value)}
                 className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-[var(--text-primary)] text-sm outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold"
@@ -217,15 +217,15 @@ await addPrompt(newProject);
               />
             </div>
             <div>
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">项目描述</label>
+              <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">项目描述</label>
               <input 
                 type="text" value={project.description} onChange={e => updateField('description', e.target.value)}
-                className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-[var(--text-muted)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors"
+                className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-[var(--text-secondary)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors"
                 placeholder="简要描述这个项目的用途或预期效果..."
               />
             </div>
             <div>
-              <label className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">标签 (Tags)</label>
+              <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">标签 (Tags)</label>
               <div 
                 ref={tagContainerRef}
                 className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-2 min-h-[46px] flex flex-wrap gap-2 focus-within:border-[var(--accent-2)]/50 transition-colors relative"
@@ -302,7 +302,7 @@ await addPrompt(newProject);
           <div className="flex flex-col gap-4 flex-1">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-3 px-4 shadow-lg">
               <div className="flex items-center gap-4 flex-wrap">
-                <label className="text-[12px] font-bold text-[var(--text-muted)] uppercase tracking-widest flex items-center gap-2 whitespace-nowrap">
+                <label className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-2 whitespace-nowrap">
                   <Cpu size={14} className="text-[var(--accent-2)]" />
                   Prompt Syntax
                 </label>
@@ -315,7 +315,7 @@ await addPrompt(newProject);
                       className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
                         (project.promptSyntax || 'danbooru') === syntax
                           ? 'bg-[var(--accent-2)] text-white shadow-[0_0_15px_rgba(179,136,255,0.5)]'
-                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)]'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)]'
                       }`}
                     >
                       {syntax.toUpperCase()}
@@ -323,7 +323,7 @@ await addPrompt(newProject);
                   ))}
                 </div>
               </div>
-              <div className="text-[11px] text-[var(--text-muted)] bg-[var(--glass-bg)] px-3 py-1.5 rounded-lg whitespace-nowrap text-center lg:text-right">
+              <div className="text-[11px] text-[var(--text-secondary)] bg-[var(--glass-bg)] px-3 py-1.5 rounded-lg whitespace-nowrap text-center lg:text-right">
                 {(project.promptSyntax || 'danbooru') === 'danbooru' && "标准逗号分隔标签 (支持智能预测)"}
                 {project.promptSyntax === 'natural' && "自然语言描述 (无限制输入)"}
                 {project.promptSyntax === 'xml' && "结构化 XML (兼容 NewBie/Anima)"}
@@ -394,7 +394,7 @@ await addPrompt(newProject);
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">采样器 (Sampler)</label>
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">采样器 (Sampler)</label>
                 <GlassDropdown 
                   value={project.sampler || "euler"}
                   onChange={v => updateField('sampler', v)}
@@ -414,7 +414,7 @@ await addPrompt(newProject);
               </div>
               
               <div>
-                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">调度器 (Scheduler)</label>
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">调度器 (Scheduler)</label>
                 <GlassDropdown 
                   value={project.scheduler || "beta57"}
                   onChange={v => updateField('scheduler', v)}
@@ -432,14 +432,14 @@ await addPrompt(newProject);
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">采样步数 (Steps)</label>
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">采样步数 (Steps)</label>
                 <input 
                   type="number" value={project.steps || 20} onChange={e => updateField('steps', Number(e.target.value))}
                   className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest mb-1.5 block">CFG Scale</label>
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">CFG Scale</label>
                 <input 
                   type="number" step="0.1" value={project.cfgScale || 5.0} onChange={e => updateField('cfgScale', Number(e.target.value))}
                   className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold"
@@ -467,9 +467,9 @@ await addPrompt(newProject);
               ) : (
                 <>
                   <div className="w-12 h-12 rounded-full bg-[var(--glass-bg)] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                    <UploadCloud size={20} className="text-[var(--text-muted)] group-hover:text-[var(--accent-1)] transition-colors" />
+                    <UploadCloud size={20} className="text-[var(--text-secondary)] group-hover:text-[var(--accent-1)] transition-colors" />
                   </div>
-                  <span className="text-[11px] font-bold text-[var(--text-muted)]">点击或拖拽上传封面</span>
+                  <span className="text-[11px] font-bold text-[var(--text-secondary)]">点击或拖拽上传封面</span>
                 </>
               )}
               <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
@@ -511,7 +511,7 @@ await addPrompt(newProject);
                 </div>
               ))}
               {(!project.instanceImages || project.instanceImages.length === 0) && (
-                <div className="w-full h-16 flex items-center justify-center border border-dashed border-[var(--glass-border)] rounded-lg text-[var(--text-muted)] text-[11px] font-bold tracking-widest">
+                <div className="w-full h-16 flex items-center justify-center border border-dashed border-[var(--glass-border)] rounded-lg text-[var(--text-secondary)] text-[11px] font-bold tracking-widest">
                   暂无参考图
                 </div>
               )}
@@ -535,7 +535,7 @@ await addPrompt(newProject);
               </div>
               
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
+                <label className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 block flex items-center gap-1.5">
                   <Layers size={12} className="text-[var(--accent-1)]" /> 工作流 (Workflow)
                 </label>
                 <div className="relative z-[60]">
@@ -552,7 +552,7 @@ await addPrompt(newProject);
               </div>
               
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block">
+                <label className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 block">
                   基础模型 (Base Model)
                 </label>
                 <div className="relative z-50">
@@ -571,7 +571,7 @@ await addPrompt(newProject);
               </div>
 
               <div>
-                <label className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold mb-1.5 block">
+                <label className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider font-bold mb-1.5 block">
                   VAE 模型
                 </label>
                 <div className="relative z-40">

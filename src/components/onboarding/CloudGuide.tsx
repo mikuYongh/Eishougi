@@ -114,7 +114,7 @@ export function CloudGuide({ onComplete, onBack }: Props) {
               </div>
               <p className="text-[var(--text-secondary)] text-xs leading-relaxed mb-3 h-12">{s.desc}</p>
               <div className="w-full aspect-video bg-black/40 rounded-lg overflow-hidden border border-[var(--glass-border)] relative flex items-center justify-center">
-                <span className="text-[10px] text-[var(--text-muted)] absolute z-0">截图位置: B{i+1}</span>
+                <span className="text-[10px] text-[var(--text-secondary)] absolute z-0">截图位置: B{i+1}</span>
                 <img src={s.img} alt={s.title} className="w-full h-full object-cover relative z-10" onError={(e) => e.currentTarget.style.display = 'none'} />
               </div>
             </div>
@@ -126,7 +126,7 @@ export function CloudGuide({ onComplete, onBack }: Props) {
           <div className="flex gap-3">
             <div className="flex-1 relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Link size={18} className="text-[var(--text-muted)]" />
+                <Link size={18} className="text-[var(--text-secondary)]" />
               </div>
               <input
                 type="text"

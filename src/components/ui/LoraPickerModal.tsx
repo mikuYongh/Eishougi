@@ -37,14 +37,14 @@ export function LoraPickerModal({ isOpen, onClose, selectedLoras, onToggle }: Lo
             <Layers size={18} className="text-[var(--accent-1)]" />
             选择并添加工作流 LoRA
           </h3>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] rounded-full transition-colors p-2 cursor-pointer">
+          <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] rounded-full transition-colors p-2 cursor-pointer">
             <X size={20} />
           </button>
         </div>
         
         <div className="p-4 border-b border-[var(--glass-border)] shrink-0 relative z-10 bg-[var(--bg-layer-1)]">
           <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] group-focus-within:text-[var(--accent-1)] transition-colors" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-1)] transition-colors" size={18} />
             <input
               type="text"
               placeholder="搜索 LoRA 模型名称..."
@@ -73,16 +73,16 @@ export function LoraPickerModal({ isOpen, onClose, selectedLoras, onToggle }: Lo
                 >
                   <div className="flex-1 min-w-0 pr-3">
                     <p className={`text-sm font-bold truncate leading-relaxed transition-colors ${isSelected ? 'text-[var(--accent-1)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`} title={lora}>{displayName}</p>
-                    <p className="text-[10px] text-[var(--text-muted)] truncate" title={lora}>{lora}</p>
+                    <p className="text-[10px] text-[var(--text-secondary)] truncate" title={lora}>{lora}</p>
                   </div>
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-[var(--accent-1)] text-white shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.5)]' : 'bg-[var(--glass-bg)] text-transparent group-hover:bg-[var(--glass-bg-hover)] group-hover:text-[var(--text-muted)] border border-[var(--glass-border)]'}`}>
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-[var(--accent-1)] text-white shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.5)]' : 'bg-[var(--glass-bg)] text-transparent group-hover:bg-[var(--glass-bg-hover)] group-hover:text-[var(--text-secondary)] border border-[var(--glass-border)]'}`}>
                     <Check size={12} />
                   </div>
                 </button>
               );
             })}
             {filteredLoras.length === 0 && (
-              <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center py-20 text-[var(--text-muted)] gap-4">
+              <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center py-20 text-[var(--text-secondary)] gap-4">
                 <div className="w-16 h-16 rounded-full bg-[var(--glass-bg)] flex items-center justify-center">
                   <Layers size={24} className="opacity-50" />
                 </div>
