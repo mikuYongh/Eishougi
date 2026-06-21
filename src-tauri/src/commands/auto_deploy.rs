@@ -471,7 +471,10 @@ pub async fn call_llm_proxy(
     body_json: String,
     on_chunk: tauri::ipc::Channel<String>,
 ) -> Result<(), String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|e| format!("Client build failed: {}", e))?;
     let resp = client
         .post(&api_url)
         .header("Content-Type", "application/json")
@@ -479,11 +482,11 @@ pub async fn call_llm_proxy(
         .body(body_json)
         .send()
         .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+        .map_err(|e| format!("API {}: {}", api_url, e))?;
     let status = { let s = resp.status().as_u16(); s };
     if status >= 400 {
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("HTTP {}: {}", status, if body.len() > 300 { &body[..300] } else { &body }));
+        return Err(format!("API {} HTTP {}: {}", api_url, status, if body.len() > 300 { &body[..300] } else { &body }));
     }
     let mut stream = resp.bytes_stream();
     while let Some(chunk) = stream.next().await {
