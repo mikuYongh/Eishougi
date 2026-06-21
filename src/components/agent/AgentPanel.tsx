@@ -764,7 +764,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                         className={`max-w-[92%] text-[14px] relative group ${
                           msg.role === 'user' 
                             ? 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tr-sm border border-[var(--accent-1)]/30 backdrop-blur-md shadow-[0_4px_15px_rgba(var(--accent-1-rgb), 10)]' 
-                            : msg.role === 'tool' || (!msg.content && msg.tool_calls && msg.tool_calls.length > 0)
+                            : msg.role === 'tool' || (!msg.content && msg.tool_calls !== undefined)
                             ? 'p-0 bg-transparent w-full shadow-none mt-2'
                             : 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl shadow-[0_4px_15px_rgba(0,0,0,0.15)]'
                         }`}
