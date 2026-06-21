@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import { usePromptStore } from '../stores/promptStore';
 import { useAgentStore } from '../stores/agentStore';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, Channel } from '@tauri-apps/api/core';
 import { useQueueStore } from '../stores/queueStore';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useModelStore } from '../stores/modelStore';
@@ -105,7 +105,6 @@ export function useAgent() {
               _mcp: { url: server.url }
             });
           }
-          console.log(`[Agent] MCP server "${server.name}" loaded ${rustTools.length} tools`);
         } catch (e) {
           console.warn(`[Agent] MCP server "${server.name}" failed to connect:`, e);
         }
@@ -441,6 +440,73 @@ export function useAgent() {
           properties: {}
         }
       }
+    },
+    {
+      type: "function",
+      function: {
+        name: "deploy_comfyui",
+        description: "One-click deploy ComfyUI: clones repo, creates venv, installs PyTorch and requirements. Emits progress events to UI. Use this when user wants to install ComfyUI from scratch.",
+        parameters: {
+          type: "object",
+          properties: {
+            target_dir: { type: "string", description: "Installation directory. Default: C:\\ComfyUI (Windows) or ~/ComfyUI" },
+            use_mirror: { type: "boolean", description: "Use mirror URLs for faster downloads in China. Default: true" }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "start_comfyui",
+        description: "Start the local ComfyUI server. Waits up to 60 seconds for it to become ready. Returns the URL.",
+        parameters: {
+          type: "object",
+          properties: {
+            comfy_dir: { type: "string", description: "ComfyUI installation directory. Default: C:\\ComfyUI" },
+            port: { type: "number", description: "Port to listen on. Default: 8188" }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "stop_comfyui",
+        description: "Stop the local ComfyUI server if it's running.",
+        parameters: {
+          type: "object",
+          properties: {}
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "install_custom_node",
+        description: "Install a ComfyUI custom node by git cloning it into custom_nodes/.",
+        parameters: {
+          type: "object",
+          properties: {
+            node_url: { type: "string", description: "Git URL of the custom node to install (e.g. https://github.com/ltdrdata/ComfyUI-Manager.git)" },
+            comfy_dir: { type: "string", description: "ComfyUI installation directory. Default: C:\\ComfyUI" }
+          },
+          required: ["node_url"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "check_comfyui_status",
+        description: "Check if a ComfyUI server is online and return its system stats.",
+        parameters: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "ComfyUI URL. Default: http://127.0.0.1:8188" }
+          }
+        }
+      }
     }
   ];
 
@@ -757,55 +823,20 @@ User input: ${userText}`;
         throw e;
       }
 
-      const response = await smartFetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${llm.apiKey}`
-        },
-        body: bodyJson,
-        signal: abortController.signal
-      });
+      const channel = new Channel<string>();
+      let streamError: string | null = null;
+      let streamDone = false;
 
-      if (!response.ok) {
-        let errorMsg = response.statusText;
-        try {
-          const errorBody = await response.json();
-          if (errorBody.error && errorBody.error.message) {
-            errorMsg = errorBody.error.message;
-          } else if (typeof errorBody.error === 'string') {
-            errorMsg = errorBody.error;
-          } else {
-            errorMsg = JSON.stringify(errorBody);
-          }
-        } catch (e) {
-          try {
-            errorMsg = await response.text();
-          } catch (e2) {}
-        }
-        throw new Error(`API Error: ${response.status} ${errorMsg}`);
-      }
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder('utf-8');
-      
+      // Stream processing: same logic as before, now receiving chunks from Rust proxy
       let assistantMessage: ChatMessage = {
         id: Date.now().toString(),
         role: 'assistant',
         content: '',
         tool_calls: []
       };
-
       const baseMessages = [...currentMessages];
       setMessages([...baseMessages, assistantMessage]);
-
-      let done = false;
       let toolCallState: any = null;
-
-      // Throttle re-renders during streaming: accumulate deltas into the
-      // assistantMessage object and flush to the store at most once per frame.
-      // Without this, every SSE chunk triggers a full messages array clone +
-      // re-render, which makes long responses janky.
       let rafScheduled = false;
       let rafId: number | null = null;
       const flushRender = () => {
@@ -816,8 +847,6 @@ User input: ${userText}`;
       const scheduleRender = () => {
         if (!rafScheduled) {
           rafScheduled = true;
-          // requestAnimationFrame fires ~60Hz; fall back to setTimeout(0) if
-          // rAF is unavailable (older Android WebViews / SSR).
           if (typeof requestAnimationFrame === 'function') {
             rafId = requestAnimationFrame(flushRender);
           } else {
@@ -826,64 +855,47 @@ User input: ${userText}`;
         }
       };
 
-      while (!done && reader) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-          for (const line of lines) {
-            if (line === 'data: [DONE]') break;
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                const delta = data.choices[0].delta;
-
-                if (delta.content) {
-                  assistantMessage.content += delta.content;
-                }
-
-                if (delta.tool_calls) {
-                  for (const toolCall of delta.tool_calls) {
-                    if (toolCall.id) {
-                      assistantMessage.tool_calls = assistantMessage.tool_calls || [];
-                      assistantMessage.tool_calls.push({
-                        id: toolCall.id,
-                        type: 'function',
-                        function: {
-                          name: toolCall.function.name,
-                          arguments: toolCall.function.arguments || ''
-                        }
-                      });
-                      toolCallState = assistantMessage.tool_calls[assistantMessage.tool_calls.length - 1];
-                    } else if (toolCall.function && toolCall.function.arguments && toolCallState) {
-                      toolCallState.function.arguments += toolCall.function.arguments;
-                    }
+      channel.onmessage = (chunk: string) => {
+        const lines = chunk.split('\n').filter(line => line.trim() !== '');
+        for (const line of lines) {
+          if (line === 'data: [DONE]') { streamDone = true; return; }
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              const delta = data.choices[0].delta;
+              if (delta.content) assistantMessage.content += delta.content;
+              if (delta.tool_calls) {
+                for (const tc of delta.tool_calls) {
+                  if (tc.id) {
+                    assistantMessage.tool_calls = assistantMessage.tool_calls || [];
+                    assistantMessage.tool_calls.push({ id: tc.id, type: 'function', function: { name: tc.function.name, arguments: tc.function.arguments || '' } });
+                    toolCallState = assistantMessage.tool_calls[assistantMessage.tool_calls.length - 1];
+                  } else if (tc.function?.arguments && toolCallState) {
+                    toolCallState.function.arguments += tc.function.arguments;
                   }
                 }
-
-                scheduleRender();
-              } catch (e) {
-                // Ignore parse errors on partial chunks
               }
-            }
+              scheduleRender();
+            } catch {}
           }
         }
+      };
+
+      try {
+        await invoke('call_llm_proxy', { apiUrl, apiKey: llm.apiKey || '', bodyJson, onChunk: channel });
+      } catch (e: any) {
+        streamError = e.toString();
       }
 
-      // Final flush: ensure the last batch of deltas is committed even if no
-      // further rAF tick happens (e.g. reader closed mid-frame).
+      // Final flush
       if (rafId !== null) {
-        if (typeof cancelAnimationFrame === 'function' && rafScheduled) {
-          cancelAnimationFrame(rafId);
-        } else if (typeof clearTimeout === 'function' && rafScheduled) {
-          clearTimeout(rafId);
-        }
-        rafId = null;
-        rafScheduled = false;
+        if (typeof cancelAnimationFrame === 'function' && rafScheduled) cancelAnimationFrame(rafId);
+        else if (typeof clearTimeout === 'function' && rafScheduled) clearTimeout(rafId);
+        rafId = null; rafScheduled = false;
       }
       setMessages([...baseMessages, { ...assistantMessage }]);
+
+      if (streamError) throw new Error(streamError);
 
       if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
         const newMessages = [...currentMessages, assistantMessage];
@@ -1338,6 +1350,40 @@ User input: ${userText}`;
                   usePromptStore.getState().fetchPrompts();
                 }
                 res = { status: "success", message: `Image added to prompt ${parsedArgs.prompt_id} instance images.` };
+              } else if (fnName === 'deploy_comfyui') {
+                const settings = useSettingsStore.getState().settings;
+                const targetDir = parsedArgs.target_dir || settings.comfyDir || null;
+                resultStr = JSON.stringify({ status: "running", message: "Starting ComfyUI deployment..." });
+                invoke<any>('deploy_comfyui', {
+                  targetDir,
+                  useMirror: parsedArgs.use_mirror !== false
+                }).then((result: any) => {
+                  useSettingsStore.getState().updateSettings({
+                    comfyUrl: 'http://127.0.0.1:8188',
+                    comfyDir: targetDir || result?.comfy_dir || settings.comfyDir
+                  });
+                }).catch((e: any) => {
+                  console.error('[Agent] deploy_comfyui failed:', e);
+                });
+              } else if (fnName === 'start_comfyui') {
+                const { url } = await invoke<any>('start_comfyui', {
+                  comfyDir: parsedArgs.comfy_dir || useSettingsStore.getState().settings.comfyDir || null,
+                  port: parsedArgs.port || null
+                });
+                res = { status: "success", url, message: `ComfyUI started at ${url}` };
+              } else if (fnName === 'stop_comfyui') {
+                await invoke('stop_comfyui');
+                res = { status: "success", message: "ComfyUI stopped" };
+              } else if (fnName === 'install_custom_node') {
+                await invoke('install_custom_node', {
+                  nodeUrl: parsedArgs.node_url,
+                  comfyDir: parsedArgs.comfy_dir || useSettingsStore.getState().settings.comfyDir || null
+                });
+                res = { status: "success", message: `Custom node installed: ${parsedArgs.node_url}` };
+              } else if (fnName === 'check_comfyui_status') {
+                res = await invoke<any>('check_comfyui_status', {
+                  url: parsedArgs.url || null
+                });
               } else {
                 const mcpTool = mcpTools.find((t: any) => t.function.name === fnName);
                 if (mcpTool?._mcp?.url) {
