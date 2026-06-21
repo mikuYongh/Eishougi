@@ -10,6 +10,7 @@ export interface McpServerConfig {
 export interface AppSettings {
   comfyUrl: string;
   videoComfyUrl: string;
+  comfyDir: string;
   autoSave: boolean;
   llm: {
     provider: 'openai' | 'anthropic' | 'ollama' | 'agnes';
@@ -27,6 +28,7 @@ export interface AppSettings {
   blurLevel: number;
   privacyMode: boolean;
   uiScale: number;
+  hasCompletedOnboarding: boolean;
 }
 
 interface SettingsState {
@@ -50,6 +52,7 @@ interface SettingsState {
 const defaultSettings: AppSettings = {
   comfyUrl: import.meta.env.VITE_COMFY_URL || 'http://127.0.0.1:8188',
   videoComfyUrl: 'http://127.0.0.1:8188',
+  comfyDir: import.meta.env.VITE_COMFY_DIR || 'C:\\ComfyUI',
   autoSave: true,
   llm: {
     provider: 'agnes',
@@ -57,7 +60,7 @@ const defaultSettings: AppSettings = {
     apiUrl: import.meta.env.VITE_LLM_API_URL || 'https://apihub.agnes-ai.com/v1',
     model: import.meta.env.VITE_LLM_MODEL || 'agnes-2.0-flash',
     temperature: 0.7,
-    maxTokens: 2048
+    maxTokens: 8192
   },
   slimToolsMode: false,
   mcpServers: [
@@ -73,6 +76,7 @@ const defaultSettings: AppSettings = {
   blurLevel: 20,
   privacyMode: false,
   uiScale: 1,
+  hasCompletedOnboarding: false,
 };
 
 export const useSettingsStore = create<SettingsState>()(

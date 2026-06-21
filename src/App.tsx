@@ -9,6 +9,7 @@ import { TopBar } from "./components/layout/TopBar";
 import { StatusBar } from "./components/layout/StatusBar";
 import { AgentPanel } from "./components/agent/AgentPanel";
 import { CompletionToast } from "./components/ui/CompletionToast";
+import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 
 import { Dashboard } from "./pages/Dashboard";
 import {
@@ -31,7 +32,9 @@ import { ToastProvider } from "./components/ui/ToastProvider";
 
 export default function App() {
   const { isMobile } = useDevice();
+  const settings = useSettingsStore(s => s.settings);
   const { wallpaperPath, appTheme, colorTheme, blurLevel, uiScale } = useSettingsStore();
+  const hasCompletedOnboarding = settings.hasCompletedOnboarding;
   const fetchPrompts = usePromptStore((state) => state.fetchPrompts);
   const fetchWorkflows = useWorkflowStore((state) => state.fetchWorkflows);
 
@@ -42,6 +45,21 @@ export default function App() {
 
   // Determine effective theme (handling 'system' if needed, but for now fallback to dark)
   const isLight = appTheme === 'light';
+
+  useEffect(() => {
+    // Sync theme to document element so modals/portals appended to body inherit CSS variables
+    const root = document.documentElement;
+    if (isLight) {
+      root.classList.add("light-mode");
+    } else {
+      root.classList.remove("light-mode");
+    }
+    // Remove old theme classes and add the new one
+    root.className = root.className.replace(/\btheme-\S+/g, '').trim();
+    if (colorTheme) {
+      root.classList.add(`theme-${colorTheme}`);
+    }
+  }, [isLight, colorTheme]);
 
   return (
     <BrowserRouter>
@@ -81,6 +99,7 @@ export default function App() {
         {!isMobile && <TitleBar />}
 
         <ToastProvider />
+        {!hasCompletedOnboarding && !isMobile && <OnboardingWizard />}
         <GlobalPhotoProvider>
           {isMobile ? (
             <MobileLayout>

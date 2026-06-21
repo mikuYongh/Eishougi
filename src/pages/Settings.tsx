@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSettingsStore, type McpServerConfig } from "../stores/settingsStore";
 import { useQueueStore } from "../stores/queueStore";
-import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database } from "lucide-react";
+import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database, Wand2 } from "lucide-react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { save, open } from "@tauri-apps/plugin-dialog";
@@ -205,7 +205,7 @@ export function Settings() {
             <SettingsIcon size={20} className="text-[var(--accent-1)]" />
             <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">应用配置</h2>
           </div>
-          <p className="text-sm mt-1 text-[var(--text-muted)] font-medium">调整界面、模型与通用行为</p>
+          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">调整界面、模型与通用行为</p>
         </div>
         
         <div
@@ -216,13 +216,13 @@ export function Settings() {
             borderWidth: 1,
           }}
         >
-          <Search size={16} className="text-[var(--text-muted)] group-focus-within:text-[var(--accent-1)] transition-colors" />
+          <Search size={16} className="text-[var(--text-secondary)] group-focus-within:text-[var(--accent-1)] transition-colors" />
           <input
             type="text"
             placeholder="搜索设置项..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="border-none bg-transparent outline-none text-[13px] text-[var(--text-primary)] w-full font-sans placeholder:text-[var(--text-muted)]"
+            className="border-none bg-transparent outline-none text-[13px] text-[var(--text-primary)] w-full font-sans placeholder:text-[var(--text-secondary)]"
           />
         </div>
       </div>
@@ -238,8 +238,8 @@ export function Settings() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-shrink-0 flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer whitespace-nowrap ${
                   isActive 
-                    ? "glass-panel bg-white/10 text-[var(--text-primary)] shadow-[0_4px_20px_rgba(179,136,255,0.15)] border-[var(--accent-1)]/30 md:translate-x-2" 
-                    : "text-[var(--text-muted)] hover:bg-white/5 hover:text-[var(--text-primary)] border border-transparent"
+                    ? "glass-panel bg-gradient-to-r from-[var(--accent-1)]/20 to-transparent text-[var(--text-primary)] shadow-[inset_0_0_20px_rgba(var(--accent-1-rgb),0.1)] border border-[var(--accent-1)]/50 md:translate-x-2" 
+                    : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)] border border-transparent"
                 }`}
               >
                 <span className={isActive ? "text-[var(--accent-1)] drop-shadow-[0_0_8px_rgba(var(--accent-1-rgb), 0.5)]" : ""}>
@@ -263,7 +263,7 @@ export function Settings() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">全局动态壁纸</h3>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">支持在线链接、相对路径，或直接从本地上传图片。</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">支持在线链接、相对路径，或直接从本地上传图片。</p>
                   </div>
                 </div>
                 
@@ -275,11 +275,11 @@ export function Settings() {
                       style={{ backgroundImage: `url("${(localWallpaper.startsWith('http') || localWallpaper.startsWith('data:') || localWallpaper.startsWith('blob:')) ? localWallpaper : convertFileSrc(localWallpaper)}")` }}
                     />
                     <div className="absolute top-2 left-2 px-2 py-1 rounded bg-[var(--glass-bg)] backdrop-blur-md border border-[var(--glass-border)]">
-                      <span className="text-[var(--text-muted)] text-[9px] font-bold tracking-widest uppercase">Preview</span>
+                      <span className="text-[var(--text-secondary)] text-[9px] font-bold tracking-widest uppercase">Preview</span>
                     </div>
                     {/* Native Upload Button Overlay */}
                     <div className="absolute inset-0 bg-[var(--bg-layer-1)] opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                      <label className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur-md text-[var(--text-primary)] text-xs font-bold cursor-pointer transition-colors shadow-lg border border-[var(--glass-border-active)]">
+                      <label className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--glass-bg-active)] hover:bg-[var(--glass-bg-active)] backdrop-blur-md text-[var(--text-primary)] text-xs font-bold cursor-pointer transition-colors shadow-lg border border-[var(--glass-border-active)]">
                         <ImageIcon size={14} /> 选本地图
                         <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
                       </label>
@@ -289,7 +289,7 @@ export function Settings() {
                   {/* Input Controls */}
                   <div className="flex-1 flex flex-col justify-center space-y-4">
                     <div>
-                      <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">图片地址</label>
+                      <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">图片地址</label>
                       <input
                         type="text"
                         value={localWallpaper}
@@ -309,7 +309,7 @@ export function Settings() {
                       </button>
                       <button
                         onClick={handleResetWallpaper}
-                        className="px-4 py-2.5 rounded-xl bg-white/5 border border-[var(--glass-border)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-all cursor-pointer flex items-center gap-2 text-[13px] font-bold"
+                        className="px-4 py-2.5 rounded-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-active)] transition-all cursor-pointer flex items-center gap-2 text-[13px] font-bold"
                       >
                         <RotateCcw size={14} /> 恢复默认
                       </button>
@@ -325,7 +325,7 @@ export function Settings() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">主题色彩与磨砂材质</h3>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">实时控制全局磨砂玻璃强度的滑块，打造专属质感。</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">实时控制全局磨砂玻璃强度的滑块，打造专属质感。</p>
                   </div>
                 </div>
                 
@@ -344,7 +344,7 @@ export function Settings() {
                           className={`px-4 py-2 rounded-lg text-sm font-bold border transition-all ${
                             appTheme === mode.id
                               ? 'bg-[var(--accent-1)]/20 text-[var(--accent-1)] border-[var(--accent-1)]'
-                              : 'bg-white/5 text-[var(--text-muted)] border-[var(--glass-border)] hover:bg-white/10'
+                              : 'bg-[var(--glass-bg)] text-[var(--text-secondary)] border-[var(--glass-border)] hover:bg-[var(--glass-bg-active)]'
                           }`}
                         >
                           {mode.label}
@@ -369,8 +369,8 @@ export function Settings() {
                           onClick={() => setColorTheme(theme.id as any)}
                           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold border transition-all ${
                             colorTheme === theme.id
-                              ? 'bg-white/10 text-[var(--text-primary)] border-[var(--glass-border-active)] shadow-[0_4px_15px_rgba(0,0,0,0.2)]'
-                              : 'bg-transparent text-[var(--text-muted)] border-[var(--glass-border)] hover:bg-white/5'
+                              ? 'bg-[var(--glass-bg-active)] text-[var(--text-primary)] border-[var(--glass-border-active)] shadow-[0_4px_15px_rgba(0,0,0,0.2)]'
+                              : 'bg-transparent text-[var(--text-secondary)] border-[var(--glass-border)] hover:bg-[var(--glass-bg)]'
                           }`}
                         >
                           <div 
@@ -399,7 +399,7 @@ export function Settings() {
                       className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer border border-[var(--glass-border)] outline-none"
                       style={{ accentColor: "var(--accent-2)" }}
                     />
-                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-bold mt-2">
+                    <div className="flex justify-between text-[10px] text-[var(--text-secondary)] uppercase tracking-widest font-bold mt-2">
                       <span>清晰 (0px)</span>
                       <span>极度朦胧 (60px)</span>
                     </div>
@@ -421,7 +421,7 @@ export function Settings() {
                       className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer border border-[var(--glass-border)] outline-none"
                       style={{ accentColor: "var(--accent-1)" }}
                     />
-                    <div className="flex justify-between text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-bold mt-2">
+                    <div className="flex justify-between text-[10px] text-[var(--text-secondary)] uppercase tracking-widest font-bold mt-2">
                       <span>迷你小巧 (50%)</span>
                       <span>默认 (100%)</span>
                       <span>超大视效 (150%)</span>
@@ -441,7 +441,7 @@ export function Settings() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">通用与安全控制</h3>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">控制程序的隐私、快捷键和其他基本行为。</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">控制程序的隐私、快捷键和其他基本行为。</p>
                   </div>
                 </div>
                 
@@ -451,7 +451,7 @@ export function Settings() {
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="text-sm font-bold text-[var(--text-primary)]">防偷窥模式 (Privacy Mode)</h4>
-                        <p className="text-xs text-[var(--text-muted)] mt-1">开启后全局图片默认高斯模糊，鼠标悬浮才清晰可见</p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1">开启后全局图片默认高斯模糊，鼠标悬浮才清晰可见</p>
                       </div>
                       <button
                         onClick={() => setPrivacyMode(!settings.privacyMode)}
@@ -476,13 +476,13 @@ export function Settings() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">ComfyUI 引擎配置</h3>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">配置本地或远程 ComfyUI 实例的连接端点。</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">配置本地或远程 ComfyUI 实例的连接端点。</p>
                   </div>
                 </div>
 
                 <div className="max-w-2xl space-y-4">
                   <div>
-                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">ComfyUI 服务器地址 (图生图/文生图)</label>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">ComfyUI 服务器地址 (图生图/文生图)</label>
                     <input
                       type="text"
                       value={settings.comfyUrl}
@@ -497,7 +497,18 @@ export function Settings() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">图生视频 服务器地址 (Video ComfyUI URL)</label>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">ComfyUI 安装路径 (用于一键部署/安装节点时定位)</label>
+                    <input
+                      type="text"
+                      value={settings.comfyDir || ''}
+                      onChange={(e) => updateSettings({ comfyDir: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono mb-4"
+                      placeholder="C:\ComfyUI"
+                    />
+                    <p className="text-xs text-[var(--text-secondary)] mt-1">可选。配置后可方便后续下载 LoRA 模型等操作。</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">图生视频 服务器地址 (Video ComfyUI URL)</label>
                     <input
                       type="text"
                       value={settings.videoComfyUrl || ''}
@@ -509,6 +520,27 @@ export function Settings() {
                 </div>
               </div>
 
+              {/* Environment setup & onboarding */}
+              <div className="glass-panel p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/20">
+                      <Wand2 size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-[var(--text-primary)]">环境检测 & 引导</h3>
+                      <p className="text-xs text-[var(--text-secondary)] mt-0.5">重新运行 ComfyUI 部署、本地检测或云端配置向导。</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateSettings({ hasCompletedOnboarding: false })}
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold transition-all"
+                  >
+                    重新开始引导
+                  </button>
+                </div>
+              </div>
+
               {/* LLM Agent Settings */}
               <div className="glass-panel p-6">
                 <div className="flex items-center gap-3 mb-6 border-b border-[var(--glass-border)] pb-4">
@@ -517,14 +549,14 @@ export function Settings() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">AI 助手 & 反推模型配置</h3>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">配置 LLM 服务的连接、模型、温度以及最大 Token。</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">配置 LLM 服务的连接、模型、温度以及最大 Token。</p>
                   </div>
                 </div>
 
                 <div className="max-w-2xl space-y-5">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">服务商 (Provider)</label>
+                      <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">服务商 (Provider)</label>
                       <GlassDropdown
                         value={settings.llm.provider}
                         onChange={(val) => {
@@ -558,7 +590,7 @@ export function Settings() {
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">模型名称 (Model)</label>
+                      <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">模型名称 (Model)</label>
                       {settings.llm.provider === 'ollama' && ollamaModels.length > 0 ? (
                         <GlassDropdown
                           value={settings.llm.model}
@@ -583,7 +615,7 @@ export function Settings() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">API 接口地址 (API Base URL)</label>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">API 接口地址 (API Base URL)</label>
                     <input
                       type="text"
                       value={settings.llm.apiUrl}
@@ -596,7 +628,7 @@ export function Settings() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">API 密钥 (API Key)</label>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">API 密钥 (API Key)</label>
                     <input
                       type="password"
                       value={settings.llm.apiKey}
@@ -612,7 +644,7 @@ export function Settings() {
                     {/* Temperature Slider */}
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest block">温度 (Temperature)</label>
+                        <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest block">温度 (Temperature)</label>
                         <span className="text-xs font-mono font-bold text-[var(--accent-1)] bg-[var(--accent-1)]/10 px-2 py-0.5 rounded border border-[var(--accent-1)]/20">
                           {settings.llm.temperature ?? 0.7}
                         </span>
@@ -629,7 +661,7 @@ export function Settings() {
                         className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer border border-[var(--glass-border)] outline-none"
                         style={{ accentColor: "var(--accent-1)" }}
                       />
-                      <div className="flex justify-between text-[9px] text-[var(--text-muted)] uppercase tracking-widest font-bold mt-2">
+                      <div className="flex justify-between text-[9px] text-[var(--text-secondary)] uppercase tracking-widest font-bold mt-2">
                         <span>精准 (0.0)</span>
                         <span>创造力 (2.0)</span>
                       </div>
@@ -637,7 +669,7 @@ export function Settings() {
 
                     {/* Max Tokens */}
                     <div>
-                      <label className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-2 block">最大生成 Token (Max Tokens)</label>
+                      <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">最大生成 Token (Max Tokens)</label>
                       <input
                         type="number"
                         min="1"
@@ -664,7 +696,7 @@ export function Settings() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">数据导出与导入</h3>
-                    <p className="text-xs text-[var(--text-muted)] mt-0.5">导出全部数据（提示词、工作流、生成记录、设置等）为 JSON 文件，方便设备间迁移。</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">导出全部数据（提示词、工作流、生成记录、设置等）为 JSON 文件，方便设备间迁移。</p>
                   </div>
                 </div>
 
@@ -681,7 +713,7 @@ export function Settings() {
                     <button
                       onClick={handleImport}
                       disabled={importStatus !== null && !importStatus.includes("失败") && !importStatus.includes("请选择")}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-white/10 transition-all cursor-pointer text-[13px] font-bold"
+                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-active)] transition-all cursor-pointer text-[13px] font-bold"
                     >
                       <Upload size={16} /> 导入备份数据
                     </button>
@@ -693,7 +725,7 @@ export function Settings() {
                         ? "bg-red-500/10 text-red-400 border border-red-500/20" 
                         : exportStatus.includes("成功")
                         ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : "bg-white/5 text-[var(--text-muted)] border border-[var(--glass-border)]"
+                        : "bg-[var(--glass-bg)] text-[var(--text-secondary)] border border-[var(--glass-border)]"
                     }`}>
                       {exportStatus}
                     </div>
@@ -704,13 +736,13 @@ export function Settings() {
                         ? "bg-red-500/10 text-red-400 border border-red-500/20"
                         : importStatus.includes("成功")
                         ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : "bg-white/5 text-[var(--text-muted)] border border-[var(--glass-border)]"
+                        : "bg-[var(--glass-bg)] text-[var(--text-secondary)] border border-[var(--glass-border)]"
                     }`}>
                       {importStatus}
                     </div>
                   )}
 
-                  <div className="text-xs text-[var(--text-muted)] space-y-1 border-t border-[var(--glass-border)] pt-4">
+                  <div className="text-xs text-[var(--text-secondary)] space-y-1 border-t border-[var(--glass-border)] pt-4">
                     <p className="font-bold text-[var(--text-primary)]">备份内容包括：</p>
                     <ul className="list-disc list-inside space-y-0.5 ml-2">
                       <li>提示词项目（正面/负面提示词、模型配置、LoRA等）</li>
@@ -720,7 +752,7 @@ export function Settings() {
                       <li>Agent 会话记录</li>
                       <li>应用设置（主题、LLM配置、壁纸等）</li>
                     </ul>
-                    <p className="mt-2 text-[var(--text-muted)]">备份格式为 .eishougi 压缩包，包含所有数据和本地图片文件。</p>
+                    <p className="mt-2 text-[var(--text-secondary)]">备份格式为 .eishougi 压缩包，包含所有数据和本地图片文件。</p>
                   </div>
                 </div>
               </div>
@@ -734,14 +766,14 @@ export function Settings() {
               
               <img src="/logo.png" alt="EISHOUGI Logo" className="w-64 h-auto mx-auto mb-6 drop-shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.5)] hover:scale-105 transition-all duration-500 object-contain" />
               <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2 drop-shadow-md tracking-wider">詠唱机 <span className="text-[var(--accent-1)] font-black">EISHOUGI</span></h3>
-              <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-widest mb-6">v0.1.0 • Stable</p>
+              <p className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-6">v0.1.0 • Stable</p>
               
               <div className="bg-black/30 p-6 rounded-xl border border-[var(--glass-border)] mx-auto max-w-lg relative shadow-inner">
                 <p className="text-sm text-[var(--text-primary)] leading-relaxed tracking-wide text-left indent-8 mb-3">
                   <span className="text-[var(--accent-1)] font-bold text-lg">在</span>这里，想象力是您唯一的边界。
                   <strong>詠唱机 (EISHOUGI)</strong> 是一款为您量身打造的灵感具现化工坊。
                 </p>
-                <p className="text-sm text-[var(--text-muted)] leading-relaxed tracking-wide text-left indent-8">
+                <p className="text-sm text-[var(--text-secondary)] leading-relaxed tracking-wide text-left indent-8">
                   我们将繁杂冰冷的技术参数温柔剥离，赋予纯粹的文字以魔法般的重构力量。您只需尽情倾诉您的创意，它便会静候在侧，将您的思绪编织为最精准的视觉咒语，并于指尖召唤出突破现实的绚丽画卷。让每一次微小的灵感闪烁，都能毫无阻碍地结晶为永恒的杰作。
                 </p>
               </div>
