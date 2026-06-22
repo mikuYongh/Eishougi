@@ -732,7 +732,12 @@ User input: ${userText}`;
               ? m.content.trim().length > 0
               : Array.isArray(m.content) && m.content.length > 0;
             const hasToolCalls = Array.isArray(m.tool_calls) && m.tool_calls.length > 0;
-            return hasContent || hasToolCalls;
+            // 过滤掉历史遗留的 [Error]: xxx 消息——这类消息是把 API 报错
+            // 当成 assistant content 存了进去，会让上游 LLM 拒绝处理整个会话。
+            // 新逻辑已经改成友好化提示，但旧污染数据需要从这里剥掉。
+            const isLegacyError = typeof m.content === 'string'
+              && m.content.startsWith('[Error]:');
+            return (hasContent || hasToolCalls) && !isLegacyError;
           }
           return true;
         });
@@ -826,6 +831,9 @@ User input: ${userText}`;
       const channel = new Channel<string>();
       let streamError: string | null = null;
       let streamDone = false;
+      // SSE event 边界缓冲：reqwest 的 bytes_stream() 不保证按 \n 切，
+      // 必须在前端拼接，否则跨 chunk 的 partial JSON 会被 catch 吞掉
+      let sseBuffer = "";
 
       // Stream processing: same logic as before, now receiving chunks from Rust proxy
       let assistantMessage: ChatMessage = {
@@ -856,13 +864,19 @@ User input: ${userText}`;
       };
 
       channel.onmessage = (chunk: string) => {
-        const lines = chunk.split('\n').filter(line => line.trim() !== '');
-        for (const line of lines) {
+        sseBuffer += chunk;
+        // 按 \n 切，最后一段可能是不完整行，留在 buffer 等下次拼接
+        const lines = sseBuffer.split('\n');
+        sseBuffer = lines.pop() || '';
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (line === '') continue;
           if (line === 'data: [DONE]') { streamDone = true; return; }
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              const delta = data.choices[0].delta;
+              const delta = data.choices?.[0]?.delta;
+              if (!delta) continue;
               if (delta.content) assistantMessage.content += delta.content;
               if (delta.tool_calls) {
                 for (const tc of delta.tool_calls) {
@@ -1445,9 +1459,24 @@ User input: ${userText}`;
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         console.error("Agent error:", error);
+        // 错误消息友好化：原样把 HTTP 500 + JSON 扔回 history 会让上游 LLM
+        // 拒绝处理（agnes-2.0-flash 是推理模型，对历史消息格式敏感），
+        // 进而每次新请求都失败、错误消息继续堆积，形成死循环。
+        // 改为简短中文提示，既对用户友好也不会污染后续 LLM 请求。
+        const raw = error.message || String(error);
+        let friendly: string;
+        if (/HTTP 5\d\d/.test(raw)) {
+          friendly = "AI 服务暂时不可用，请稍后重试。";
+        } else if (/Failed to fetch|NetworkError|timeout|ETIMEDOUT|ECONNRESET/i.test(raw)) {
+          friendly = "网络连接失败，请检查网络后重试。";
+        } else if (/HTTP 4\d\d/.test(raw)) {
+          friendly = "请求参数有误，请检查 LLM 配置或稍后重试。";
+        } else {
+          friendly = "AI 处理失败，请稍后重试。";
+        }
         setMessages([
-          ...currentMessages, 
-          { id: Date.now().toString(), role: 'assistant', content: `[Error]: ${error.message}` }
+          ...currentMessages,
+          { id: Date.now().toString(), role: 'assistant', content: friendly }
         ]);
       }
     }
@@ -1508,6 +1537,16 @@ User input: ${userText}`;
     addMessage(userMsg);
     const newMessages = [...messages, userMsg];
     setIsGenerating(true);
+
+    // 立即插入一个空 assistant 占位气泡，让用户看到"思考中..."反馈
+    // （尤其重要：pre-check 会阻塞几秒，没有这个占位期间画面毫无反应）
+    const placeholderId = 'pending_' + Date.now().toString();
+    setMessages([...newMessages, {
+      id: placeholderId,
+      role: 'assistant',
+      content: '',
+      tool_calls: [],
+    }]);
 
     roundCounterRef.current = 0;
     duplicateTrackerRef.current = new Map();
