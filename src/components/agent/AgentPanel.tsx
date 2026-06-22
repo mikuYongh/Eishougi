@@ -73,14 +73,10 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
 });
 
 const AgentFooter = React.forwardRef<HTMLDivElement, { context?: { isGenerating: boolean } }>(({ context }, ref) => {
-  return context?.isGenerating ? (
-    <div ref={ref} className="px-6 py-3 flex items-start animate-in fade-in duration-300">
-      <div className="bg-[var(--glass-bg)] border border-[var(--accent-1)]/20 p-4 rounded-2xl rounded-tl-sm flex gap-3 items-center backdrop-blur-md shadow-[0_0_15px_rgba(var(--accent-1-rgb), 10)]">
-        <Loader2 size={16} className="text-[var(--accent-1)] animate-spin" />
-        <span className="text-xs font-mono text-[var(--accent-1)] tracking-widest uppercase animate-pulse">Processing...</span>
-      </div>
-    </div>
-  ) : <div ref={ref} className="h-4" />;
+  // Loading 反馈由空 assistant 气泡的"思考中..."占位统一负责，
+  // Footer 只保留一个占位 div 防止最后一条消息贴着输入框。
+  void context;
+  return <div ref={ref} className="h-4" />;
 });
 
 export function AgentPanel() {
@@ -316,6 +312,12 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
         ) : msg.content ? (
           <div className="text-[14px]">
             <MarkdownContent content={msg.content} />
+          </div>
+        ) : (!msg.tool_calls || msg.tool_calls.length === 0) ? (
+          // assistant 流式尚未吐第一个字时的占位反馈
+          <div className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] font-mono">
+            <Loader2 size={14} className="animate-spin text-[var(--accent-1)]" />
+            <span className="tracking-widest uppercase animate-pulse">思考中...</span>
           </div>
         ) : null}
         
@@ -764,7 +766,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
                         className={`max-w-[92%] text-[14px] relative group ${
                           msg.role === 'user' 
                             ? 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tr-sm border border-[var(--accent-1)]/30 backdrop-blur-md shadow-[0_4px_15px_rgba(var(--accent-1-rgb), 10)]' 
-                            : msg.role === 'tool' || (!msg.content && msg.tool_calls !== undefined)
+                            : msg.role === 'tool' || (msg.tool_calls && msg.tool_calls.length > 0)
                             ? 'p-0 bg-transparent w-full shadow-none mt-2'
                             : 'p-4 bg-[var(--glass-bg)] text-[var(--text-primary)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl shadow-[0_4px_15px_rgba(0,0,0,0.15)]'
                         }`}

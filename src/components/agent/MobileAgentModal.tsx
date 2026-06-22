@@ -409,12 +409,8 @@ export function MobileAgentModal() {
               })}
 
               {isGenerating && session?.messages && session.messages[session.messages.length - 1]?.role === 'user' && (
-                <div className="flex justify-start">
-                  <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-3xl rounded-tl-sm px-5 py-3 flex items-center gap-3 text-[var(--accent-1)] shadow-xl">
-                    <Loader2 size={16} className="animate-spin" />
-                    <span className="text-xs font-bold font-mono tracking-widest uppercase">Thinking...</span>
-                  </div>
-                </div>
+                /* Loading 反馈统一由空 assistant 气泡的"思考中..."占位负责，这里不再重复显示 */
+                null
               )}
               <div ref={messagesEndRef} />
             </div>
