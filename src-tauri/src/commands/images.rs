@@ -4,12 +4,22 @@ use tauri::{AppHandle, Manager};
 
 #[tauri::command]
 pub async fn download_comfyui_image(app: AppHandle, url: String) -> Result<String, String> {
-    // Generate a unique filename
+    // Extract original filename from ComfyUI URL to preserve correct extension.
+    // Video workflows produce .mp4/.webm files, image workflows produce .png/.jpg;
+    // using the original filename prevents videos being saved as .png.
+    let original_name = url
+        .split("filename=")
+        .nth(1)
+        .and_then(|rest| rest.split('&').next())
+        .filter(|s| !s.is_empty())
+        .unwrap_or("output.png");
+    let safe_name = original_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis();
-    let filename = format!("gen_{}.png", timestamp);
+    // gen_ prefix for traceability, timestamp for uniqueness, original extension preserved
+    let filename = format!("gen_{}_{}", timestamp, safe_name);
 
     // Get the uploads directory
     let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;

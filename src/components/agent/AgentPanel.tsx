@@ -291,6 +291,25 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
   };
 
   const renderMessageContent = (msg: ChatMessage) => {
+    // 共享的图片/视频渲染——tool / user / assistant 消息都能有附件
+    const renderImages = (images: any[] | undefined) => {
+      if (!images || images.length === 0) return null;
+      return (
+        <div className="flex gap-2 flex-wrap mt-2">
+          {images.map((img, i) => {
+            const o = img as any;
+            const src = typeof o === 'string' ? o : (o?.url || o?.filePath || o?.outputPath || o?.path || '');
+            if (!src) return null;
+            const ext = (typeof src === 'string' ? src.split('?')[0].split('.').pop()?.toLowerCase() : '') || '';
+            const isVideo = ['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v'].includes(ext);
+            return isVideo
+              ? <video key={i} src={getImgSrc(src)} controls className="max-w-xs max-h-64 rounded-lg border border-[var(--glass-border)] mt-2" />
+              : <ChatImage key={i} src={src} />;
+          })}
+        </div>
+      );
+    };
+
     if (msg.role === 'tool') {
       return (
         <div className="flex flex-col gap-2 p-3 mt-1 rounded-xl bg-[var(--glass-bg)] border border-[var(--accent-1)]/30 text-[11px] text-[var(--text-primary)] font-mono overflow-x-auto custom-scrollbar shadow-[0_0_15px_rgba(var(--accent-1-rgb), 15)] relative">
@@ -300,6 +319,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
             <span className="font-bold tracking-widest uppercase">System Execution: {msg.name}</span>
           </div>
           <div className="ml-2 opacity-80 whitespace-pre-wrap">{msg.content}</div>
+          {renderImages(msg.images)}
         </div>
       );
     }
@@ -321,20 +341,7 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
           </div>
         ) : null}
         
-        {msg.images && msg.images.length > 0 && (
-          <div className="flex gap-2 flex-wrap mt-2">
-            {msg.images.map((img, i) => {
-              const o = img as any;
-              const src = typeof o === 'string' ? o : (o?.url || o?.filePath || o?.outputPath || o?.path || '');
-              if (!src) return null;
-              const ext = (typeof src === 'string' ? src.split('?')[0].split('.').pop()?.toLowerCase() : '') || '';
-              const isVideo = ['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v'].includes(ext);
-              return isVideo
-                ? <video key={i} src={getImgSrc(src)} controls className="max-w-xs max-h-64 rounded-lg border border-[var(--glass-border)] mt-2" />
-                : <ChatImage key={i} src={src} />;
-            })}
-          </div>
-        )}
+        {renderImages(msg.images)}
         
         {msg.tool_calls && msg.tool_calls.length > 0 && (
           <div className={`${msg.content ? 'mt-3' : ''} flex flex-col gap-2 max-w-full`}>
