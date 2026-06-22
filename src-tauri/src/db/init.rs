@@ -46,6 +46,17 @@ fn read_resource(name: &str, app_data_dir: &Path) -> Option<String> {
         }
     }
 
+    // Strategy 1b: exe-relative (release builds extract resources alongside the EXE)
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let p = exe_dir.join("resources").join(name);
+            if let Ok(content) = std::fs::read_to_string(&p) {
+                log::info!("Loaded resource {} from exe dir: {}", name, p.display());
+                return Some(content);
+            }
+        }
+    }
+
     // Strategy 2: Android APK assets (must be packaged into assets/ at build time)
     #[cfg(target_os = "android")]
     {
