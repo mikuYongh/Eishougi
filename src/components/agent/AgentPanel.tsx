@@ -49,7 +49,22 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
       components={{
         p: ({node, ...props}) => <div className="mb-2 last:mb-0" {...props} />,
         strong: ({node, ...props}) => <strong className="text-[var(--accent-1)] font-bold" {...props} />,
-        a: ({node, ...props}) => <a className="text-[var(--accent-2)] underline hover:text-[var(--accent-1)] transition-colors" target="_blank" {...props} />,
+        a: ({node, href, children, ...props}) => {
+          // LLM 回复中的 [视频预览](path.mp4) 是 markdown 链接语法，
+          // 对媒体文件直接渲染为 video/img 播放器，不显示为可点击超链接。
+          const MEDIA_VIDEO = new Set(['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v']);
+          const MEDIA_IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
+          if (typeof href === 'string') {
+            const ext = href.split('?')[0].split('.').pop()?.toLowerCase() || '';
+            if (MEDIA_VIDEO.has(ext)) {
+              return <video src={getImgSrc(href)} controls className="max-w-full max-h-64 rounded-lg border border-[var(--glass-border)] my-2" />;
+            }
+            if (MEDIA_IMAGE.has(ext)) {
+              return <PhotoView src={getImgSrc(href)}><img src={getImgSrc(href)} className="max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in" /></PhotoView>;
+            }
+          }
+          return <a className="text-[var(--accent-2)] underline hover:text-[var(--accent-1)] transition-colors" target="_blank" href={href} {...props}>{children}</a>;
+        },
         code: ({node, inline, className, children, ...props}: any) =>
           inline
             ? <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--accent-1)]/20 text-[var(--accent-1)] font-mono text-[12px]" {...props}>{children}</code>
@@ -319,7 +334,6 @@ When asked to set model/LoRA on a project → use update_prompt_settings.`;
             <span className="font-bold tracking-widest uppercase">System Execution: {msg.name}</span>
           </div>
           <div className="ml-2 opacity-80 whitespace-pre-wrap">{msg.content}</div>
-          {renderImages(msg.images)}
         </div>
       );
     }
