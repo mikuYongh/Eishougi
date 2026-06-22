@@ -489,10 +489,22 @@ pub async fn call_llm_proxy(
         return Err(format!("API {} HTTP {}: {}", api_url, status, if body.len() > 300 { &body[..300] } else { &body }));
     }
     let mut stream = resp.bytes_stream();
+    // SSE 行边界缓冲：reqwest 的 bytes_stream() 可能从任意字节位置切断，
+    // 一行 data: {...} 可能被切成多个 chunk。按 \n 切分，只把完整行
+    // send 给前端，避免前端 JSON.parse 失败丢内容。
+    let mut buffer = String::new();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        let text = String::from_utf8_lossy(&chunk).to_string();
-        let _ = on_chunk.send(text);
+        buffer.push_str(&String::from_utf8_lossy(&chunk));
+        while let Some(nl) = buffer.find('\n') {
+            let line: String = buffer[..=nl].to_string();
+            let _ = on_chunk.send(line);
+            buffer = buffer[nl + 1..].to_string();
+        }
+    }
+    // flush 残留（最后一行可能没 \n 结尾）
+    if !buffer.trim().is_empty() {
+        let _ = on_chunk.send(buffer);
     }
     let _ = on_chunk.send("data: [DONE]".to_string());
     Ok(())
