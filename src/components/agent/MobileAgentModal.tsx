@@ -356,7 +356,12 @@ export function MobileAgentModal() {
                           {msg.images.map((img, idx) => {
                             const o = img as any;
                             const src = typeof o === 'string' ? o : (o?.url || o?.filePath || o?.outputPath || o?.path || '');
-                            return src ? <ChatImage key={idx} src={src} /> : null;
+                            if (!src) return null;
+                            const ext = (typeof src === 'string' ? src.split('?')[0].split('.').pop()?.toLowerCase() : '') || '';
+                            const isVideo = ['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v'].includes(ext);
+                            return isVideo
+                              ? <video key={idx} src={getImgSrc(src)} controls className="max-w-xs max-h-64 rounded-lg border border-[var(--glass-border)]" />
+                              : <ChatImage key={idx} src={src} />;
                           })}
                         </div>
                       )}
@@ -364,7 +369,7 @@ export function MobileAgentModal() {
                       <div className="prose prose-invert prose-sm max-w-none break-words">
                         {msg.content ? (
                           <>
-                            <ReactMarkdown 
+                            <ReactMarkdown
                               remarkPlugins={[remarkGfm]}
                               urlTransform={(url) => url}
                               components={{
@@ -385,6 +390,9 @@ export function MobileAgentModal() {
                                       <Wrench size={12} />
                                       <span className="font-mono">Call: {tc.function?.name}</span>
                                     </div>
+                                    {tc.function?.arguments && (
+                                      <div className="ml-2 whitespace-pre-wrap break-all opacity-80">{tc.function.arguments}</div>
+                                    )}
                                   </div>
                                 ))}
                               </div>
@@ -398,10 +406,19 @@ export function MobileAgentModal() {
                                   <Wrench size={12} className={isGenerating && i === session.messages.length - 1 ? "animate-spin-slow" : ""} />
                                   System Call: {tc.function?.name || 'unknown'}
                                 </div>
+                                {tc.function?.arguments && (
+                                  <div className="ml-2 whitespace-pre-wrap break-all opacity-80">{tc.function.arguments}</div>
+                                )}
                               </div>
                             ))}
                           </div>
-                        ) : null}
+                        ) : (
+                          // assistant 流式尚未吐第一个字时的占位反馈（与桌面端 AgentPanel renderMessageContent 对齐）
+                          <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)] font-mono">
+                            <Loader2 size={14} className="animate-spin text-[var(--accent-1)]" />
+                            <span className="tracking-widest uppercase animate-pulse">思考中...</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
