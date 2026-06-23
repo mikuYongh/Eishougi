@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import { comfyService, getComfyUrl, getVideoComfyUrl } from '../services/comfyService';
+import { comfyService, getComfyUrl, getVideoComfyUrl, getWsUrl } from '../services/comfyService';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
+import { appLog } from '../utils/appLog';
 
 export interface QueueJob {
   id: string;
@@ -86,11 +87,16 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     const u3 = await listen<any>('comfy-completed', (event) => {
       const payload = event.payload;
       const { job_id, images } = payload;
-      
+      const imgCount = Array.isArray(images) ? images.length : 0;
+      console.info(`[ComfyWS] comfy-completed event: job_id=${job_id} images=${imgCount}`);
+
       const resolve = _jobResolvers.get(job_id);
       if (resolve) {
         resolve(images);
         _jobResolvers.delete(job_id);
+      } else {
+        console.warn(`[ComfyWS] comfy-completed for job_id=${job_id} but no resolver found (already cleaned up or unknown job)`);
+        appLog.warn('ComfyWS', `comfy-completed with no resolver: job_id=${job_id}`);
       }
 
       set(state => {
@@ -127,6 +133,10 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     const u4 = await listen<any>('comfy-error', (event) => {
       const msg = event.payload;
       const promptId = msg.data?.prompt_id;
+      console.error(
+        `[ComfyWS] comfy-error event: prompt_id=${promptId} exception=${msg.data?.exception_message || '(none)'}`
+      );
+      appLog.error('ComfyWS', `comfy-error: prompt_id=${promptId} ${msg.data?.exception_message || ''}`);
       set(state => {
         let activeIndex = promptId ? state.jobs.findIndex(j => j.comfyPromptId === promptId) : -1;
         if (activeIndex === -1) return state;
@@ -150,10 +160,13 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     historyUpdateTick: 0,
 
     connect: async () => {
+      const wsUrl = getWsUrl();
+      console.info(`[ComfyWS] connect() called, wsUrl=${wsUrl}, alreadySetup=${_isSetup}`);
       await setupCallbacks();
     },
 
     disconnect: () => {
+      console.info(`[ComfyWS] disconnect() called, removing ${_unlisteners.length} listeners`);
       _unlisteners.forEach(unlisten => unlisten());
       _unlisteners = [];
       _isSetup = false;
@@ -161,6 +174,12 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     },
 
     addJob: async (project: any, workflowId?: string, batchCount: number = 1) => {
+      const t0 = performance.now();
+      const comfyUrl = getComfyUrl();
+      console.info(
+        `[ComfyQueue] addJob start: projectId=${project.id} title="${project.title}" ` +
+        `workflowId=${workflowId || '(default)'} batch=${batchCount} comfyUrl=${comfyUrl}`
+      );
       await get().connect();
 
       const jobIds: string[] = [];
@@ -193,15 +212,17 @@ export const useQueueStore = create<QueueStore>((set, get) => {
             const w = await invoke('get_workflow', { id: workflowId }) as any;
             if (w && w.jsonContent) {
               wfString = w.jsonContent;
+              console.info(`[ComfyQueue] workflow loaded: id=${workflowId} size=${wfString.length}B`);
             }
           } catch (e) {
-            console.warn("[Queue] Failed to fetch workflow", e);
+            console.warn(`[ComfyQueue] Failed to fetch workflow ${workflowId}:`, e);
           }
         }
 
         if (!wfString) {
           const defaultWorkflow = (await import('../assets/default_workflow.json')).default;
           wfString = JSON.stringify(defaultWorkflow);
+          console.info(`[ComfyQueue] using default workflow, size=${wfString.length}B`);
         }
 
         for (let i = 0; i < batchCount; i++) {
@@ -218,6 +239,9 @@ export const useQueueStore = create<QueueStore>((set, get) => {
             workflowId: workflowId || null,
             seed: parseInt(project.seed) || null
           });
+          console.info(
+            `[ComfyQueue] job ${jobs[i].id} queued, comfyPromptId=${res?.prompt_id || '(none)'}`
+          );
 
           if (res && res.prompt_id) {
             set(state => {
@@ -232,9 +256,13 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         }
 
         const results = await Promise.all(jobPromises);
+        const elapsed = Math.round(performance.now() - t0);
+        console.info(`[ComfyQueue] addJob done in ${elapsed}ms, ${results.length} image set(s)`);
         return results;
       } catch (e: any) {
-        console.error("[Queue] addJob error:", e.message);
+        const elapsed = Math.round(performance.now() - t0);
+        console.error(`[ComfyQueue] addJob FAILED after ${elapsed}ms: ${e.message}`);
+        appLog.error('ComfyQueue', `addJob FAILED after ${elapsed}ms: ${e.message}`);
         for (const id of jobIds) {
           _jobResolvers.delete(id);
         }
@@ -246,6 +274,12 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     },
 
     addVideoJob: async (tempProject: any, workflowId: string, imageFilename: string, fps: number, duration: number, width: number, height: number, prompt: string, baseModel: string) => {
+      const t0 = performance.now();
+      const videoComfyUrl = getVideoComfyUrl();
+      console.info(
+        `[ComfyQueue] addVideoJob start: workflowId=${workflowId} imageFilename=${imageFilename} ` +
+        `fps=${fps} duration=${duration}s ${width}x${height} videoComfyUrl=${videoComfyUrl}`
+      );
       await get().connect();
 
       const jobId = tempProject.id; // use tempProject id directly to match
@@ -271,9 +305,10 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           const w = await invoke('get_workflow', { id: workflowId }) as any;
           if (w && w.jsonContent) {
             wfString = w.jsonContent;
+            console.info(`[ComfyQueue] video workflow loaded: id=${workflowId} size=${wfString.length}B`);
           }
         } catch (e) {
-          console.warn("[Queue] Failed to fetch workflow", e);
+          console.warn(`[ComfyQueue] Failed to fetch video workflow ${workflowId}:`, e);
         }
 
         if (!wfString) {
@@ -291,7 +326,6 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           baseModel
         );
 
-        const videoComfyUrl = getVideoComfyUrl();
         const res = await invoke<any>('queue_prompt_and_track', {
           prompt: injectedWf,
           comfyUrl: videoComfyUrl,
@@ -302,15 +336,22 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           workflowId: workflowId,
           seed: tempProject.seed
         });
+        console.info(
+          `[ComfyQueue] video job ${job.id} queued, comfyPromptId=${res?.prompt_id || '(none)'}`
+        );
 
         set(state => ({
           jobs: state.jobs.map(j => j.id === job.id ? { ...j, comfyPromptId: res.prompt_id } : j)
         }));
 
         const result = await promise;
+        const elapsed = Math.round(performance.now() - t0);
+        console.info(`[ComfyQueue] addVideoJob done in ${elapsed}ms, ${result.length} video(s)`);
         return result;
       } catch (e: any) {
-        console.error("[Queue] addVideoJob error:", e.message);
+        const elapsed = Math.round(performance.now() - t0);
+        console.error(`[ComfyQueue] addVideoJob FAILED after ${elapsed}ms: ${e.message}`);
+        appLog.error('ComfyQueue', `addVideoJob FAILED after ${elapsed}ms: ${e.message}`);
         _jobResolvers.delete(jobId);
         set(state => ({
           jobs: state.jobs.map(j => j.id === job.id ? { ...j, status: 'failed', error: e.message } : j)
