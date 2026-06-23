@@ -98,11 +98,18 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   },
   setDefaultWorkflow: async (id) => {
     try {
+      const target = get().workflows.find((w) => w.id === id);
+      if (!target) return;
       await invoke('set_default_workflow', { id });
+      // per-type 默认：只清同 type 的旧 default，其他 type 的 default 保持不动。
+      // 后端 set_default_workflow 也是这个语义；乐观更新必须对齐，否则前端会
+      // 短暂认为其他 type 也没默认，UI 显示错误状态直到下次 refetch。
       set((state) => ({
         workflows: state.workflows.map((w) => ({
           ...w,
           isDefault: w.id === id
+            ? true
+            : (w.type === target.type ? false : w.isDefault),
         })),
       }));
     } catch (error) {
