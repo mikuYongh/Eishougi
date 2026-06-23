@@ -1,8 +1,10 @@
 import { Sparkles, Activity, Server, Image as ImageIcon, Search, MessageSquare, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useQueueStore } from "../../stores/queueStore";
+import { useAppVersion } from "../../hooks/useAppVersion";
 
 export function StatusBar() {
   const { jobs, isConnected } = useQueueStore();
+  const appVersion = useAppVersion();
   
   const pendingJobs = jobs.filter(j => j.status === 'pending');
   const generatingJobs = jobs.filter(j => j.status === 'generating');
@@ -141,7 +143,7 @@ export function StatusBar() {
       </div>
       <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
         <Sparkles size={12} className="text-[var(--accent-1)]" />
-        <span className="font-bold tracking-widest text-[9px] uppercase">詠唱机 EISHOUGI v0.1</span>
+        <span className="font-bold tracking-widest text-[9px] uppercase">詠唱机 EISHOUGI v{appVersion}</span>
       </div>
     </div>
   );

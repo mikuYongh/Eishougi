@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useSettingsStore, type McpServerConfig } from "../stores/settingsStore";
 import { useQueueStore } from "../stores/queueStore";
 import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database, Wand2 } from "lucide-react";
+import { useAppVersion } from "../hooks/useAppVersion";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { save, open } from "@tauri-apps/plugin-dialog";
@@ -18,6 +19,7 @@ const SETTINGS_TABS = [
 export function Settings() {
   const [activeTab, setActiveTab] = useState("appearance");
   const [searchQuery, setSearchQuery] = useState("");
+  const appVersion = useAppVersion();
   
   const { 
     wallpaperPath, setWallpaperPath, resetWallpaper, 
@@ -766,7 +768,7 @@ export function Settings() {
               
               <img src="/logo.png" alt="EISHOUGI Logo" className="w-64 h-auto mx-auto mb-6 drop-shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.5)] hover:scale-105 transition-all duration-500 object-contain" />
               <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2 drop-shadow-md tracking-wider">詠唱机 <span className="text-[var(--accent-1)] font-black">EISHOUGI</span></h3>
-              <p className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-6">v0.1.0 • Stable</p>
+              <p className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-6">v{appVersion} • Stable</p>
               
               <div className="bg-black/30 p-6 rounded-xl border border-[var(--glass-border)] mx-auto max-w-lg relative shadow-inner">
                 <p className="text-sm text-[var(--text-primary)] leading-relaxed tracking-wide text-left indent-8 mb-3">
