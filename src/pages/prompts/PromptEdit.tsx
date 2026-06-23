@@ -47,18 +47,36 @@ export function PromptEdit() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (id && id !== 'new') {
+    if (id) {
       const p = prompts.find(p => p.id === id);
       if (p) setProject(p);
-    } else if (id === 'new') {
-      // Set default workflow for new prompts
+    } else {
+      // 新建提示词：用 text2img 默认工作流初始化所有可识别的参数
+      // （baseModel / vaeModel / width / height / steps / cfgScale / sampler / scheduler / loras）。
       const defaultWorkflow = workflows.find(w => w.type === 'text2img' && w.isDefault);
-      // Use the first local checkpoint as the default base model if the current
-      // placeholder is not present in the user's library.
       setProject(prev => {
         const next: Partial<PromptProject> = { ...prev };
-        if (defaultWorkflow) next.workflowId = defaultWorkflow.id;
-        if (checkpoints.length > 0 && (!next.baseModel || !checkpoints.includes(next.baseModel))) {
+        if (defaultWorkflow) {
+          next.workflowId = defaultWorkflow.id;
+          if (defaultWorkflow.jsonContent) {
+            try {
+              const a = comfyService.analyzeWorkflow(defaultWorkflow.jsonContent);
+              if (a.baseModel) next.baseModel = a.baseModel;
+              if (a.vaeModel) next.vaeModel = a.vaeModel;
+              if (a.width) next.width = a.width;
+              if (a.height) next.height = a.height;
+              if (a.steps) next.steps = a.steps;
+              if (a.cfgScale) next.cfgScale = a.cfgScale;
+              if (a.samplerName) next.sampler = a.samplerName;
+              if (a.scheduler) next.scheduler = a.scheduler;
+              if (a.loras && a.loras.length > 0) next.loraConfigs = a.loras;
+            } catch (e) {
+              console.warn("[PromptEdit] new-prompt: failed to parse default workflow:", e);
+            }
+          }
+        }
+        // baseModel 兜底：workflow 没解析出来时，用本地第一个 checkpoint
+        if ((!next.baseModel || !checkpoints.includes(next.baseModel)) && checkpoints.length > 0) {
           next.baseModel = checkpoints[0];
         }
         return next;
@@ -66,6 +84,9 @@ export function PromptEdit() {
     }
   }, [id, prompts, workflows, checkpoints]);
 
+  // 切换 workflow 时同步 loraConfigs（既有项目也生效——LoRA 总是从 workflow 解析，
+  // 用户不应手动管理绑定的 workflow 里的 lora）。其他参数仅在新建时同步（见上），
+  // 避免 import 一个 workflow 后用户改了 baseModel，再切回来又被覆盖。
   useEffect(() => {
     const wfId = project.workflowId;
     if (!wfId) return;
@@ -100,10 +121,10 @@ export function PromptEdit() {
       return;
     }
 
-    if (id && id !== 'new') {
+    if (id) {
       await updatePrompt(id, project);
       toast.success('项目已更新');
-      } else if (id === 'new') {
+      } else {
       // Create a new prompt project
       const newId = "p_" + Date.now().toString();
       const now = Date.now();
@@ -179,7 +200,7 @@ await addPrompt(newProject);
           </button>
           <div className="hidden md:block">
             <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md">
-              {id === 'new' ? '新建提示词项目' : '编辑提示词项目'}
+              {!id ? '新建提示词项目' : '编辑提示词项目'}
             </h2>
             <p className="text-[12px] text-[var(--text-secondary)]">{project.title || "未命名项目"}</p>
           </div>
