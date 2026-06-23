@@ -10,6 +10,7 @@ use tauri::{AppHandle, Manager, State, Emitter};
 use tokio::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tauri_plugin_notification::NotificationExt;
+use log::{info, error};
 use std::time::Duration;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -77,11 +78,11 @@ pub async fn process_executed(app_clone: AppHandle, ctx: JobContext, images: Vec
             
             if let Some(app_state) = app_clone.try_state::<AppState>() {
                 match crate::commands::history::save_generated_image(app_state, img_record.clone()).await {
-                    Ok(_) => println!("[ComfyWS] Saved to history: {}", img_record.output_path),
-                    Err(e) => eprintln!("[ComfyWS] Failed to save to history: {}", e),
+                    Ok(_) => info!("[ComfyWS] Saved to history: {}", img_record.output_path),
+                    Err(e) => error!("[ComfyWS] Failed to save to history: {}", e),
                 }
             } else {
-                eprintln!("[ComfyWS] AppState not available, cannot save to history");
+                error!("[ComfyWS] AppState not available, cannot save to history");
             }
         }
     }
@@ -105,11 +106,11 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
     let state = app.state::<ComfyState>();
     let mut connected = state.ws_connected.lock().await;
     if *connected {
-        println!("[ComfyWS Backend] ensure_ws_connection: already connected, skipping. ws_url={}", ws_url);
+        info!("[ComfyWS Backend] ensure_ws_connection: already connected, skipping. ws_url={}", ws_url);
         return;
     }
     *connected = true;
-    println!("[ComfyWS Backend] ensure_ws_connection: spawning WS task for {}", ws_url);
+    info!("[ComfyWS Backend] ensure_ws_connection: spawning WS task for {}", ws_url);
     drop(connected);
 
     let jobs_map = state.active_jobs.clone();
@@ -118,13 +119,13 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
 
     tokio::spawn(async move {
         let connect_url = format!("{}/ws?clientId={}", ws_url, client_id);
-        println!("[ComfyWS Backend] Connecting to {}", connect_url);
+        info!("[ComfyWS Backend] Connecting to {}", connect_url);
         let mut msg_count: u64 = 0;
         let mut prog_count: u64 = 0;
         
         match connect_async(&connect_url).await {
             Ok((ws_stream, _)) => {
-                println!("[ComfyWS Backend] Connected!");
+                info!("[ComfyWS Backend] Connected!");
                 emit_to_frontend(&app_clone, "comfy-status", serde_json::json!("connected"));
 
                 let (_, mut read) = ws_stream.split();
@@ -134,7 +135,7 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
                         Ok(Message::Text(text)) => {
                             msg_count += 1;
                             if msg_count <= 3 || msg_count % 10 == 0 {
-                                println!("[ComfyWS Backend] WS msg #{}: len={}", msg_count, text.len());
+                                info!("[ComfyWS Backend] WS msg #{}: len={}", msg_count, text.len());
                             }
                             if let Ok(json) = serde_json::from_str::<Value>(&text) {
                                 let msg_type = json["type"].as_str().unwrap_or("");
@@ -144,7 +145,7 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
                                 if msg_type == "progress" {
                                     prog_count += 1;
                                     if prog_count <= 3 || prog_count % 10 == 0 {
-                                        println!("[ComfyWS Backend] Progress #{}: value={}/{} node={}", prog_count, data["value"], data["max"], data["node"]);
+                                        info!("[ComfyWS Backend] Progress #{}: value={}/{} node={}", prog_count, data["value"], data["max"], data["node"]);
                                     }
                                     emit_to_frontend(&app_clone, "comfy-progress", json.clone());
                                     
@@ -155,7 +156,7 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
                                     
                                 } else if msg_type == "executing" {
                                     if data["node"].is_null() {
-                                        println!("[ComfyWS Backend] Prompt {} fully executed!", prompt_id);
+                                        info!("[ComfyWS Backend] Prompt {} fully executed!", prompt_id);
                                         
                                         let mut locked_jobs = jobs_map.lock().await;
                                         if let Some(ctx) = locked_jobs.remove(&prompt_id) {
@@ -205,18 +206,18 @@ pub async fn ensure_ws_connection(app: AppHandle, ws_url: String, client_id: Str
                         }
                         Ok(_) => {},
                         Err(e) => {
-                            println!("[ComfyWS Backend] WS Error: {}", e);
+                            info!("[ComfyWS Backend] WS Error: {}", e);
                             break;
                         }
                     }
                 }
             }
             Err(e) => {
-                println!("[ComfyWS Backend] Connection failed: {}", e);
+                info!("[ComfyWS Backend] Connection failed: {}", e);
             }
         }
         
-        println!("[ComfyWS Backend] WS task exiting after {} msgs ({} progress). Resetting ws_connected.", msg_count, prog_count);
+        info!("[ComfyWS Backend] WS task exiting after {} msgs ({} progress). Resetting ws_connected.", msg_count, prog_count);
         let state = app_clone.state::<ComfyState>();
         let mut connected = state.ws_connected.lock().await;
         *connected = false;
@@ -358,7 +359,7 @@ pub async fn queue_prompt_and_track(
                                         let mut locked_jobs = jobs_poll.lock().await;
                                         if let Some(ctx_poll) = locked_jobs.remove(&prompt_poll) {
                                             drop(locked_jobs);
-                                            println!("[ComfyWS Backend] Fallback Poll completed prompt {}", prompt_poll);
+                                            info!("[ComfyWS Backend] Fallback Poll completed prompt {}", prompt_poll);
                                             
                                             // Emit a full progress event just to update UI to 100%
                                             let _ = emit_to_frontend(&app_poll, "comfy-progress", serde_json::json!({
