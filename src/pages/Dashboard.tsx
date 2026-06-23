@@ -171,7 +171,7 @@ export function Dashboard() {
               <div
                 key={p.id}
                 className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-layer-1)] border border-[var(--glass-border)] hover:bg-white/5 transition-colors cursor-pointer group"
-                onClick={() => navigate(`/prompts/edit/${p.id}`)}
+                onClick={() => navigate(`/prompts/${p.id}/edit`)}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   {p.coverImage ? (
