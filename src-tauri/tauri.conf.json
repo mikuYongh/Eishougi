@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "詠唱机",
-  "version": "0.2.0-fix",
+  "version": "0.2.1",
   "identifier": "com.promptmuse.app",
   "build": {
     "frontendDist": "../dist",
