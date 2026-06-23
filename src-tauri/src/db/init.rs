@@ -25,8 +25,8 @@ pub fn sync_library_data(conn: &Connection) {
 
     log::info!("Syncing library data: DB v{} → v{}", current, LIBRARY_DATA_VERSION);
 
-    if let Some(content) = embedded_resource("characters.json") {
-        match replace_characters(conn, content) {
+    if let Some(content) = load_resource("characters.json") {
+        match replace_characters(conn, &content) {
             Ok((inserted, updated)) => log::info!("characters: {} new, {} fav restored", inserted, updated),
             Err(e) => log::error!("characters sync failed: {}", e),
         }
@@ -34,8 +34,8 @@ pub fn sync_library_data(conn: &Connection) {
         log::warn!("characters.json not found in embedded binary");
     }
 
-    if let Some(content) = embedded_resource("artists.json") {
-        match replace_artists(conn, content) {
+    if let Some(content) = load_resource("artists.json") {
+        match replace_artists(conn, &content) {
             Ok((inserted, updated)) => log::info!("artists: {} new, {} fav restored", inserted, updated),
             Err(e) => log::error!("artists sync failed: {}", e),
         }
@@ -191,11 +191,18 @@ fn replace_artists(conn: &Connection, json_str: &str) -> Result<(usize, usize), 
     Ok((artists.len() - restored, restored))
 }
 
-/// Compile-time embedded resources (works on all platforms).
-fn embedded_resource(name: &str) -> Option<&'static str> {
+/// Load resource from compile-time embedding (desktop) or Android assets.
+/// Android uses assets/ to avoid duplicating ~48MB across 4 CPU architectures.
+fn load_resource(name: &str) -> Option<String> {
     match name {
-        "characters.json" => Some(include_str!("../../resources/characters.json")),
-        "artists.json" => Some(include_str!("../../resources/artists.json")),
+        #[cfg(not(target_os = "android"))]
+        "characters.json" => Some(include_str!("../../resources/characters.json").to_string()),
+        #[cfg(not(target_os = "android"))]
+        "artists.json" => Some(include_str!("../../resources/artists.json").to_string()),
+        #[cfg(target_os = "android")]
+        "characters.json" | "artists.json" => {
+            crate::jvm_plugin::read_asset_to_string(name)
+        }
         _ => None,
     }
 }
