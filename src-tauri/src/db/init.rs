@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Increment this when characters.json or artists.json content changes.
-const LIBRARY_DATA_VERSION: u32 = 6;
+const LIBRARY_DATA_VERSION: u32 = 7;
 
 /// Sync library data from compile-time embedded JSON into the database.
 /// Safe to call from any thread with its own Connection.
