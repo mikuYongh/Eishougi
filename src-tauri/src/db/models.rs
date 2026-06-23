@@ -135,6 +135,8 @@ pub struct Character {
     pub character_tag: String,
     pub name_en: String,
     pub name_zh: Option<String>,
+    pub series: Option<String>,
+    pub series_zh: Option<String>,
     pub copyright: Option<String>,
     pub trigger: String,
     pub core_tags: Option<String>,

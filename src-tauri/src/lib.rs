@@ -326,6 +326,7 @@ pub fn run() {
             commands::data::export_all_data,
             commands::data::import_all_data,
             commands::library::search_characters,
+            commands::library::get_character_series,
             commands::library::search_artists,
             commands::library::toggle_favorite_character,
             commands::library::toggle_favorite_artist,
@@ -333,15 +334,16 @@ pub fn run() {
             comfy_ws::upload_image_to_comfy,
         ])
         .setup(|app| {
-            // Initialize library data (characters / artists) AFTER Tauri runtime
-            // is ready. On Android this is critical: reading APK assets requires
-            // the JNI/ndk_context that Tauri registers during startup.
+            // Background: sync library data (characters / artists) from embedded JSON.
+            // Uses a second DB connection so the main UI thread never blocks.
             let state = app.state::<AppState>();
-            let db = state.db.blocking_lock();
-            if let Err(e) = db::init::init_library_data(&db.conn, &state.app_data_dir) {
-                log::warn!("Failed to initialize library data: {}", e);
-            }
-            drop(db);
+            let app_data_dir = state.app_data_dir.clone();
+            std::thread::spawn(move || {
+                match db::connection::Database::open_second(&app_data_dir) {
+                    Ok(conn) => db::init::sync_library_data(&conn),
+                    Err(e) => log::warn!("Failed to open DB for library sync: {}", e),
+                }
+            });
             // Auto-backup DB to external storage (survives pm clear).
             #[cfg(target_os = "android")]
             crate::jvm_plugin::backup_database(&state.app_data_dir.join("prompt-muse.db"));

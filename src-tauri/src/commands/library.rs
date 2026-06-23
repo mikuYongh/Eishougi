@@ -7,6 +7,7 @@ use tauri::State;
 pub async fn search_characters(
     state: State<'_, AppState>,
     search: Option<String>,
+    series: Option<String>,
     limit: usize,
     offset: usize,
     favorite: Option<bool>,
@@ -18,12 +19,20 @@ pub async fn search_characters(
 
     if let Some(s) = search {
         if !s.trim().is_empty() {
-            query.push_str(" AND (character_tag LIKE ? OR name_en LIKE ? OR name_zh LIKE ? OR \"trigger\" LIKE ?)");
+            query.push_str(" AND (character_tag LIKE ? OR name_en LIKE ? OR name_zh LIKE ? OR \"trigger\" LIKE ? OR series LIKE ? OR series_zh LIKE ?)");
             let pattern = format!("%{}%", s);
-            args.push(pattern.clone());
-            args.push(pattern.clone());
-            args.push(pattern.clone());
-            args.push(pattern);
+            for _ in 0..6 {
+                args.push(pattern.clone());
+            }
+        }
+    }
+
+
+    if let Some(s) = series {
+        if !s.trim().is_empty() {
+            query.push_str(" AND (series = ? OR series_zh = ?)");
+            args.push(s.clone());
+            args.push(s);
         }
     }
 
@@ -56,6 +65,8 @@ pub async fn search_characters(
                 character_tag: row.get("character_tag")?,
                 name_en: row.get("name_en")?,
                 name_zh: row.get("name_zh")?,
+                series: row.get("series").ok(),
+                series_zh: row.get("series_zh").ok(),
                 copyright: row.get("copyright")?,
                 trigger: row.get("trigger")?,
                 core_tags: row.get("core_tags")?,
@@ -79,6 +90,7 @@ pub async fn search_characters(
 pub async fn search_artists(
     state: State<'_, AppState>,
     search: Option<String>,
+    series: Option<String>,
     limit: usize,
     offset: usize,
     favorite: Option<bool>,
@@ -96,6 +108,15 @@ pub async fn search_artists(
             args.push(pattern.clone());
             args.push(pattern.clone());
             args.push(pattern);
+        }
+    }
+
+
+    if let Some(s) = series {
+        if !s.trim().is_empty() {
+            query.push_str(" AND (series = ? OR series_zh = ?)");
+            args.push(s.clone());
+            args.push(s);
         }
     }
 
@@ -199,4 +220,34 @@ pub async fn toggle_favorite_artist(
         .map_err(|e| e.to_string())?;
 
     Ok(new_fav)
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SeriesOption {
+    pub series: String,
+    pub series_zh: String,
+    pub count: i32,
+}
+
+#[tauri::command]
+pub async fn get_character_series(state: State<'_, AppState>) -> Result<Vec<SeriesOption>, String> {
+    let db = state.db.lock().await;
+    let mut stmt = db.conn.prepare(
+        "SELECT series, series_zh, COUNT(id) as count FROM characters WHERE series IS NOT NULL AND series != '' GROUP BY series, series_zh ORDER BY count DESC"
+    ).map_err(|e| e.to_string())?;
+
+    let rows = stmt.query_map([], |row| {
+        Ok(SeriesOption {
+            series: row.get("series")?,
+            series_zh: row.get("series_zh")?,
+            count: row.get("count")?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut res = Vec::new();
+    for r in rows {
+        res.push(r.map_err(|e| e.to_string())?);
+    }
+    Ok(res)
 }

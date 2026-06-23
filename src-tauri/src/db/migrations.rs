@@ -10,6 +10,10 @@ pub fn run(conn: &Connection) -> Result<()> {
         (MIGRATION_V4, 4),
         (MIGRATION_V5, 5),
         (MIGRATION_V6, 6),
+        (MIGRATION_V7, 7),
+        (MIGRATION_V8, 8),
+        (MIGRATION_V9, 9),
+        (MIGRATION_V10, 10),
     ];
 
     for (sql, ver) in migrations {
@@ -184,4 +188,17 @@ CREATE INDEX IF NOT EXISTS idx_artists_fav ON artists(is_favorite);
 const MIGRATION_V5: &str = r#"
 ALTER TABLE generated_images ADD COLUMN is_saved INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS idx_gen_images_saved ON generated_images(is_saved);
+"#;
+
+const MIGRATION_V7: &str = "";
+const MIGRATION_V8: &str = "";
+const MIGRATION_V9: &str = r#"
+ALTER TABLE characters ADD COLUMN series TEXT;
+ALTER TABLE characters ADD COLUMN series_zh TEXT;
+ALTER TABLE artists ADD COLUMN series TEXT;
+ALTER TABLE artists ADD COLUMN series_zh TEXT;
+"#;
+
+const MIGRATION_V10: &str = r#"
+CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 "#;

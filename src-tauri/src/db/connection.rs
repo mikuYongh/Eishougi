@@ -16,4 +16,14 @@ impl Database {
         // only available after Tauri runtime starts. See lib.rs setup().
         Ok(Self { conn })
     }
+
+    /// Open a second connection for background work (e.g. library sync).
+    /// WAL mode allows concurrent readers while the main connection is active.
+    pub fn open_second(app_data_dir: &Path) -> Result<Connection> {
+        let db_path = app_data_dir.join("prompt-muse.db");
+        let conn = Connection::open(&db_path)?;
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
+        // Migrations already ran via the main connection; skip here.
+        Ok(conn)
+    }
 }
