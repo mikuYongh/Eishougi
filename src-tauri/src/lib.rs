@@ -287,6 +287,7 @@ pub fn run() {
             commands::auto_deploy::check_comfyui_status,
             commands::auto_deploy::download_model_file,
             commands::auto_deploy::check_file_exists,
+            commands::logging::write_log,
             commands::auto_deploy::call_llm_proxy,
             commands::fetch_ollama_models,
             commands::prompts::create_prompt,
