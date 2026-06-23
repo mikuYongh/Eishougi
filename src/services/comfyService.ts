@@ -2,6 +2,7 @@
 
 import { useSettingsStore } from '../stores/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
+import { appLog } from '../utils/appLog';
 
 // Get dynamically from settings
 export const getComfyUrl = () => {
@@ -158,26 +159,79 @@ export class ComfyService {
     }
   }
 
+  /**
+   * 拉取 ComfyUI 节点信息（用于解析 checkpoints/loras 列表）。
+   *
+   * 优化：从全量 /object_info（4MB+, 装了很多自定义节点的 ComfyUI 实测 50+ 秒）
+   * 改为只拉模型相关节点（每个约 1-4KB, 2-3 秒）。
+   * 请求顺序：UNETLoader + CheckpointLoaderSimple + LoraLoader + Power Lora Loader (rgthree)
+   * 任一节点失败不阻塞其他节点（容错）。
+   */
   async fetchObjectInfo() {
-    try {
-      const comfyUrl = getComfyUrl();
-      const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 8000);
-      const response = await fetch(`${comfyUrl}/object_info`, {
-        method: 'GET',
-        signal: abortController.signal
-      });
-      clearTimeout(timeoutId);
-      if (!response.ok) throw new Error("Failed to fetch object info");
-      return await response.json();
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') {
-        console.warn("[ComfyService] fetchObjectInfo timed out after 8s");
-      } else {
-        console.error(e);
+    const t0 = performance.now();
+    const comfyUrl = getComfyUrl();
+    const NODES = [
+      'UNETLoader',
+      'CheckpointLoaderSimple',
+      'CheckpointLoader',
+      'LoraLoader',
+      'Power Lora Loader (rgthree)',
+    ];
+
+    const result: any = {};
+    const failures: string[] = [];
+
+    for (const node of NODES) {
+      const url = `${comfyUrl}/object_info/${encodeURIComponent(node)}`;
+      const tNode = performance.now();
+      try {
+        const abortController = new AbortController();
+        // 单节点接口本身很快（~2s），给 15s 兜底足够
+        const timeoutId = setTimeout(() => abortController.abort(), 15000);
+        const resp = await fetch(url, {
+          method: 'GET',
+          signal: abortController.signal,
+        });
+        clearTimeout(timeoutId);
+        const elapsed = Math.round(performance.now() - tNode);
+        if (!resp.ok) {
+          console.warn(`[ComfyHTTP] /object_info/${node} HTTP ${resp.status} after ${elapsed}ms`);
+          appLog.warn('ComfyHTTP', `/object_info/${node} HTTP ${resp.status} after ${elapsed}ms`);
+          failures.push(`${node}(HTTP ${resp.status})`);
+          continue;
+        }
+        const text = await resp.text();
+        try {
+          const json = JSON.parse(text);
+          // ComfyUI 单节点接口返回 { NodeName: { ... } } 结构
+          if (json && json[node]) {
+            result[node] = json[node];
+          }
+        } catch (parseErr) {
+          console.warn(`[ComfyHTTP] /object_info/${node} returned non-JSON body: ${text.substring(0, 200)}`);
+          appLog.warn('ComfyHTTP', `/object_info/${node} non-JSON response`);
+          failures.push(`${node}(PARSE_ERR)`);
+          continue;
+        }
+        console.info(
+          `[ComfyHTTP] /object_info/${node} 200 OK ${elapsed}ms size=${text.length}B`
+        );
+      } catch (e: any) {
+        const elapsed = Math.round(performance.now() - tNode);
+        const reason = e?.name === 'AbortError' ? 'TIMEOUT' : (e?.message || String(e));
+        console.warn(`[ComfyHTTP] /object_info/${node} FAILED after ${elapsed}ms: ${reason}`);
+        appLog.error('ComfyHTTP', `/object_info/${node} FAILED after ${elapsed}ms: ${reason}`);
+        failures.push(`${node}(${reason})`);
       }
-      return {};
     }
+
+    const totalMs = Math.round(performance.now() - t0);
+    const keyCount = Object.keys(result).length;
+    console.info(
+      `[ComfyHTTP] fetchObjectInfo done in ${totalMs}ms, got ${keyCount}/${NODES.length} nodes` +
+      (failures.length > 0 ? `, failed: ${failures.join(', ')}` : '')
+    );
+    return result;
   }
 
   async uploadImage(file: File | Blob, filename: string): Promise<string> {
