@@ -516,6 +516,10 @@ export function useAgent() {
 
   const roundCounterRef = useRef<number>(0);
   const duplicateTrackerRef = useRef<Map<string, number>>(new Map());
+  // 历史 image_path → base64 缓存。每轮 callLLM 会把所有历史图片重读一遍，
+  // 长 session 下 N² 的 IO；缓存后只有第一次 read，之后命中内存。
+  // data: URL 不缓存（已内存）。session 切换不需要清——同张图路径不变。
+  const imageBase64CacheRef = useRef<Map<string, string>>(new Map());
 
   /**
    * Lightweight pre-check call before the main agent loop.
@@ -610,8 +614,12 @@ User input: ${userText}`;
       apiUrl = apiUrl.replace(/\/$/, '') + '/chat/completions';
     }
 
-    const abortController = new AbortController();
+    // 复用 sendMessage 入口创建的 AbortController，避免 stopGenerating abort 错实例。
+    // 仅当 ref 上没有时（理论上不该发生）才新建一个。
+    const abortController = abortControllerRef.current || new AbortController();
     abortControllerRef.current = abortController;
+    // 若调用方请求停止（ref 已被 abort 且替换），本轮直接退出
+    if (abortController.signal.aborted) return;
 
     try {
       // Pre-process messages to fetch base64 for images.
@@ -627,20 +635,29 @@ User input: ${userText}`;
         if (imageOnly.length > 0) {
           const b64Images = await Promise.all(imageOnly.map(async (urlOrPath) => {
             if (urlOrPath.startsWith('data:')) return urlOrPath;
+            // 命中缓存直接返回，避免每轮重复 IO / fetch
+            const cached = imageBase64CacheRef.current.get(urlOrPath);
+            if (cached) return cached;
+            let result: string;
             if (urlOrPath.startsWith('http')) {
               try {
                 const res = await fetch(urlOrPath);
                 const blob = await res.blob();
-                return new Promise<string>((resolve) => {
+                result = await new Promise<string>((resolve) => {
                   const reader = new FileReader();
                   reader.onloadend = () => resolve(reader.result as string);
                   reader.readAsDataURL(blob);
                 });
               } catch(e) { return urlOrPath; }
+            } else {
+              try {
+                result = await invoke('read_image_base64', { path: urlOrPath });
+              } catch(e) { return urlOrPath; }
             }
-            try {
-              return await invoke('read_image_base64', { path: urlOrPath });
-            } catch(e) { return urlOrPath; }
+            if (result && result.startsWith('data:')) {
+              imageBase64CacheRef.current.set(urlOrPath, result);
+            }
+            return result;
           }));
           
           m.content = [
@@ -805,7 +822,7 @@ User input: ${userText}`;
           ],
           stream: true,
           temperature: llm.temperature !== undefined ? llm.temperature : 0.7,
-          max_tokens: llm.maxTokens !== undefined ? llm.maxTokens : 2048,
+          max_tokens: llm.maxTokens !== undefined ? llm.maxTokens : 4096,
         };
         if (!budgetExceeded) {
           payload.tools = allTools.map((t: any) => {
@@ -864,6 +881,8 @@ User input: ${userText}`;
       };
 
       channel.onmessage = (chunk: string) => {
+        // 用户已请求停止 → 丢弃后续 chunk，避免停止后消息继续累积
+        if (abortController.signal.aborted) return;
         sseBuffer += chunk;
         // 按 \n 切，最后一段可能是不完整行，留在 buffer 等下次拼接
         const lines = sseBuffer.split('\n');
@@ -915,6 +934,8 @@ User input: ${userText}`;
         const newMessages = [...currentMessages, assistantMessage];
         
         for (const call of assistantMessage.tool_calls) {
+          // 用户已请求停止 → 不再执行后续工具，跳出循环
+          if (abortController.signal.aborted) break;
           let resultStr = "";
           let rawArgs = "";
           let res: any = undefined;
@@ -1392,11 +1413,22 @@ User input: ${userText}`;
                 await invoke('stop_comfyui');
                 res = { status: "success", message: "ComfyUI stopped" };
               } else if (fnName === 'install_custom_node') {
+                // 安全：custom node 是 Python 代码，clone 后会被 ComfyUI 自动加载执行。
+                // 限制只允许主流代码托管域名，防止 LLM 被 prompt injection 诱导 clone 恶意仓库。
+                const allowedHosts = ['github.com', 'gitlab.com', 'gitee.com', 'cnb.cool'];
+                const nodeUrl = String(parsedArgs.node_url || '');
+                let urlHost = '';
+                try {
+                  urlHost = new URL(nodeUrl).hostname;
+                } catch { /* invalid url */ }
+                if (!urlHost || !allowedHosts.includes(urlHost)) {
+                  throw new Error(`Refused: node_url host must be one of ${allowedHosts.join(', ')}. Got: "${urlHost}".`);
+                }
                 await invoke('install_custom_node', {
-                  nodeUrl: parsedArgs.node_url,
+                  nodeUrl,
                   comfyDir: parsedArgs.comfy_dir || useSettingsStore.getState().settings.comfyDir || null
                 });
-                res = { status: "success", message: `Custom node installed: ${parsedArgs.node_url}` };
+                res = { status: "success", message: `Custom node installed: ${nodeUrl}` };
               } else if (fnName === 'check_comfyui_status') {
                 res = await invoke<any>('check_comfyui_status', {
                   url: parsedArgs.url || null
