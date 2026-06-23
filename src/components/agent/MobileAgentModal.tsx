@@ -5,12 +5,11 @@ import { useAgentStore } from "../../stores/agentStore";
 import { useAgent, type ChatMessage, type ChatAttachment } from "../../hooks/useAgent";
 import { useSettingsStore, type McpServerConfig } from "../../stores/settingsStore";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { PhotoView } from 'react-photo-view';
 import { HistoryImagePicker } from "../ui/HistoryImagePicker";
 import { cn } from "../../lib/utils";
 import { getImgSrc } from "../../utils/imageUtils";
+import { MarkdownContent } from "./MarkdownContent";
 
 interface InputAreaProps {
   isGenerating: boolean;
@@ -369,19 +368,7 @@ export function MobileAgentModal() {
                       <div className="prose prose-invert prose-sm max-w-none break-words">
                         {msg.content ? (
                           <>
-                            <ReactMarkdown
-                              remarkPlugins={[remarkGfm]}
-                              urlTransform={(url) => url}
-                              components={{
-                                img: ({node, ...props}) => (
-                                  <PhotoView src={getImgSrc(props.src)}>
-                                    <img {...props} src={getImgSrc(props.src)} className="max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in" />
-                                  </PhotoView>
-                                )
-                              }}
-                            >
-                              {msg.content}
-                            </ReactMarkdown>
+                            <MarkdownContent content={msg.content} />
                             {msg.tool_calls && msg.tool_calls.length > 0 && (
                               <div className="mt-3 pt-3 border-t border-[var(--glass-border)] flex flex-col gap-2">
                                 {msg.tool_calls.map((tc, idx) => (

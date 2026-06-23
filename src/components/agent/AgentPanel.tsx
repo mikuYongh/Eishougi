@@ -1,5 +1,5 @@
 import { Bot, Send, Sparkles, Settings, Plus, History, ChevronRight, ChevronLeft, Wrench, Zap, Loader2, Trash2, ArrowLeft, Save, ImagePlus, X, ArrowDown, Paperclip, FileText } from "lucide-react";
-import React, { useState, useRef, useEffect, memo, type KeyboardEvent } from "react";
+import React, { useState, useRef, useEffect, type KeyboardEvent } from "react";
 import { useAgent } from "../../hooks/useAgent";
 import { useAgentStore } from "../../stores/agentStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -7,9 +7,8 @@ import type { McpServerConfig } from "../../stores/settingsStore";
 import type { ChatAttachment } from "../../hooks/useAgent";
 import { invoke } from "@tauri-apps/api/core";
 import type { ChatMessage } from "../../hooks/useAgent";
-import ReactMarkdown from 'react-markdown';
 import { toast } from "sonner";
-import remarkGfm from 'remark-gfm';
+import { MarkdownContent } from "./MarkdownContent";
 import { HistoryImagePicker } from "../ui/HistoryImagePicker";
 import { Virtuoso } from "react-virtuoso";
 import type { VirtuosoHandle } from "react-virtuoso";
@@ -32,60 +31,6 @@ function ChatImage({ src }: { src: string }) {
     </PhotoView>
   );
 }
-
-/**
- * Markdown renderer extracted into a memoized component.
- *
- * Why: during streaming, `messages` updates ~60 times per second (rAF throttled).
- * Each update re-renders every prior assistant message. ReactMarkdown is
- * expensive (parses + walks AST). memo() bails out when `content` is unchanged,
- * so only the currently-streaming message pays the markdown cost.
- */
-const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
-  return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      urlTransform={(url) => url}
-      components={{
-        p: ({node, ...props}) => <div className="mb-2 last:mb-0" {...props} />,
-        strong: ({node, ...props}) => <strong className="text-[var(--accent-1)] font-bold" {...props} />,
-        a: ({node, href, children, ...props}) => {
-          // LLM 回复中的 [视频预览](path.mp4) 是 markdown 链接语法，
-          // 对媒体文件直接渲染为 video/img 播放器，不显示为可点击超链接。
-          const MEDIA_VIDEO = new Set(['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v']);
-          const MEDIA_IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
-          if (typeof href === 'string') {
-            const ext = href.split('?')[0].split('.').pop()?.toLowerCase() || '';
-            if (MEDIA_VIDEO.has(ext)) {
-              return <video src={getImgSrc(href)} controls className="max-w-full max-h-64 rounded-lg border border-[var(--glass-border)] my-2" />;
-            }
-            if (MEDIA_IMAGE.has(ext)) {
-              return <PhotoView src={getImgSrc(href)}><img src={getImgSrc(href)} className="max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in" /></PhotoView>;
-            }
-          }
-          return <a className="text-[var(--accent-2)] underline hover:text-[var(--accent-1)] transition-colors" target="_blank" href={href} {...props}>{children}</a>;
-        },
-        code: ({node, inline, className, children, ...props}: any) =>
-          inline
-            ? <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--accent-1)]/20 text-[var(--accent-1)] font-mono text-[12px]" {...props}>{children}</code>
-            : <pre className="p-3 rounded-xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] overflow-x-auto text-[12px] font-mono text-[var(--text-secondary)] mt-2 mb-2 custom-scrollbar"><code {...props}>{children}</code></pre>,
-        ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
-        ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
-        h1: ({node, ...props}) => <h1 className="text-lg font-bold text-[var(--text-primary)] mt-4 mb-2" {...props} />,
-        h2: ({node, ...props}) => <h2 className="text-md font-bold text-[var(--text-primary)] mt-3 mb-2" {...props} />,
-        h3: ({node, ...props}) => <h3 className="text-sm font-bold text-[var(--text-primary)] mt-2 mb-1" {...props} />,
-        blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-[var(--accent-1)]/30 pl-3 py-1 text-[var(--text-secondary)] italic my-2" {...props} />,
-        img: ({node, ...props}) => (
-          <PhotoView src={getImgSrc(props.src)}>
-            <img {...props} src={getImgSrc(props.src)} className="max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in" />
-          </PhotoView>
-        )
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-  );
-});
 
 const AgentFooter = React.forwardRef<HTMLDivElement, { context?: { isGenerating: boolean } }>(({ context }, ref) => {
   // Loading 反馈由空 assistant 气泡的"思考中..."占位统一负责，
@@ -148,89 +93,10 @@ export function AgentPanel() {
     }
   }, [messages.length, isGenerating, viewMode, isExpanded]);
 
-  // Auto-upgrade system prompt for older sessions
-  useEffect(() => {
-    let currentPrompt = settings.systemPrompt;
-    let needsUpdate = false;
-
-    if (!currentPrompt.includes('MCP_TOOLS')) {
-      const defaultSystemPrompt = `You are NEXUS, a highly capable AI Agent designed for 詠唱机 EISHOUGI.
-You assist the user in generating high-quality prompts, creating workflows, and generating images.
-Always respond in the user's language. Keep answers concise.
-
-## CRITICAL CONCEPT CLARIFICATION (WORKFLOW_CLARIFICATION):
-In this app, "工作流 (Workflow)" and "提示词项目 (Prompt Project)" are TWO DIFFERENT things:
-- **工作流 (Workflow)**: A ComfyUI pipeline JSON file that defines the processing nodes (KSampler, VAE, etc). Users import these from ComfyUI. You CANNOT generate this from a scene description.
-- **提示词项目 (Prompt Project)**: A scene description with positive/negative prompts, model settings, LoRAs, etc. This is what you CREATE for the user based on their scene descriptions.
-
-When a user says "帮我添加工作流" or "创建工作流" with a scene description (e.g. "蕾姆在床上"):
-→ DO NOT try to create a workflow JSON. Instead:
-  1. Clarify: "您描述的场景内容适合创建**提示词项目**，而不是工作流。工作流是 ComfyUI 的 pipeline 文件，需要您自己导入。"
-  2. Offer to create a prompt project for the scene immediately using create_prompt.
-  3. For generation: use search_workflows to list available workflows and ask user to pick one.
-
-When a user explicitly wants to manage ComfyUI pipeline workflows (import/delete):
-→ Guide them to the workflow management page: "请前往左侧菜单的**工作流管理**页面，点击导入按钮上传您的 ComfyUI JSON 文件。"
-
-## PROMPT CREATION RULES:
-When using create_prompt or update_prompt:
-1. If MCP tools (search_tags) are available, use them FIRST to convert the scene description into accurate Danbooru English tags. Then compose the positive_prompt from the returned tags.
-2. If MCP tools are NOT available, you MUST translate the positive_prompt into high-quality English keywords based on your own Danbooru tag knowledge.
-3. You MUST auto-generate suitable negative_prompt keywords tailored to the specific scene to avoid bad generations (e.g. lowres, bad anatomy, bad hands, missing fingers, extra digit, worst quality, etc).
-4. CAN specify model params: base_model, lora_configs [{name, strength, enabled}], width, height, steps, cfg_scale, seed.
-5. DO NOT invent or hallucinate physical traits (like hair color, eye color, breast size, etc.) when a specific character name or Danbooru character tag is provided. Character tags already encapsulate their appearance. Only add basic physical trait tags if the user explicitly requests an original character (OC) or a specific trait variation.
-
-## MCP TOOLS — Danbooru Tag Search (MCP_TOOLS):
-When MCP tools (search_tags, get_related_tags, get_artist_recommendations) are loaded:
-- search_tags(query, use_segmentation, top_k, limit, category): Convert natural language into English Danbooru tags. use_segmentation=true for full scenes. category="character" for character names.
-- get_related_tags(tags, limit): Find tags commonly co-occurring with selected tags, enrich prompts with complementary details.
-- get_artist_recommendations(tags, limit): Find artists skilled at drawing specific elements, suggest @artist_name references.
-Use these proactively when creating prompts to ensure tags are valid Danbooru keywords.
-
-## Custom Styles & Artists Library:
-You have tools to manage the user's custom styles and artists:
-- get_custom_styles(): Get the list of all saved styles.
-- add_custom_style(name, trigger, category, preview): Add a new style. Use this when the user asks to save or create a new style/artist.
-- update_custom_style(id, name, trigger, category, preview): Update an existing style.
-- delete_custom_style(id): Delete a style.
-When the user wants to manage their styles, use these tools to directly modify their library.
-
-## INSTANCE IMAGES:
-- Use get_generated_images to browse history (filter by prompt_id optional).
-- Use add_instance_image to add a generated image as reference to a prompt project.
-
-## GENERATION RULES:
-- When asked to generate an image, simply call the generate_image tool with the prompt_id. DO NOT ask the user which workflow to use. The generate_image tool will automatically use the prompt's default bound workflow.
-- Only if generate_image returns an error stating "No workflows exist", you should tell the user to import a workflow from the Workflows page.
-import { getImgSrc } from "../../utils/imageUtils";
-
-## CONTEXT AWARENESS:
-- You will be provided with [System Context] containing the active prompt ID if the user is viewing one.
-- CRITICAL: If the user describes a change, asks for a modification, or says "Generate X" while an Active Prompt ID is present, YOU MUST use update_prompt_content or update_prompt_settings on THAT active prompt. DO NOT use create_prompt unless the user explicitly says "create a new prompt".
-- Only use create_prompt if no prompt is currently active, or if the user explicitly requests a new one.
-
-When asked to create/modify/delete prompts → use create_prompt / update_prompt_content / update_prompt_settings / delete_prompt.
-When asked to set model/LoRA on a project → use update_prompt_settings.`;
-
-      currentPrompt = defaultSystemPrompt;
-      needsUpdate = true;
-    } else if (!currentPrompt.includes('hallucinate physical traits')) {
-      const rule5 = "\n5. DO NOT invent or hallucinate physical traits (like hair color, eye color, breast size, etc.) when a specific character name or Danbooru character tag is provided. Character tags already encapsulate their appearance. Only add basic physical trait tags if the user explicitly requests an original character (OC) or a specific trait variation.";
-      
-      if (currentPrompt.includes("4. CAN specify model params")) {
-        currentPrompt = currentPrompt.replace(
-          "4. CAN specify model params: base_model, lora_configs [{name, strength, enabled}], width, height, steps, cfg_scale, seed.",
-          "4. CAN specify model params: base_model, lora_configs [{name, strength, enabled}], width, height, steps, cfg_scale, seed." + rule5
-        );
-        needsUpdate = true;
-      }
-    }
-
-    if (needsUpdate) {
-      updateSettings({ systemPrompt: currentPrompt });
-      setTempSystemPrompt(currentPrompt);
-    }
-  }, [settings.systemPrompt, updateSettings]);
+  // 旧版本会在这里用 useEffect 强制覆盖用户的 systemPrompt 为内置 default。
+  // 该行为会静默丢失用户在设置面板里做的定制，已移除。
+  // systemPrompt 的真相源是 agentStore.ts 的 defaultSystemPrompt + 用户的显式编辑。
+  // 版本升级需要迁移时，应通过 zustand persist 的 migrate 钩子显式做，而不是基于关键字嗅探。
 
 
 
