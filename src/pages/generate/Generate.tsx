@@ -123,7 +123,7 @@ export function Generate() {
 
   useEffect(() => {
     if (project) {
-      const defaultWf = workflows.find(w => w.isDefault);
+      const defaultWf = workflows.find(w => w.type === 'text2img' && w.isDefault);
       const initialWorkflowId = project.workflowId || (defaultWf ? defaultWf.id : "");
       setSelectedWorkflowId(initialWorkflowId);
 
@@ -477,7 +477,6 @@ export function Generate() {
                       }
                     }}
                     options={[
-                      { label: "默认工作流 (Default)", value: "" },
                       ...workflows.map(w => ({ label: w.name, value: w.id }))
                     ]}
                     accentColor="blue"

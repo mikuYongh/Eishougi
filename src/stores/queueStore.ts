@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { appLog } from '../utils/appLog';
+import { useWorkflowStore } from './workflowStore';
 
 export interface QueueJob {
   id: string;
@@ -220,9 +221,19 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         }
 
         if (!wfString) {
-          const defaultWorkflow = (await import('../assets/default_workflow.json')).default;
-          wfString = JSON.stringify(defaultWorkflow);
-          console.info(`[ComfyQueue] using default workflow, size=${wfString.length}B`);
+          // 项目未绑定工作流时，回落到 DB 中标记为默认的工作流；
+          // 找不到再回落到打包内嵌的占位工作流（仅作为最终兜底）。
+          const defaultWf = useWorkflowStore.getState().workflows.find(w => w.type === 'text2img' && w.isDefault);
+          if (defaultWf && defaultWf.jsonContent) {
+            wfString = defaultWf.jsonContent;
+            console.info(`[ComfyQueue] using DB default workflow: id=${defaultWf.id} size=${wfString.length}B`);
+          }
+        }
+
+        if (!wfString) {
+          const fallbackWorkflow = (await import('../assets/default_workflow.json')).default;
+          wfString = JSON.stringify(fallbackWorkflow);
+          console.info(`[ComfyQueue] using bundled fallback workflow, size=${wfString.length}B`);
         }
 
         for (let i = 0; i < batchCount; i++) {

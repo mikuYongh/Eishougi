@@ -52,7 +52,7 @@ export function PromptEdit() {
       if (p) setProject(p);
     } else if (id === 'new') {
       // Set default workflow for new prompts
-      const defaultWorkflow = workflows.find(w => w.isDefault);
+      const defaultWorkflow = workflows.find(w => w.type === 'text2img' && w.isDefault);
       // Use the first local checkpoint as the default base model if the current
       // placeholder is not present in the user's library.
       setProject(prev => {
@@ -539,11 +539,10 @@ await addPrompt(newProject);
                   <Layers size={12} className="text-[var(--accent-1)]" /> 工作流 (Workflow)
                 </label>
                 <div className="relative z-[60]">
-                  <GlassDropdown 
-                    value={project.workflowId || ""}
+                  <GlassDropdown
+                    value={project.workflowId || workflows.find(w => w.type === 'text2img' && w.isDefault)?.id || ""}
                     onChange={v => updateField('workflowId', v || undefined)}
                     options={[
-                      { label: "默认工作流", value: "" },
                       ...workflows.map(w => ({ label: w.name, value: w.id }))
                     ]}
                     accentColor="blue"

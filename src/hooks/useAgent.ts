@@ -960,9 +960,10 @@ User input: ${userText}`;
                   resolvedBaseModel = "";
                 }
 
-                // Resolve workflow: explicit > user's default (isDefault=true) > null
+                // Resolve workflow: explicit > text2img default > null
+                // (create_prompt 服务的后续是 generate_image —— 都是文本生图场景)
                 const workflows = useWorkflowStore.getState().workflows;
-                const defaultWf = workflows.find(w => w.isDefault);
+                const defaultWf = workflows.find(w => w.type === 'text2img' && w.isDefault);
                 const resolvedWorkflowId: string | null =
                   parsedArgs.workflow_id
                   || (defaultWf ? defaultWf.id : null)
@@ -1111,7 +1112,9 @@ User input: ${userText}`;
                 let wfId = project.workflowId;
                 if (!wfId) {
                   const workflows = useWorkflowStore.getState().workflows;
-                  const defaultWf = workflows.find((w: any) => w.isDefault);
+                  // generate_image 走文本生图：优先 text2img 类型的默认
+                  const defaultWf = workflows.find((w: any) => w.type === 'text2img' && w.isDefault)
+                    || workflows.find((w: any) => w.type === 'text2img');
                   if (defaultWf) {
                     wfId = defaultWf.id;
                   } else if (workflows.length > 0) {
