@@ -1,11 +1,19 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 
+export interface SeriesOption {
+  series: string;
+  seriesZh: string;
+  count: number;
+}
+
 export interface Character {
   id: string;
   characterTag: string;
   nameEn: string;
   nameZh: string | null;
+  series: string | null;
+  seriesZh: string | null;
   copyright: string | null;
   trigger: string;
   coreTags: string | null;
@@ -27,6 +35,8 @@ export interface Artist {
 
 interface LibraryState {
   characters: Character[];
+  seriesList: SeriesOption[];
+  selectedSeries: string | null;
   artists: Artist[];
   isCharactersLoading: boolean;
   isArtistsLoading: boolean;
@@ -44,6 +54,8 @@ interface LibraryState {
   artistHasMore: boolean;
 
   // Actions
+  setSeriesFilter: (series: string | null) => void;
+  fetchSeriesList: () => Promise<void>;
   setCharacterSearch: (query: string) => void;
   setArtistSearch: (query: string) => void;
   toggleCharacterFavoriteFilter: () => void;
@@ -60,6 +72,8 @@ const PAGE_SIZE = 50;
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   characters: [],
+  seriesList: [],
+  selectedSeries: null,
   artists: [],
   isCharactersLoading: false,
   isArtistsLoading: false,
@@ -74,8 +88,22 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   artistShowFavorites: false,
   artistHasMore: true,
 
+  setSeriesFilter: (series: string | null) => {
+    set({ selectedSeries: series, characterPage: 0, characters: [], characterHasMore: true });
+    get().loadMoreCharacters();
+  },
+
+  fetchSeriesList: async () => {
+    try {
+      const results: SeriesOption[] = await invoke('get_character_series');
+      set({ seriesList: results });
+    } catch (e) {
+      console.error("Failed to fetch series list:", e);
+    }
+  },
+
   setCharacterSearch: (query: string) => {
-    set({ characterSearch: query, characterPage: 0, characters: [], characterHasMore: true });
+    set({ characterSearch: query, characterPage: 0, characters: [], selectedSeries: null, characterHasMore: true });
     get().loadMoreCharacters();
   },
 
@@ -104,6 +132,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     try {
       const results: Character[] = await invoke('search_characters', {
         search: state.characterSearch || null,
+        series: state.selectedSeries,
         limit: PAGE_SIZE,
         offset: state.characterPage * PAGE_SIZE,
         favorite: state.characterShowFavorites ? true : null

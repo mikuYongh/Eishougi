@@ -133,8 +133,20 @@ export function ItemDetailModal({ item, onClose, onToggleFavorite, isArtist }: I
               </div>
             </div>
 
+            {characterItem && (characterItem.seriesZh || characterItem.series) && (
+              <div className="bg-[var(--bg-layer-2)] border border-[var(--glass-border)] rounded-xl p-4 transition-all hover:border-[var(--glass-border-hover)]">
+                <div className="text-[var(--text-secondary)] text-sm mb-1 font-medium">所属作品 (Series)</div>
+                <div className="text-[var(--text-primary)] font-medium">
+                  {characterItem.seriesZh || characterItem.series}
+                  {characterItem.seriesZh && characterItem.series && characterItem.series !== characterItem.seriesZh && (
+                    <span className="text-[var(--text-secondary)] text-sm ml-2">({characterItem.series.replace(/_/g, " ")})</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {characterItem && characterItem.copyright && (
-              <div className="bg-[var(--bg-layer-2)] border border-[var(--glass-border)] rounded-xl p-4">
+              <div className="bg-[var(--bg-layer-2)] border border-[var(--glass-border)] rounded-xl p-4 transition-all hover:border-[var(--glass-border-hover)]">
                 <div className="text-[var(--text-secondary)] text-sm mb-1 font-medium">版权/来源 (Copyright/Source)</div>
                 <div className="text-[var(--text-primary)] font-medium">
                   {characterItem.copyright.replace(/_/g, " ")}
