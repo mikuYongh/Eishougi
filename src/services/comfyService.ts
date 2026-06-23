@@ -143,18 +143,9 @@ export class ComfyService {
   async interrupt() {
     try {
       const comfyUrl = getComfyUrl();
-      const response = await fetch(`${comfyUrl}/interrupt`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to interrupt: ${response.status} ${response.statusText}`);
-      }
-      return true;
+      return await invoke<boolean>('interrupt_comfy', { url: comfyUrl || null });
     } catch (e: any) {
-      console.error(`Failed to interrupt ComfyUI execution: ${e.message}`);
+      console.error(`Failed to interrupt ComfyUI execution: ${e.message || e}`);
       return false;
     }
   }

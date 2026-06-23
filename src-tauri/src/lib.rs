@@ -285,6 +285,8 @@ pub fn run() {
             commands::auto_deploy::stop_comfyui,
             commands::auto_deploy::install_custom_node,
             commands::auto_deploy::check_comfyui_status,
+            commands::auto_deploy::fetch_comfy_models,
+            commands::auto_deploy::interrupt_comfy,
             commands::auto_deploy::download_model_file,
             commands::auto_deploy::check_file_exists,
             commands::logging::write_log,

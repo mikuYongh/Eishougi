@@ -398,6 +398,65 @@ pub async fn check_comfyui_status(url: Option<String>) -> Result<serde_json::Val
     }
 }
 
+// ========== fetch_comfy_models ==========
+#[tauri::command]
+pub async fn fetch_comfy_models(url: Option<String>) -> Result<serde_json::Value, String> {
+    let base = url.unwrap_or_else(|| "http://127.0.0.1:8188".to_string())
+        .trim_end_matches('/').to_string();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build().map_err(|e| format!("{}", e))?;
+
+    let nodes = ["UNETLoader","CheckpointLoaderSimple","CheckpointLoader","LoraLoader","Power Lora Loader (rgthree)"];
+    let mut checkpoints = Vec::new();
+    let mut loras = Vec::new();
+
+    for node in &nodes {
+        let u = format!("{}/object_info/{}", base, node.replace(" ", "%20").replace("(", "%28").replace(")", "%29"));
+        match client.get(&u).send().await {
+            Ok(r) if r.status().is_success() => {
+                if let Ok(j) = r.json::<serde_json::Value>().await {
+                    if let Some(nd) = j.get(node) {
+                        let inputs = nd["input"]["required"].as_object()
+                            .or_else(|| nd["input"]["optional"].as_object());
+                        if let Some(inputs) = inputs {
+                            for (k, v) in inputs {
+                                let kl = k.to_lowercase();
+                                if let Some(arr) = v.as_array().and_then(|a| a.first()?.as_array()) {
+                                    let strs: Vec<String> = arr.iter().filter_map(|x| x.as_str().map(String::from)).collect();
+                                    if kl.contains("lora") || kl.contains("lora_name") || node.to_lowercase().contains("lora") {
+                                        loras.extend(strs);
+                                    } else if kl.contains("unet") || kl.contains("ckpt") || kl.contains("model") {
+                                        checkpoints.extend(strs);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(r) => { log::warn!("[fetch_models] {} HTTP {}", node, r.status()); }
+            Err(e) => { log::error!("[fetch_models] {} failed: {}", node, e); return Err(format!("无法连接 ComfyUI: {}", e)); }
+        }
+    }
+    checkpoints.sort(); checkpoints.dedup();
+    loras.sort(); loras.dedup();
+    Ok(serde_json::json!({ "checkpoints": checkpoints, "loras": loras }))
+}
+
+// ========== interrupt_comfy ==========
+#[tauri::command]
+pub async fn interrupt_comfy(url: Option<String>) -> Result<bool, String> {
+    let base = url.unwrap_or_else(|| "http://127.0.0.1:8188".to_string())
+        .trim_end_matches('/').to_string();
+    let client = reqwest::Client::new();
+    match client.post(format!("{}/interrupt", base)).send().await {
+        Ok(r) if r.status().is_success() => Ok(true),
+        Ok(r) => Err(format!("HTTP {}", r.status())),
+        Err(e) => Err(format!("请求失败: {}", e)),
+    }
+}
+
 // ========== 6. download_model_file (streaming with progress) ==========
 #[tauri::command]
 pub async fn download_model_file(
