@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { useSettingsStore, type McpServerConfig } from "../stores/settingsStore";
 import { useQueueStore } from "../stores/queueStore";
+import { useModelStore } from "../stores/modelStore";
+import { appLog } from "../utils/appLog";
 import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database, Wand2 } from "lucide-react";
 import { useAppVersion } from "../hooks/useAppVersion";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { GlassDropdown } from "../components/ui/GlassDropdown";
+import { toast } from "sonner";
 
 const SETTINGS_TABS = [
   { id: "appearance", label: "外观设置", icon: <Palette size={18} /> },
@@ -33,6 +36,26 @@ export function Settings() {
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [ollamaModels, setOllamaModels] = useState<{label: string, value: string}[]>([]);
+  const [isTestingComfy, setIsTestingComfy] = useState(false);
+
+  const handleTestComfy = async (url: string) => {
+    setIsTestingComfy(true);
+    try {
+      const result = await invoke<any>('check_comfyui_status', { url: url || null });
+      if (result && result.online === true) {
+        toast.success('连接成功！ComfyUI 服务运行正常', { icon: '✨' });
+      } else {
+        const errDetail = result?.error || '未知原因';
+        toast.error('连接失败：' + errDetail, { duration: 8000 });
+        appLog.warn('ComfySettings', `test connection to ${url} failed: ${errDetail}`);
+      }
+    } catch (error: any) {
+      toast.error('连接异常: ' + error);
+      appLog.error('ComfySettings', `test connection to ${url} exception: ${error}`);
+    } finally {
+      setIsTestingComfy(false);
+    }
+  };
 
   useEffect(() => {
     if (settings.llm.provider === 'ollama') {
@@ -485,18 +508,30 @@ export function Settings() {
                 <div className="max-w-2xl space-y-4">
                   <div>
                     <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">ComfyUI 服务器地址 (图生图/文生图)</label>
-                    <input
-                      type="text"
-                      value={settings.comfyUrl}
-                      onChange={(e) => updateSettings({ comfyUrl: e.target.value })}
-                      onBlur={() => {
-                        const qs = useQueueStore.getState();
-                        qs.disconnect();
-                        qs.connect();
-                      }}
-                      className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono mb-4"
-                      placeholder="http://192.168.1.100:8188"
-                    />
+                    <div className="flex items-center gap-2 mb-4">
+                      <input
+                        type="text"
+                        value={settings.comfyUrl}
+                        onChange={(e) => updateSettings({ comfyUrl: e.target.value })}
+                        onBlur={() => {
+                          console.info(`[ComfySettings] comfyUrl changed to "${settings.comfyUrl}", reconnecting WS...`);
+                          const qs = useQueueStore.getState();
+                          qs.disconnect();
+                          qs.connect();
+                          // 同时刷新模型列表（用户改了 URL 后旧模型列表已失效）
+                          useModelStore.getState().fetchModels(true);
+                        }}
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                        placeholder="http://192.168.1.100:8188"
+                      />
+                      <button
+                        onClick={() => handleTestComfy(settings.comfyUrl)}
+                        disabled={isTestingComfy}
+                        className="flex-shrink-0 px-4 py-3 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-xl text-[13px] font-bold text-[var(--text-primary)] transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        {isTestingComfy ? '测试中...' : '测试连接'}
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">ComfyUI 安装路径 (用于一键部署/安装节点时定位)</label>
@@ -511,13 +546,22 @@ export function Settings() {
                   </div>
                   <div>
                     <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">图生视频 服务器地址 (Video ComfyUI URL)</label>
-                    <input
-                      type="text"
-                      value={settings.videoComfyUrl || ''}
-                      onChange={(e) => updateSettings({ videoComfyUrl: e.target.value })}
-                      className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
-                      placeholder="http://127.0.0.1:8188"
-                    />
+                    <div className="flex items-center gap-2 mb-4">
+                      <input
+                        type="text"
+                        value={settings.videoComfyUrl || ''}
+                        onChange={(e) => updateSettings({ videoComfyUrl: e.target.value })}
+                        className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
+                        placeholder="http://192.168.1.100:8189"
+                      />
+                      <button
+                        onClick={() => handleTestComfy(settings.videoComfyUrl || '')}
+                        disabled={isTestingComfy}
+                        className="flex-shrink-0 px-4 py-3 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-xl text-[13px] font-bold text-[var(--text-primary)] transition-colors disabled:opacity-50 cursor-pointer"
+                      >
+                        {isTestingComfy ? '测试中...' : '测试连接'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
