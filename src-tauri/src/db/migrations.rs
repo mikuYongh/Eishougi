@@ -14,6 +14,7 @@ pub fn run(conn: &Connection) -> Result<()> {
         (MIGRATION_V8, 8),
         (MIGRATION_V9, 9),
         (MIGRATION_V10, 10),
+        (MIGRATION_V11, 11),
     ];
 
     for (sql, ver) in migrations {
@@ -201,4 +202,26 @@ ALTER TABLE artists ADD COLUMN series_zh TEXT;
 
 const MIGRATION_V10: &str = r#"
 CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+"#;
+
+// V11: 默认工作流语义从「全局唯一」改为「每种 type 内唯一」。
+// 1) 同 type 内若有多个 is_default=1（历史 bug），按 updated_at 最新仲裁保留一条
+// 2) 建部分唯一索引，DB 层强制约束每种 type 至多一条默认
+const MIGRATION_V11: &str = r#"
+UPDATE workflows SET is_default = 0
+WHERE is_default = 1
+  AND id NOT IN (
+    SELECT w1.id FROM workflows AS w1
+    WHERE w1.is_default = 1
+      AND NOT EXISTS (
+        SELECT 1 FROM workflows AS w2
+        WHERE w2.is_default = 1
+          AND w2.type = w1.type
+          AND (w2.updated_at > w1.updated_at
+               OR (w2.updated_at = w1.updated_at AND w2.id > w1.id))
+      )
+  );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workflows_default_per_type
+ON workflows(type) WHERE is_default = 1;
 "#;

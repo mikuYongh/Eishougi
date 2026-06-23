@@ -49,6 +49,63 @@ pub fn sync_library_data(conn: &Connection) {
     );
 
     log::info!("Library data synced to v{}", LIBRARY_DATA_VERSION);
+
+    // 在同一线程/连接里顺势种入默认工作流（仅首次安装或该 type 还无默认时）
+    seed_default_workflows(conn);
+}
+
+/// 为 text2img 和 img2video 各种入一条内置默认工作流。
+/// 仅当该 type 当前没有任何 is_default=1 的工作流时才种入 ——
+/// 这样既能让新装用户开箱即用，也避免覆盖老用户的自定义默认。
+fn seed_default_workflows(conn: &Connection) {
+    let now = now_millis();
+
+    let has_t2i: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM workflows WHERE type='text2img' AND is_default=1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if has_t2i == 0 {
+        let json = include_str!("../../resources/default_workflows/text2img.json");
+        let inserted = conn.execute(
+            "INSERT OR IGNORE INTO workflows (id, name, description, json_content, type, is_default, is_builtin, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 'text2img', 1, 1, ?5, ?5)",
+            rusqlite::params!["seed_text2img_default", "默认文生图工作流", "SDXL 文本生图基础工作流", json, now],
+        );
+        match inserted {
+            Ok(_) => log::info!("Seeded default text2img workflow"),
+            Err(e) => log::error!("Failed to seed text2img workflow: {}", e),
+        }
+    }
+
+    let has_i2v: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM workflows WHERE type='img2video' AND is_default=1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or(0);
+    if has_i2v == 0 {
+        let json = include_str!("../../resources/default_workflows/img2video.json");
+        let inserted = conn.execute(
+            "INSERT OR IGNORE INTO workflows (id, name, description, json_content, type, is_default, is_builtin, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, 'img2video', 1, 1, ?5, ?5)",
+            rusqlite::params!["seed_img2video_default", "默认图生视频工作流", "LTX 2.3 图生视频工作流", json, now],
+        );
+        match inserted {
+            Ok(_) => log::info!("Seeded default img2video workflow"),
+            Err(e) => log::error!("Failed to seed img2video workflow: {}", e),
+        }
+    }
+}
+
+fn now_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 /// Replace all character rows with fresh data, preserving is_favorite.

@@ -1,0 +1,780 @@
+{
+  "75": {
+    "inputs": {
+      "filename_prefix": "LTX_2.3_i2v",
+      "format": "auto",
+      "codec": "auto",
+      "video": [
+        "320:310",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "保存视频"
+    }
+  },
+  "269": {
+    "inputs": {
+      "image": "微信图片_20260516212029_2_11.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "加载图像"
+    }
+  },
+  "324": {
+    "inputs": {
+      "image": [
+        "269",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "获取图像尺寸"
+    }
+  },
+  "326": {
+    "inputs": {
+      "model_name": "astron-code-latest",
+      "base_url": "https://maas-coding-api.cn-huabei-1.xf-yun.com/v2",
+      "api_key": "aa3857bab06e6540b69ad3897b02c2e1:YWFjNGUyM2VlOWVjM2E0NDU4YjE1ODIx",
+      "is_ollama": false
+    },
+    "class_type": "LLM_api_loader",
+    "_meta": {
+      "title": "API LLM Loader"
+    }
+  },
+  "329": {
+    "inputs": {},
+    "class_type": "About_us",
+    "_meta": {
+      "title": "About Us"
+    }
+  },
+  "331": {
+    "inputs": {
+      "system_prompt": "你是一个图生视频生成大师，我需要你准确的将用户的语句翻译成用于生成视频的描述并进行润色成英文，你只需要返回生成后的语句，除此之外都不要返回",
+      "user_prompt": [
+        "334",
+        0
+      ],
+      "temperature": 0.1,
+      "is_memory": "disable",
+      "is_tools_in_sys_prompt": "disable",
+      "is_locked": "disable",
+      "main_brain": "disable",
+      "max_length": 1920,
+      "imgbb_api_key": "",
+      "conversation_rounds": 100,
+      "historical_record": "",
+      "is_enable": true,
+      "model": [
+        "326",
+        0
+      ]
+    },
+    "class_type": "LLM",
+    "_meta": {
+      "title": "API LLM general link"
+    }
+  },
+  "334": {
+    "inputs": {
+      "string": "用二次元游戏动画CG的方式，人物全程不说话，不要有背景音乐。镜头要有比较小变动，仿佛人在拍摄 场景:女孩慢慢的将脚向前踩下去"
+    },
+    "class_type": "Simple String",
+    "_meta": {
+      "title": "Simple String"
+    }
+  },
+  "335": {
+    "inputs": {
+      "value": "你是一个文生视频生成大师，我需要你准确的将用户的语句翻译成英文并进行润色，你只需要返回生成后的语句，除此之外都不要返回"
+    },
+    "class_type": "PrimitiveString",
+    "_meta": {
+      "title": "字符串"
+    }
+  },
+  "336": {
+    "inputs": {
+      "prefix": "Value:",
+      "value": [
+        "331",
+        0
+      ]
+    },
+    "class_type": "ConsoleDebug+",
+    "_meta": {
+      "title": "🔧 Console Debug"
+    }
+  },
+  "320:276": {
+    "inputs": {
+      "noise_seed": 42
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "随机噪波"
+    }
+  },
+  "320:277": {
+    "inputs": {
+      "noise_seed": 760070908223730
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "随机噪波"
+    }
+  },
+  "320:278": {
+    "inputs": {
+      "video_latent": [
+        "320:288",
+        0
+      ],
+      "audio_latent": [
+        "320:307",
+        1
+      ]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": {
+      "title": "LTXVConcatAVLatent"
+    }
+  },
+  "320:279": {
+    "inputs": {
+      "ckpt_name": "10Eros_v1-fp8mixed_learned.safetensors"
+    },
+    "class_type": "LTXVAudioVAELoader",
+    "_meta": {
+      "title": "LTXV音频VAE加载器"
+    }
+  },
+  "320:280": {
+    "inputs": {
+      "sampler_name": "euler_cfg_pp"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "K采样器选择"
+    }
+  },
+  "320:281": {
+    "inputs": {
+      "sigmas": "0.85, 0.7250, 0.4219, 0.0"
+    },
+    "class_type": "ManualSigmas",
+    "_meta": {
+      "title": "自定义Sigmas"
+    }
+  },
+  "320:282": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "320:285",
+        0
+      ],
+      "positive": [
+        "320:284",
+        0
+      ],
+      "negative": [
+        "320:284",
+        1
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFG引导器"
+    }
+  },
+  "320:283": {
+    "inputs": {
+      "noise": [
+        "320:277",
+        0
+      ],
+      "guider": [
+        "320:314",
+        0
+      ],
+      "sampler": [
+        "320:291",
+        0
+      ],
+      "sigmas": [
+        "320:306",
+        0
+      ],
+      "latent_image": [
+        "320:318",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "自定义采样器（高级）"
+    }
+  },
+  "320:284": {
+    "inputs": {
+      "positive": [
+        "320:304",
+        0
+      ],
+      "negative": [
+        "320:304",
+        1
+      ],
+      "latent": [
+        "320:307",
+        0
+      ]
+    },
+    "class_type": "LTXVCropGuides",
+    "_meta": {
+      "title": "LTXV裁剪指导"
+    }
+  },
+  "320:285": {
+    "inputs": {
+      "lora_name": "ltx-2.3-22b-distilled-lora-384.safetensors",
+      "strength_model": 0.5,
+      "model": [
+        "320:316",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoRA加载器（仅模型）"
+    }
+  },
+  "320:286": {
+    "inputs": {
+      "longer_edge": 1536,
+      "images": [
+        "320:290",
+        0
+      ]
+    },
+    "class_type": "ResizeImagesByLongerEdge",
+    "_meta": {
+      "title": "缩放图像（长边）"
+    }
+  },
+  "320:287": {
+    "inputs": {
+      "samples": [
+        "320:307",
+        0
+      ],
+      "upscale_model": [
+        "320:311",
+        0
+      ],
+      "vae": [
+        "320:316",
+        2
+      ]
+    },
+    "class_type": "LTXVLatentUpsampler",
+    "_meta": {
+      "title": "LTXV潜空间上采样器"
+    }
+  },
+  "320:288": {
+    "inputs": {
+      "strength": 1,
+      "bypass": [
+        "320:302",
+        0
+      ],
+      "vae": [
+        "320:316",
+        2
+      ],
+      "image": [
+        "320:289",
+        0
+      ],
+      "latent": [
+        "320:287",
+        0
+      ]
+    },
+    "class_type": "LTXVImgToVideoInplace",
+    "_meta": {
+      "title": "LTXV图像转视频（原地）"
+    }
+  },
+  "320:289": {
+    "inputs": {
+      "img_compression": 18,
+      "image": [
+        "320:286",
+        0
+      ]
+    },
+    "class_type": "LTXVPreprocess",
+    "_meta": {
+      "title": "LTXV预处理"
+    }
+  },
+  "320:290": {
+    "inputs": {
+      "resize_type": "scale dimensions",
+      "resize_type.width": [
+        "320:312",
+        0
+      ],
+      "resize_type.height": [
+        "320:299",
+        0
+      ],
+      "resize_type.crop": "center",
+      "scale_method": "lanczos",
+      "input": [
+        "269",
+        0
+      ]
+    },
+    "class_type": "ResizeImageMaskNode",
+    "_meta": {
+      "title": "调整图像/掩码大小"
+    }
+  },
+  "320:291": {
+    "inputs": {
+      "sampler_name": "euler_ancestral_cfg_pp"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "K采样器选择"
+    }
+  },
+  "320:292": {
+    "inputs": {
+      "expression": "a/2",
+      "values.a": [
+        "320:312",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "数学表达式"
+    }
+  },
+  "320:294": {
+    "inputs": {
+      "expression": "a/2",
+      "values.a": [
+        "320:299",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "数学表达式"
+    }
+  },
+  "320:295": {
+    "inputs": {
+      "width": [
+        "320:292",
+        1
+      ],
+      "height": [
+        "320:294",
+        1
+      ],
+      "length": [
+        "320:323",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLTXVLatentVideo",
+    "_meta": {
+      "title": "空Latent视频（LTXV）"
+    }
+  },
+  "320:296": {
+    "inputs": {
+      "strength": 0.7,
+      "bypass": [
+        "320:302",
+        0
+      ],
+      "vae": [
+        "320:316",
+        2
+      ],
+      "image": [
+        "320:289",
+        0
+      ],
+      "latent": [
+        "320:295",
+        0
+      ]
+    },
+    "class_type": "LTXVImgToVideoInplace",
+    "_meta": {
+      "title": "LTXV图像转视频（原地）"
+    }
+  },
+  "320:297": {
+    "inputs": {
+      "samples": [
+        "320:309",
+        1
+      ],
+      "audio_vae": [
+        "320:279",
+        0
+      ]
+    },
+    "class_type": "LTXVAudioVAEDecode",
+    "_meta": {
+      "title": "LTXV音频VAE解码"
+    }
+  },
+  "320:298": {
+    "inputs": {
+      "expression": "a",
+      "values.a": [
+        "320:300",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "数学表达式"
+    }
+  },
+  "320:299": {
+    "inputs": {
+      "value": [
+        "324",
+        1
+      ]
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Height"
+    }
+  },
+  "320:300": {
+    "inputs": {
+      "value": 25
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Frame Rate"
+    }
+  },
+  "320:301": {
+    "inputs": {
+      "value": 5
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Duration"
+    }
+  },
+  "320:302": {
+    "inputs": {
+      "value": false
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "Switch to Text to Video?"
+    }
+  },
+  "320:303": {
+    "inputs": {
+      "text": [
+        "320:319",
+        0
+      ],
+      "clip": [
+        "320:317",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "320:304": {
+    "inputs": {
+      "frame_rate": [
+        "320:298",
+        0
+      ],
+      "positive": [
+        "320:303",
+        0
+      ],
+      "negative": [
+        "320:313",
+        0
+      ]
+    },
+    "class_type": "LTXVConditioning",
+    "_meta": {
+      "title": "LTXV条件"
+    }
+  },
+  "320:305": {
+    "inputs": {
+      "frames_number": [
+        "320:323",
+        1
+      ],
+      "frame_rate": [
+        "320:298",
+        1
+      ],
+      "batch_size": 1,
+      "audio_vae": [
+        "320:279",
+        0
+      ]
+    },
+    "class_type": "LTXVEmptyLatentAudio",
+    "_meta": {
+      "title": "LTXV 空音频潜空间"
+    }
+  },
+  "320:306": {
+    "inputs": {
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    },
+    "class_type": "ManualSigmas",
+    "_meta": {
+      "title": "自定义Sigmas"
+    }
+  },
+  "320:307": {
+    "inputs": {
+      "av_latent": [
+        "320:283",
+        0
+      ]
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": {
+      "title": "LTXV分离音视频潜空间"
+    }
+  },
+  "320:308": {
+    "inputs": {
+      "noise": [
+        "320:276",
+        0
+      ],
+      "guider": [
+        "320:282",
+        0
+      ],
+      "sampler": [
+        "320:280",
+        0
+      ],
+      "sigmas": [
+        "320:281",
+        0
+      ],
+      "latent_image": [
+        "320:278",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "自定义采样器（高级）"
+    }
+  },
+  "320:309": {
+    "inputs": {
+      "av_latent": [
+        "320:308",
+        0
+      ]
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": {
+      "title": "LTXV分离音视频潜空间"
+    }
+  },
+  "320:310": {
+    "inputs": {
+      "fps": [
+        "320:298",
+        0
+      ],
+      "images": [
+        "320:315",
+        0
+      ],
+      "audio": [
+        "320:297",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "创建视频"
+    }
+  },
+  "320:311": {
+    "inputs": {
+      "model_name": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+    },
+    "class_type": "LatentUpscaleModelLoader",
+    "_meta": {
+      "title": "加载Latent放大模型"
+    }
+  },
+  "320:312": {
+    "inputs": {
+      "value": [
+        "324",
+        0
+      ]
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Width"
+    }
+  },
+  "320:313": {
+    "inputs": {
+      "text": "pc game, console game, video game, cartoon, childish, ugly",
+      "clip": [
+        "320:317",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "320:314": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "320:285",
+        0
+      ],
+      "positive": [
+        "320:304",
+        0
+      ],
+      "negative": [
+        "320:304",
+        1
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFG引导器"
+    }
+  },
+  "320:315": {
+    "inputs": {
+      "tile_size": 768,
+      "overlap": 64,
+      "temporal_size": 4096,
+      "temporal_overlap": 4,
+      "samples": [
+        "320:309",
+        0
+      ],
+      "vae": [
+        "320:316",
+        2
+      ]
+    },
+    "class_type": "VAEDecodeTiled",
+    "_meta": {
+      "title": "VAE解码（分块）"
+    }
+  },
+  "320:316": {
+    "inputs": {
+      "ckpt_name": "10Eros_v1-fp8mixed_learned.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Checkpoint加载器（简易）"
+    }
+  },
+  "320:317": {
+    "inputs": {
+      "text_encoder": "gemma_3_12B_it_fpmixed.safetensors",
+      "ckpt_name": "10Eros_v1-fp8mixed_learned.safetensors",
+      "device": "default"
+    },
+    "class_type": "LTXAVTextEncoderLoader",
+    "_meta": {
+      "title": "LTXV音频文本编码器加载器"
+    }
+  },
+  "320:318": {
+    "inputs": {
+      "video_latent": [
+        "320:296",
+        0
+      ],
+      "audio_latent": [
+        "320:305",
+        0
+      ]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": {
+      "title": "LTXVConcatAVLatent"
+    }
+  },
+  "320:319": {
+    "inputs": {
+      "value": [
+        "331",
+        0
+      ]
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt"
+    }
+  },
+  "320:323": {
+    "inputs": {
+      "expression": "a * b + 1",
+      "values.a": [
+        "320:301",
+        0
+      ],
+      "values.b": [
+        "320:300",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "Math Expression (length)"
+    }
+  }
+}

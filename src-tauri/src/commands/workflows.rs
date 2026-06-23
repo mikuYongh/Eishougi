@@ -19,6 +19,9 @@ pub async fn create_workflow(
     let db = state.db.lock().await;
     workflow.created_at = now();
     workflow.updated_at = workflow.created_at;
+    // is_default 由 set_default_workflow 显式管理，禁止客户端在 create 时直写。
+    // DB 有部分唯一索引 idx_workflows_default_per_type 强制约束。
+    workflow.is_default = false;
 
     db.conn.execute(
         "INSERT INTO workflows (id, name, description, json_content, type, is_default, is_builtin, created_at, updated_at)
@@ -71,12 +74,14 @@ pub async fn update_workflow(
     let db = state.db.lock().await;
     workflow.updated_at = now();
 
+    // 不允许通过 update 改 is_default：避免绕过 set_default_workflow 造成多默认。
+    // type 字段也保持不变（改 type 应走新建+删旧，避免默认索引错位）。
     db.conn.execute(
-        "UPDATE workflows SET name = ?1, description = ?2, json_content = ?3, type = ?4, is_default = ?5, updated_at = ?6
-         WHERE id = ?7 AND is_builtin = 0",
+        "UPDATE workflows SET name = ?1, description = ?2, json_content = ?3, updated_at = ?4
+         WHERE id = ?5 AND is_builtin = 0",
         params![
-            workflow.name, workflow.description, workflow.json_content, workflow.workflow_type,
-            workflow.is_default, workflow.updated_at, workflow.id
+            workflow.name, workflow.description, workflow.json_content,
+            workflow.updated_at, workflow.id
         ]
     ).map_err(|e| e.to_string())?;
 
@@ -129,17 +134,32 @@ pub async fn list_workflows(state: State<'_, AppState>) -> Result<Vec<Workflow>,
 
 #[tauri::command]
 pub async fn set_default_workflow(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let db = state.db.lock().await;
+    let mut db = state.db.lock().await;
 
-    db.conn
-        .execute("UPDATE workflows SET is_default = 0", [])
-        .map_err(|e| e.to_string())?;
-    db.conn
-        .execute(
-            "UPDATE workflows SET is_default = 1 WHERE id = ?1",
+    // 读目标的 type；不存在则报错
+    let wf_type: String = db
+        .conn
+        .query_row(
+            "SELECT type FROM workflows WHERE id = ?1",
             params![id],
+            |row| row.get(0),
         )
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("workflow not found: {e}"))?;
+
+    // 事务内：清零同 type 的所有默认 → 置一目标
+    // 部分唯一索引 idx_workflows_default_per_type 保证不会出现多默认
+    let tx = db.conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute(
+        "UPDATE workflows SET is_default = 0 WHERE type = ?1",
+        params![wf_type],
+    )
+    .map_err(|e| e.to_string())?;
+    tx.execute(
+        "UPDATE workflows SET is_default = 1 WHERE id = ?1",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
 
     Ok(())
 }
