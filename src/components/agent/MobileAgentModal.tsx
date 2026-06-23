@@ -365,10 +365,12 @@ export function MobileAgentModal() {
                         </div>
                       )}
 
-                      <div className="prose prose-invert prose-sm max-w-none break-words">
+                      <div className="break-words leading-relaxed w-full">
                         {msg.content ? (
                           <>
-                            <MarkdownContent content={msg.content} />
+                            <div className="prose prose-invert prose-sm max-w-none">
+                              <MarkdownContent content={msg.content} />
+                            </div>
                             {msg.tool_calls && msg.tool_calls.length > 0 && (
                               <div className="mt-3 pt-3 border-t border-[var(--glass-border)] flex flex-col gap-2">
                                 {msg.tool_calls.map((tc, idx) => (
@@ -401,7 +403,7 @@ export function MobileAgentModal() {
                           </div>
                         ) : (
                           // assistant 流式尚未吐第一个字时的占位反馈（与桌面端 AgentPanel renderMessageContent 对齐）
-                          <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)] font-mono">
+                          <div className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)] font-mono">
                             <Loader2 size={14} className="animate-spin text-[var(--accent-1)]" />
                             <span className="tracking-widest uppercase animate-pulse">思考中...</span>
                           </div>
