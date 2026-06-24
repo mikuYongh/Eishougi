@@ -963,25 +963,7 @@ User input: ${userText}`;
             try {
               const fnName = call.function.name;
               if (fnName === 'create_prompt') {
-                // Resolve base model: validate against local checkpoints, fallback gracefully.
-                // We don't throw on invalid base_model (unlike update_prompt_settings) because
-                // failing the whole create is worse than a fallback. Just use first checkpoint.
-                const localCheckpoints = useModelStore.getState().checkpoints || [];
-                let resolvedBaseModel: string;
-                if (parsedArgs.base_model && localCheckpoints.length > 0 && localCheckpoints.includes(parsedArgs.base_model)) {
-                  resolvedBaseModel = parsedArgs.base_model;
-                } else if (parsedArgs.base_model && localCheckpoints.length === 0) {
-                  // User has no checkpoints loaded; trust agent's input (maybe models will load later)
-                  resolvedBaseModel = parsedArgs.base_model;
-                } else if (localCheckpoints.length > 0) {
-                  // Invalid base_model or none provided: fallback to first local checkpoint
-                  resolvedBaseModel = localCheckpoints[0];
-                } else {
-                  // No checkpoints, no agent input: empty string (better than hardcoded fake filename)
-                  resolvedBaseModel = "";
-                }
-
-                // Resolve workflow: explicit > text2img default > null
+                // Resolve workflow first so we can pull base_model / loras from its JSON.
                 // (create_prompt 服务的后续是 generate_image —— 都是文本生图场景)
                 const workflows = useWorkflowStore.getState().workflows;
                 const defaultWf = workflows.find(w => w.type === 'text2img' && w.isDefault);
@@ -990,26 +972,52 @@ User input: ${userText}`;
                   || (defaultWf ? defaultWf.id : null)
                   || null;
 
-                // LoRA 总是从绑定的 workflow JSON 解析，忽略 agent 传的 lora_configs。
-                // 原因：agent 不可能知道用户本地装了什么 LoRA，agent 编出来的 lora_configs 是错的，
-                // 保存到数据库后会污染 Generate 页面（Generate 的逻辑是项目有 loraConfigs 就用项目的）。
-                // workflow 是 LoRA 的真实来源（rgthree Power Lora Loader / LoraLoader 节点）。
-                let resolvedLoraConfigs: string | null = null;
+                // 从绑定的 workflow JSON 解析 base_model + loras（跟 PromptEdit 新建模式对齐）。
+                // workflow 是模型配置的真实来源——agent 不知道用户本地装了什么 checkpoint，
+                // 但默认工作流的 UNETLoader / CheckpointLoader 节点写明了用什么模型。
+                let workflowParsedBaseModel: string | null = null;
                 let workflowParsedLoras: any[] = [];
                 if (resolvedWorkflowId) {
                   const wf = workflows.find(w => w.id === resolvedWorkflowId);
                   if (wf && wf.jsonContent) {
                     try {
                       const analysis = comfyService.analyzeWorkflow(wf.jsonContent);
+                      workflowParsedBaseModel = analysis.baseModel || null;
                       workflowParsedLoras = analysis.loras || [];
-                      resolvedLoraConfigs = workflowParsedLoras.length > 0
-                        ? JSON.stringify(workflowParsedLoras)
-                        : null;
                     } catch (e) {
-                      console.warn("[Agent] create_prompt: failed to parse loras from workflow:", e);
+                      console.warn("[Agent] create_prompt: failed to parse workflow JSON:", e);
                     }
                   }
                 }
+
+                // Resolve base model 优先级：
+                // 1. agent 显式传且在本地 checkpoints 列表里
+                // 2. workflow JSON 解析出的 baseModel（即使不在本地列表也信——可能还没加载）
+                // 3. 本地第一个 checkpoint
+                // 4. 空串
+                const localCheckpoints = useModelStore.getState().checkpoints || [];
+                let resolvedBaseModel: string;
+                if (parsedArgs.base_model && localCheckpoints.length > 0 && localCheckpoints.includes(parsedArgs.base_model)) {
+                  resolvedBaseModel = parsedArgs.base_model;
+                } else if (parsedArgs.base_model && localCheckpoints.length === 0) {
+                  // User has no checkpoints loaded; trust agent's input (maybe models will load later)
+                  resolvedBaseModel = parsedArgs.base_model;
+                } else if (workflowParsedBaseModel) {
+                  // agent 没给有效值，回落到 workflow 的 baseModel
+                  resolvedBaseModel = workflowParsedBaseModel;
+                } else if (localCheckpoints.length > 0) {
+                  resolvedBaseModel = localCheckpoints[0];
+                } else {
+                  resolvedBaseModel = "";
+                }
+
+                // LoRA 总是从绑定的 workflow JSON 解析，忽略 agent 传的 lora_configs。
+                // 原因：agent 不可能知道用户本地装了什么 LoRA，agent 编出来的 lora_configs 是错的，
+                // 保存到数据库后会污染 Generate 页面（Generate 的逻辑是项目有 loraConfigs 就用项目的）。
+                // workflow 是 LoRA 的真实来源（rgthree Power Lora Loader / LoraLoader 节点）。
+                const resolvedLoraConfigs: string | null = workflowParsedLoras.length > 0
+                  ? JSON.stringify(workflowParsedLoras)
+                  : null;
 
                 console.log("[Agent] create_prompt resolution:", {
                   title: parsedArgs.title,
