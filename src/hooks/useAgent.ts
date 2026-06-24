@@ -5,6 +5,7 @@ import { useAgentStore } from '../stores/agentStore';
 import { invoke, Channel } from '@tauri-apps/api/core';
 import { useQueueStore } from '../stores/queueStore';
 import { useWorkflowStore } from '../stores/workflowStore';
+import { useFavoriteLibraryStore } from '../stores/favoriteLibraryStore';
 import { useModelStore } from '../stores/modelStore';
 import { comfyService } from '../services/comfyService';
 import { buildOutputSpec, type PromptSyntax } from '../lib/agentPrompts';
@@ -1822,6 +1823,7 @@ User input: ${userText}`;
                 res = { status: removed ? "success" : "not_found" };
               } else if (fnName === 'relink_favorite_character') {
                 res = await invoke<any>('relink_favorite_character', { id: parsedArgs.id });
+                  useFavoriteLibraryStore.getState().refreshFavorites();
               } else if (fnName === 'add_tags_to_favorite_character') {
                 const added = await invoke<number>('add_tags_to_favorite_character', {
                   characterId: parsedArgs.character_id,
