@@ -840,6 +840,26 @@ User input: ${userText}`;
           payload.options = { num_ctx: 32768 };
         }
         bodyJson = JSON.stringify(payload);
+
+        // payload 诊断日志：记录 size / 消息数 / 图片 base64 数 / 工具数 / round。
+        // 用于排查 Agnes 500 / ERR_CONNECTION_CLOSED 是否由 payload 过大引起。
+        const imageCount = finalMessages.reduce((acc: number, m: any) => {
+          if (m.role === 'tool') return acc;
+          const imgs = m.role === 'assistant' && Array.isArray(m.content)
+            ? m.content.filter((c: any) => c?.type === 'image_url').length
+            : 0;
+          return acc + imgs;
+        }, 0);
+        console.log("[Agent] outgoing payload:", {
+          bytes: bodyJson.length,
+          kb: Math.round(bodyJson.length / 1024),
+          round: currentRound,
+          messages: finalMessages.length,
+          imageAttachments: imageCount,
+          tools: payload.tools?.length || 0,
+          model: payload.model,
+          maxTokens: payload.max_tokens,
+        });
       } catch (e) {
         console.error("[Agent] JSON.stringify failed:", e);
         throw e;
@@ -972,10 +992,17 @@ User input: ${userText}`;
                   || (defaultWf ? defaultWf.id : null)
                   || null;
 
-                // 从绑定的 workflow JSON 解析 base_model + loras（跟 PromptEdit 新建模式对齐）。
-                // workflow 是模型配置的真实来源——agent 不知道用户本地装了什么 checkpoint，
-                // 但默认工作流的 UNETLoader / CheckpointLoader 节点写明了用什么模型。
+                // 从绑定的 workflow JSON 解析所有模型/采样参数（跟 PromptEdit 新建模式完全对齐）。
+                // workflow 是配置的真实来源——agent 不知道用户本地装了什么 checkpoint / LoRA，
+                // 也不知道 workflow 里 KSampler 节点用的 steps/cfg/sampler。agent 传的值只作无 workflow 时的回退。
                 let workflowParsedBaseModel: string | null = null;
+                let workflowParsedVaeModel: string | null = null;
+                let workflowParsedSampler: string | null = null;
+                let workflowParsedScheduler: string | null = null;
+                let workflowParsedWidth: number | null = null;
+                let workflowParsedHeight: number | null = null;
+                let workflowParsedSteps: number | null = null;
+                let workflowParsedCfg: number | null = null;
                 let workflowParsedLoras: any[] = [];
                 if (resolvedWorkflowId) {
                   const wf = workflows.find(w => w.id === resolvedWorkflowId);
@@ -983,6 +1010,13 @@ User input: ${userText}`;
                     try {
                       const analysis = comfyService.analyzeWorkflow(wf.jsonContent);
                       workflowParsedBaseModel = analysis.baseModel || null;
+                      workflowParsedVaeModel = analysis.vaeModel || null;
+                      workflowParsedSampler = analysis.samplerName || null;
+                      workflowParsedScheduler = analysis.scheduler || null;
+                      workflowParsedWidth = analysis.width || null;
+                      workflowParsedHeight = analysis.height || null;
+                      workflowParsedSteps = analysis.steps || null;
+                      workflowParsedCfg = analysis.cfgScale || null;
                       workflowParsedLoras = analysis.loras || [];
                     } catch (e) {
                       console.warn("[Agent] create_prompt: failed to parse workflow JSON:", e);
@@ -990,20 +1024,14 @@ User input: ${userText}`;
                   }
                 }
 
-                // Resolve base model 优先级：
-                // 1. agent 显式传且在本地 checkpoints 列表里
-                // 2. workflow JSON 解析出的 baseModel（即使不在本地列表也信——可能还没加载）
-                // 3. 本地第一个 checkpoint
-                // 4. 空串
+                // base_model 优先级（跟 PromptEdit 一致）：
+                // 1. workflow 解析出的 baseModel（即使不在本地列表也信——可能还没加载）
+                // 2. 本地第一个 checkpoint 兜底
+                // 3. 空串
+                // agent 传的 base_model 完全忽略——它只会抄 schema 示例里的 "sd_xl_base_1.0.safetensors"。
                 const localCheckpoints = useModelStore.getState().checkpoints || [];
                 let resolvedBaseModel: string;
-                if (parsedArgs.base_model && localCheckpoints.length > 0 && localCheckpoints.includes(parsedArgs.base_model)) {
-                  resolvedBaseModel = parsedArgs.base_model;
-                } else if (parsedArgs.base_model && localCheckpoints.length === 0) {
-                  // User has no checkpoints loaded; trust agent's input (maybe models will load later)
-                  resolvedBaseModel = parsedArgs.base_model;
-                } else if (workflowParsedBaseModel) {
-                  // agent 没给有效值，回落到 workflow 的 baseModel
+                if (workflowParsedBaseModel) {
                   resolvedBaseModel = workflowParsedBaseModel;
                 } else if (localCheckpoints.length > 0) {
                   resolvedBaseModel = localCheckpoints[0];
@@ -1011,10 +1039,18 @@ User input: ${userText}`;
                   resolvedBaseModel = "";
                 }
 
+                // 其他采样参数：workflow 优先，agent 传值仅作无 workflow 或 workflow 没解析出来时的回退。
+                const resolvedWidth = workflowParsedWidth ?? parsedArgs.width ?? 1024;
+                const resolvedHeight = workflowParsedHeight ?? parsedArgs.height ?? 1024;
+                const resolvedSteps = workflowParsedSteps ?? parsedArgs.steps ?? 25;
+                const resolvedCfg = workflowParsedCfg ?? parsedArgs.cfg_scale ?? 5.0;
+                const resolvedSampler = workflowParsedSampler ?? parsedArgs.sampler_name ?? "euler";
+                const resolvedScheduler = workflowParsedScheduler ?? parsedArgs.scheduler ?? "beta57";
+                const resolvedVae = workflowParsedVaeModel ?? parsedArgs.vae_model ?? "auto";
+
                 // LoRA 总是从绑定的 workflow JSON 解析，忽略 agent 传的 lora_configs。
                 // 原因：agent 不可能知道用户本地装了什么 LoRA，agent 编出来的 lora_configs 是错的，
                 // 保存到数据库后会污染 Generate 页面（Generate 的逻辑是项目有 loraConfigs 就用项目的）。
-                // workflow 是 LoRA 的真实来源（rgthree Power Lora Loader / LoraLoader 节点）。
                 const resolvedLoraConfigs: string | null = workflowParsedLoras.length > 0
                   ? JSON.stringify(workflowParsedLoras)
                   : null;
@@ -1030,6 +1066,20 @@ User input: ${userText}`;
                   workflowParsedLoras,
                   resolvedLoraConfigs,
                   localCheckpointsCount: localCheckpoints.length,
+                  workflowParsed: {
+                    baseModel: workflowParsedBaseModel,
+                    vae: workflowParsedVaeModel,
+                    sampler: workflowParsedSampler,
+                    scheduler: workflowParsedScheduler,
+                    width: workflowParsedWidth,
+                    height: workflowParsedHeight,
+                    steps: workflowParsedSteps,
+                    cfg: workflowParsedCfg,
+                  },
+                  resolved: {
+                    width: resolvedWidth, height: resolvedHeight, steps: resolvedSteps,
+                    cfg: resolvedCfg, sampler: resolvedSampler, scheduler: resolvedScheduler, vae: resolvedVae,
+                  },
                 });
 
                 const newPrompt = {
@@ -1040,15 +1090,15 @@ User input: ${userText}`;
                   negativePrompt: parsedArgs.negative_prompt || "",
                   artistPrompt: parsedArgs.artist_prompt || "",
                   promptSyntax: parsedArgs.prompt_syntax || "danbooru",
-                  width: parsedArgs.width || 1024,
-                  height: parsedArgs.height || 1024,
-                  steps: parsedArgs.steps || 25,
-                  cfgScale: parsedArgs.cfg_scale || 5.0,
+                  width: resolvedWidth,
+                  height: resolvedHeight,
+                  steps: resolvedSteps,
+                  cfgScale: resolvedCfg,
                   seed: parsedArgs.seed || "-1",
-                  samplerName: parsedArgs.sampler_name || "euler",
-                  scheduler: parsedArgs.scheduler || "beta57",
+                  samplerName: resolvedSampler,
+                  scheduler: resolvedScheduler,
                   baseModel: resolvedBaseModel,
-                  vaeModel: parsedArgs.vae_model || "auto",
+                  vaeModel: resolvedVae,
                   workflowId: resolvedWorkflowId,
                   loraConfigs: resolvedLoraConfigs,
                   tags: (parsedArgs.tags || []).map((t: string, i: number) => ({
@@ -1619,9 +1669,12 @@ User input: ${userText}`;
   };
 
   const stopGenerating = () => {
-    if (abortControllerRef.current) {
+    // 只 abort，不清空 ref。清空后递归 callLLM 入口会 new 一个全新的、未 abort 的
+    // controller，行 622 的 abort 检查失效，agent 变得无法停止。
+    // 留着已 abort 的 controller，递归入口才能命中检查并 return。
+    // sendMessage 的 finally 块会在本轮结束后清空 ref，不影响下一条消息。
+    if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
       abortControllerRef.current.abort();
-      abortControllerRef.current = null;
     }
     setIsGenerating(false);
   };
