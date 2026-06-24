@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X, Layers, Check } from 'lucide-react';
+import { Search, X, Layers, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import { useModelStore } from '../../stores/modelStore';
 
 interface LoraPickerModalProps {
@@ -11,7 +11,7 @@ interface LoraPickerModalProps {
 }
 
 export function LoraPickerModal({ isOpen, onClose, selectedLoras, onToggle }: LoraPickerModalProps) {
-  const { loras } = useModelStore();
+  const { loras, isLoading, isError, fetchModels } = useModelStore();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredLoras = useMemo(() => {
@@ -42,8 +42,8 @@ export function LoraPickerModal({ isOpen, onClose, selectedLoras, onToggle }: Lo
           </button>
         </div>
         
-        <div className="p-4 border-b border-[var(--glass-border)] shrink-0 relative z-10 bg-[var(--bg-layer-1)]">
-          <div className="relative group">
+        <div className="p-4 border-b border-[var(--glass-border)] shrink-0 relative z-10 bg-[var(--bg-layer-1)] flex items-center gap-2">
+          <div className="relative group flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-[var(--accent-1)] transition-colors" size={18} />
             <input
               type="text"
@@ -54,11 +54,44 @@ export function LoraPickerModal({ isOpen, onClose, selectedLoras, onToggle }: Lo
               autoFocus
             />
           </div>
+          <button 
+            onClick={() => fetchModels(true)}
+            className="flex items-center justify-center w-10 h-10 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-xl text-[var(--text-primary)] transition-colors cursor-pointer shrink-0"
+            title="刷新 LoRA 列表"
+          >
+            <RefreshCw size={16} className={`text-[var(--accent-1)] ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-[var(--glass-border)] scrollbar-track-transparent relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-24">
-            {filteredLoras.map(lora => {
+            {isLoading ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="p-4 rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)] flex items-center justify-between">
+                  <div className="flex-1 pr-3 flex flex-col gap-2">
+                    <div className="h-4 w-3/4 rounded-md animate-shimmer"></div>
+                    <div className="h-3 w-1/2 rounded-md animate-shimmer"></div>
+                  </div>
+                  <div className="w-6 h-6 rounded-full shrink-0 animate-shimmer border border-[var(--glass-border)]"></div>
+                </div>
+              ))
+            ) : isError ? (
+              <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center py-16 text-[var(--text-secondary)] gap-4">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                  <AlertCircle size={32} className="text-red-500" />
+                </div>
+                <div className="text-center">
+                  <h4 className="text-sm font-bold text-red-400 mb-1">加载失败</h4>
+                  <p className="text-xs text-[var(--text-muted)]">无法连接到服务器或拉取数据超时</p>
+                </div>
+                <button 
+                  onClick={() => fetchModels(true)}
+                  className="px-6 py-2 mt-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <RefreshCw size={14} /> 重试获取
+                </button>
+              </div>
+            ) : filteredLoras.map(lora => {
               const isSelected = selectedLoras.includes(lora);
               const displayName = lora.split('/').pop() || lora;
               return (
@@ -81,7 +114,8 @@ export function LoraPickerModal({ isOpen, onClose, selectedLoras, onToggle }: Lo
                 </button>
               );
             })}
-            {filteredLoras.length === 0 && (
+            
+            {!isLoading && !isError && filteredLoras.length === 0 && (
               <div className="col-span-1 md:col-span-2 flex flex-col items-center justify-center py-20 text-[var(--text-secondary)] gap-4">
                 <div className="w-16 h-16 rounded-full bg-[var(--glass-bg)] flex items-center justify-center">
                   <Layers size={24} className="opacity-50" />

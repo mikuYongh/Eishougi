@@ -179,3 +179,16 @@ body {
 .PhotoView-Slider__toolbarWrap {
   padding-top: max(env(safe-area-inset-top), 30px) !important;
 }
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.02) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+.light-mode .animate-shimmer {
+  background: linear-gradient(90deg, rgba(0,0,0,0.02) 25%, rgba(0,0,0,0.06) 50%, rgba(0,0,0,0.02) 75%);
+  background-size: 200% 100%;
+}

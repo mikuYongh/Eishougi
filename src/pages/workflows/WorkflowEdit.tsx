@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { ArrowLeft, Save, UploadCloud, FileJson, Layers, Sliders, Cpu, Plus, Trash2, Maximize2 } from "lucide-react";
+import { ArrowLeft, Save, UploadCloud, FileJson, Layers, Sliders, Cpu, Plus, Trash2, Maximize2, RefreshCw } from "lucide-react";
 import { useWorkflowStore, type WorkflowProject, type WorkflowType } from "../../stores/workflowStore";
 import { useModelStore } from "../../stores/modelStore";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -37,7 +37,7 @@ export function WorkflowEdit() {
   const addWorkflow = useWorkflowStore((state) => state.addWorkflow);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   
-  const { checkpoints, loras, fetchModels } = useModelStore();
+  const { checkpoints, loras, isLoading, isError, fetchModels } = useModelStore();
 
   const [workflow, setWorkflow] = useState<Partial<WorkflowProject>>({
     name: "", description: "", type: "text2img", jsonContent: "", tags: []
@@ -287,12 +287,21 @@ export function WorkflowEdit() {
             <h3 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
               <Sliders size={18} className="text-yellow-400" /> 默认参数配置
             </h3>
-            <button 
-              onClick={handleImportJson}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 text-[12px] font-bold transition-colors cursor-pointer border border-yellow-500/20"
-            >
-              <FileJson size={14} /> 重新导入 JSON
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => fetchModels(true)}
+                className="flex items-center justify-center w-8 h-8 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-lg text-[var(--text-primary)] transition-colors cursor-pointer"
+                title="刷新模型列表"
+              >
+                <RefreshCw size={14} className="text-[var(--accent-1)]" />
+              </button>
+              <button 
+                onClick={handleImportJson}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 text-[12px] font-bold transition-colors cursor-pointer border border-yellow-500/20"
+              >
+                <FileJson size={14} /> 重新导入 JSON
+              </button>
+            </div>
           </div>
 
           {!workflow.jsonContent ? (
@@ -325,7 +334,10 @@ export function WorkflowEdit() {
                       value={draftParams.baseModel || ""}
                       onChange={v => updateDraft('baseModel', v)}
                       options={modelOptions}
-                      placeholder="默认模型..."
+                      placeholder="基础模型"
+                      searchPlaceholder="搜索模型..."
+                      isLoading={isLoading}
+                      isError={isError}
                     />
                   </div>
                   <div>
@@ -441,6 +453,8 @@ export function WorkflowEdit() {
                               }}
                               options={loraOptions}
                               placeholder="搜索或选择 LoRA..."
+                              isLoading={isLoading}
+                              isError={isError}
                             />
                           </div>
                           <div className="w-24 flex-shrink-0">

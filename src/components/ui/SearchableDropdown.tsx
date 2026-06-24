@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Search, Check } from "lucide-react";
+import { ChevronDown, Search, Check, Loader2, AlertCircle } from "lucide-react";
 
 interface Option {
   label: string;
@@ -16,6 +16,8 @@ interface SearchableDropdownProps {
   triggerClassName?: string;
   dropdownClassName?: string;
   containerClassName?: string;
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
 export function SearchableDropdown({ 
@@ -28,6 +30,8 @@ export function SearchableDropdown({
   triggerClassName = "",
   dropdownClassName = "",
   containerClassName = "",
+  isLoading = false,
+  isError = false,
 }: SearchableDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -88,17 +92,24 @@ export function SearchableDropdown({
     <div className={`relative ${containerClassName}`} ref={containerRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-between transition-all cursor-pointer ${
+        disabled={isLoading || isError}
+        onClick={() => !isLoading && !isError && setIsOpen(!isOpen)}
+        className={`flex items-center justify-between transition-all ${isLoading || isError ? 'cursor-not-allowed' : 'cursor-pointer'} ${
           triggerClassName 
             ? `${triggerClassName} ${isOpen ? 'ring-2 ring-[var(--accent-2)]/50' : ''}`
-            : `w-full px-3 py-2 rounded-lg bg-[var(--glass-bg)] border ${isOpen ? theme.border + ' ' + theme.shadow : 'border-[var(--glass-border)] hover:border-[var(--glass-border-active)]'}`
+            : `w-full px-3 py-2 rounded-lg bg-[var(--glass-bg)] border ${isError ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : isOpen ? theme.border + ' ' + theme.shadow : 'border-[var(--glass-border)] hover:border-[var(--glass-border-active)]'}`
         }`}
       >
-        <span className={`text-[12px] truncate ${selectedOption ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
-          {selectedOption ? selectedOption.label : placeholder}
+        <span className={`text-[12px] truncate ${isError ? 'text-red-400' : selectedOption ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'} ${isLoading ? 'opacity-60' : ''}`}>
+          {isError ? "加载失败" : isLoading ? "正在加载模型..." : (selectedOption ? selectedOption.label : placeholder)}
         </span>
-        <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 ' + theme.text : 'text-[var(--text-secondary)]'}`} />
+        {isLoading ? (
+          <Loader2 size={14} className="text-[var(--accent-1)] animate-spin" />
+        ) : isError ? (
+          <AlertCircle size={14} className="text-red-500" />
+        ) : (
+          <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 ' + theme.text : 'text-[var(--text-secondary)]'}`} />
+        )}
       </button>
 
       {isOpen && (

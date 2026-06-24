@@ -92,7 +92,7 @@ export function Generate() {
 
   const { jobs, isConnected, connect, addJob } = useQueueStore();
   const workflows = useWorkflowStore(state => state.workflows);
-  const { checkpoints, loras, fetchModels } = useModelStore();
+  const { checkpoints, loras, isLoading, isError, fetchModels } = useModelStore();
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
   useEffect(() => {
@@ -427,7 +427,7 @@ export function Generate() {
               <h3 className="text-[13px] font-bold text-[var(--text-primary)]">项目参数概览</h3>
               <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => fetchModels()}
+                  onClick={() => fetchModels(true)}
                   className="flex items-center justify-center w-6 h-6 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-md text-[var(--text-primary)] transition-colors cursor-pointer"
                   title="刷新模型列表"
                 >
@@ -459,6 +459,8 @@ export function Generate() {
                     accentColor="purple"
                     placeholder="选择基础模型..."
                     searchPlaceholder="搜索模型文件..."
+                    isLoading={isLoading}
+                    isError={isError}
                   />
                 </div>
               </div>

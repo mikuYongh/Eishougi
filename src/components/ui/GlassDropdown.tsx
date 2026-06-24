@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Check, Loader2, AlertCircle } from "lucide-react";
 
 interface Option {
   label: string;
@@ -13,6 +13,8 @@ interface GlassDropdownProps {
   accentColor?: "pink" | "orange" | "blue" | "purple" | "green" | "yellow";
   className?: string;
   small?: boolean;
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
 export function GlassDropdown({ 
@@ -21,7 +23,9 @@ export function GlassDropdown({
   onChange, 
   accentColor = "pink", 
   className = "", 
-  small = false 
+  small = false,
+  isLoading = false,
+  isError = false,
 }: GlassDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -51,11 +55,19 @@ export function GlassDropdown({
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       <div 
-        className={`w-full rounded-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] ${c.border} text-[var(--text-primary)] flex items-center justify-between cursor-pointer transition-all shadow-[inset_0_2px_10px_rgba(0,0,0,0.2)] group ${small ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-[13px]'}`}
-        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full rounded-xl bg-[var(--glass-bg)] border ${isError ? 'border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : `border-[var(--glass-border)] ${c.border}`} text-[var(--text-primary)] flex items-center justify-between transition-all shadow-[inset_0_2px_10px_rgba(0,0,0,0.2)] group ${small ? 'px-3 py-2 text-xs' : 'px-4 py-3 text-[13px]'} ${isLoading || isError ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+        onClick={() => !isLoading && !isError && setIsOpen(!isOpen)}
       >
-        <span className="font-bold tracking-wide truncate pr-2">{selectedLabel}</span>
-        <ChevronDown size={small ? 14 : 16} className={`text-[var(--text-secondary)] transition-transform duration-300 group-hover:text-[var(--text-primary)] flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <span className={`font-bold tracking-wide truncate pr-2 ${isError ? 'text-red-400' : ''} ${isLoading ? 'opacity-60' : ''}`}>
+          {isError ? "加载失败" : isLoading ? "加载中..." : selectedLabel}
+        </span>
+        {isLoading ? (
+          <Loader2 size={small ? 14 : 16} className="text-[var(--accent-1)] animate-spin flex-shrink-0" />
+        ) : isError ? (
+          <AlertCircle size={small ? 14 : 16} className="text-red-500 flex-shrink-0" />
+        ) : (
+          <ChevronDown size={small ? 14 : 16} className={`text-[var(--text-secondary)] transition-transform duration-300 group-hover:text-[var(--text-primary)] flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        )}
       </div>
 
       {isOpen && (
