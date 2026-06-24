@@ -12,7 +12,7 @@ export function MobileMenu() {
       border: "border-pink-500/20 hover:border-pink-500/50"
     },
     {
-      title: "风格画师",
+      title: "角色图鉴",
       subtitle: "Characters",
       icon: <Wand2 size={24} className="text-purple-400" />,
       path: "/characters",
