@@ -1,15 +1,17 @@
 import { useEffect, useState, useRef } from "react";
 import { useLibraryStore } from "../../stores/libraryStore";
-import { Search, Star, Heart, Flame, Loader2, AlertCircle, Filter } from "lucide-react";
+import { Search, Star, Heart, Flame, Loader2, AlertCircle, Filter, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { VirtuosoGrid } from "react-virtuoso";
 
 import { ItemDetailModal } from "../../components/library/ItemDetailModal";
+import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import type { Character, SeriesOption } from "../../stores/libraryStore";
 import { useDevice } from "../../hooks/useDevice";
 
 export function CharacterLibrary() {
   const { isMobile } = useDevice();
   const [selectedItem, setSelectedItem] = useState<Character | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const {
     characters,
@@ -44,14 +46,22 @@ export function CharacterLibrary() {
 
   const renderSeriesSidebar = () => {
     return (
-      <div className="hidden md:flex flex-col w-64 h-full bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-2xl overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-[var(--glass-border)] bg-[var(--bg-layer-2)]/50">
+      <div 
+        className={`hidden md:flex flex-col h-full bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-2xl overflow-hidden shadow-sm transition-all duration-300 relative ${isSidebarOpen ? 'w-64' : 'w-0 border-0 opacity-0'}`}
+      >
+        <div className="p-4 border-b border-[var(--glass-border)] bg-[var(--bg-layer-2)]/50 flex items-center justify-between min-w-[16rem]">
           <h2 className="font-bold text-[var(--text-primary)] flex items-center gap-2">
             <Filter size={16} className="text-[var(--accent-1)]" />
             作品分类
           </h2>
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-1 hover:bg-[var(--glass-bg-hover)] rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+          >
+            <PanelLeftClose size={16} />
+          </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar min-w-[16rem]">
           <button
             onClick={() => handleSeriesSelect(null)}
             className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 mb-1 flex items-center justify-between ${
@@ -89,34 +99,21 @@ export function CharacterLibrary() {
   };
 
   const renderMobileSeriesTabs = () => {
+    const options = [
+      { label: "全部作品分类", value: "" },
+      ...seriesList.map(s => ({ label: `${s.seriesZh || s.series} (${s.count})`, value: s.series }))
+    ];
+
     return (
-      <div className="md:hidden w-full overflow-x-auto no-scrollbar py-2 border-b border-[var(--glass-border)]">
-        <div className="flex gap-2 px-1 w-max">
-          <button
-            onClick={() => handleSeriesSelect(null)}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-              selectedSeries === null
-                ? "bg-[var(--accent-1)] text-white shadow-md shadow-[var(--accent-1)]/30"
-                : "bg-[var(--bg-layer-1)] text-[var(--text-secondary)] border border-[var(--glass-border)]"
-            }`}
-          >
-            全部
-          </button>
-          {seriesList.map((s) => (
-            <button
-              key={s.series}
-              onClick={() => handleSeriesSelect(s.series)}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                selectedSeries === s.series
-                  ? "bg-[var(--accent-1)] text-white shadow-md shadow-[var(--accent-1)]/30"
-                  : "bg-[var(--bg-layer-1)] text-[var(--text-secondary)] border border-[var(--glass-border)]"
-              }`}
-            >
-              {s.seriesZh || s.series}
-              <span className={`text-[10px] opacity-70`}>{s.count}</span>
-            </button>
-          ))}
-        </div>
+      <div className="md:hidden w-full py-2 border-b border-[var(--glass-border)] relative z-[80]">
+        <SearchableDropdown
+          value={selectedSeries || ""}
+          onChange={(val) => handleSeriesSelect(val || null)}
+          options={options}
+          placeholder="全部作品分类"
+          searchPlaceholder="搜索作品名称..."
+          containerClassName="w-full"
+        />
       </div>
     );
   };
@@ -125,6 +122,15 @@ export function CharacterLibrary() {
     <div className="flex h-full gap-4 relative">
       {/* Sidebar for Desktop */}
       {!isMobile && renderSeriesSidebar()}
+
+      {!isMobile && !isSidebarOpen && (
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="hidden md:flex absolute top-[18px] left-0 z-[100] p-1.5 bg-[var(--bg-layer-2)] border border-[var(--glass-border)] rounded-r-xl shadow-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-all cursor-pointer"
+        >
+          <PanelLeftOpen size={16} />
+        </button>
+      )}
 
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 h-full min-w-0">
@@ -242,8 +248,8 @@ export function CharacterLibrary() {
                 <div className="absolute bottom-0 inset-x-0 p-3 pt-8 flex flex-col justify-end pointer-events-none">
                   {/* Series Badge */}
                   {(character.seriesZh || character.series) && (
-                    <div className="mb-1.5">
-                      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--accent-1)]/20 text-[var(--accent-1)] border border-[var(--accent-1)]/30 backdrop-blur-sm truncate max-w-full">
+                    <div className="mb-0.5 flex">
+                      <span className="inline-flex items-center px-1.5 py-[2px] text-[9px] font-bold tracking-wider bg-black/50 text-white/90 border-l-[2px] border-[var(--accent-1)] backdrop-blur-md shadow-sm truncate max-w-[95%]">
                         {character.seriesZh || character.series}
                       </span>
                     </div>
