@@ -1,6 +1,6 @@
 [package]
 name = "prompt-muse"
-version = "0.2.2"
+version = "0.2.3"
 description = "ComfyUI Prompt Management Workstation"
 authors = ["you"]
 license = "MIT"
