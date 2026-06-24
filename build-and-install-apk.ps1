@@ -10,6 +10,7 @@ $apksigner = "$($buildTools.FullName)\apksigner.bat"
 $adb = "$sdk\platform-tools\adb.exe"
 
 $javaDir = "C:\Program Files\Android\Android Studio\jbr\bin"
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 $keytool = if (Test-Path "$javaDir\keytool.exe") { "$javaDir\keytool.exe" } else { "keytool" }
 
 $apk = "src-tauri\gen\android\app\build\outputs\apk\universal\release\app-universal-release-unsigned.apk"
@@ -42,6 +43,8 @@ if (Test-Path "$gradleDir\.gradle") {
     Remove-Item -Recurse -Force "$gradleDir\.gradle" -ErrorAction SilentlyContinue  
     Write-Host "  已删除 .gradle 缓存"
 }
+# 确保 Kotlin daemon 已停止，避免增量编译缓存不一致（不同根路径 bug）
+& "$gradleDir\gradlew" --stop 2>&1 | Out-Null
 
 Write-Host "`n=== 4/6 编译 Rust -> Android APK ===" -ForegroundColor Cyan
 npx tauri android build --apk 2>&1 | Out-Default
@@ -54,7 +57,6 @@ if (-not (Test-Path $keystore)) {
 }
 
 $signed = "app-release.apk"
-$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 & $apksigner sign --ks $keystore --ks-pass pass:android --ks-key-alias debug --key-pass pass:android --out $signed $apk 2>&1 | Out-Default
 
 Write-Host "`n=== 6/6 安装到设备 ===" -ForegroundColor Cyan
