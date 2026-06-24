@@ -523,6 +523,15 @@ pub async fn run_auto_deploy(
 }
 
 // ========== call_llm_proxy (HTTP proxy for webview CORS bypass) ==========
+//
+// 瞬时错误重试策略：
+// - reqwest 的 connect/timeout 错误（"error sending request"）→ 重试
+// - HTTP 5xx（含 Agnes 的 do_request_failed）→ 重试
+// - HTTP 4xx（请求格式错误）→ 不重试，原样抛回
+// - 流式开始后的中断 → 不重试（已发出 chunk，重试会重复）
+//
+// Agnes AI 在连续多轮 agent 调用后经常出现网络抖动，单次重试能消化掉
+// 大部分失败。重试间隔指数退避（1s, 2s），最多 3 次尝试。
 #[tauri::command]
 pub async fn call_llm_proxy(
     api_url: String,
@@ -534,23 +543,66 @@ pub async fn call_llm_proxy(
         .timeout(std::time::Duration::from_secs(120))
         .build()
         .map_err(|e| format!("Client build failed: {}", e))?;
-    let resp = client
-        .post(&api_url)
-        .header("Content-Type", "application/json")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .body(body_json)
-        .send()
-        .await
-        .map_err(|e| format!("API {}: {}", api_url, e))?;
-    let status = { let s = resp.status().as_u16(); s };
-    if status >= 400 {
-        let body = resp.text().await.unwrap_or_default();
-        return Err(format!("API {} HTTP {}: {}", api_url, status, if body.len() > 300 { &body[..300] } else { &body }));
+
+    const MAX_ATTEMPTS: usize = 3;
+    let mut last_err: Option<String> = None;
+    let mut resp: Option<reqwest::Response> = None;
+
+    for attempt in 1..=MAX_ATTEMPTS {
+        let send_result = client
+            .post(&api_url)
+            .header("Content-Type", "application/json")
+            .header("Authorization", format!("Bearer {}", api_key))
+            .body(body_json.clone())
+            .send()
+            .await;
+
+        match send_result {
+            Ok(r) => {
+                let status = r.status().as_u16();
+                if status >= 500 {
+                    // 5xx：服务端瞬时错误（含 Agnes do_request_failed），可重试
+                    let body_text = r.text().await.unwrap_or_default();
+                    let snippet = if body_text.len() > 300 { &body_text[..300] } else { &body_text };
+                    last_err = Some(format!("API {} HTTP {}: {}", api_url, status, snippet));
+                    log::warn!("[LLM Proxy] attempt {}/{} got HTTP {}, will retry", attempt, MAX_ATTEMPTS, status);
+                } else if status >= 400 {
+                    // 4xx：请求格式错误，重试无用，直接抛
+                    let body_text = r.text().await.unwrap_or_default();
+                    let snippet = if body_text.len() > 300 { &body_text[..300] } else { &body_text };
+                    return Err(format!("API {} HTTP {}: {}", api_url, status, snippet));
+                } else {
+                    resp = Some(r);
+                    break;
+                }
+            }
+            Err(e) => {
+                // reqwest 错误：connect/timeout 可重试，其他不重试
+                let is_retryable = e.is_connect() || e.is_timeout();
+                let msg = format!("API {}: {}", api_url, e);
+                if !is_retryable || attempt == MAX_ATTEMPTS {
+                    return Err(msg);
+                }
+                last_err = Some(msg);
+                log::warn!("[LLM Proxy] attempt {}/{} network error ({}), will retry", attempt, MAX_ATTEMPTS, e);
+            }
+        }
+
+        // 指数退避：1s, 2s（最后一次失败后不睡）
+        if attempt < MAX_ATTEMPTS {
+            let backoff = std::time::Duration::from_secs(1u64 << (attempt - 1));
+            log::info!("[LLM Proxy] retrying in {:?}", backoff);
+            tokio::time::sleep(backoff).await;
+        }
     }
+
+    let resp = resp.ok_or_else(|| last_err.unwrap_or_else(|| "LLM proxy: all attempts failed".to_string()))?;
+
     let mut stream = resp.bytes_stream();
     // SSE 行边界缓冲：reqwest 的 bytes_stream() 可能从任意字节位置切断，
     // 一行 data: {...} 可能被切成多个 chunk。按 \n 切分，只把完整行
     // send 给前端，避免前端 JSON.parse 失败丢内容。
+    // 流式开始后不再重试——已发出的 chunk 不可撤回。
     let mut buffer = String::new();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;

@@ -113,7 +113,19 @@ generate_image 工具会**阻塞到生成完成**并返回图片 URL。**不要*
 
 ## 自定义样式与画师库
 - get_custom_styles / add_custom_style / update_custom_style / delete_custom_style：管理用户的样式与画师库。
-- 用户要管理样式时直接用这些工具。`;
+- 用户要管理样式时直接用这些工具。
+
+## 收藏管理（关键 — 防止误用）
+favorite_characters / favorite_artists 系列工具仅用于**用户明确说"收藏"**某个角色或画师时。
+**常见误用警告：**
+- ❌ 用户说"生成 N 个角色" / "生成 10 种原神角色" → 用 create_prompt + generate_image，**绝对不要**用 add_favorite_character
+- ❌ 用户说"添加角色到 prompt" → 用 update_prompt_content，不是收藏
+- ❌ add_favorite_* 不能用来"触发生成图片"——它只是登记一个书签条目
+- ❌ example_image 字段需要传**已存在的图片路径**（如 generate_image 返回值），不是触发新生成
+- ✅ 用户说"收藏雷电将军" / "把这个画师加入收藏" → 这才用 favorite 工具
+- ✅ 用户说"把刚才生成的图片设为示范图片" → 先确认设给哪个收藏条目，用 update_favorite_character/artist 传 example_image
+
+当用户请求含糊（既可能是收藏也可能是生成）时，**先问一句**："你是想 (A) 收藏这些角色到收藏夹 还是 (B) 生成这些角色的新图片？" 不要默认走收藏路径。`;
 
 export const useAgentStore = create<AgentStore>()(
   persist(
@@ -256,7 +268,7 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: 'prompt-muse-agent',
-      version: 7,
+      version: 8,
       // 每个 session 最多保留 MAX_MESSAGES_PER_SESSION 条消息，超出按时间裁剪。
       // 原因：messages 含完整工具结果与图片路径，长 session 会让 localStorage
       // 超过 quota 静默失败 → 整个 store 写不进，用户感觉历史丢失。
@@ -300,6 +312,14 @@ export const useAgentStore = create<AgentStore>()(
               if (s.messages.length <= MAX_MESSAGES_PER_SESSION) return s;
               return { ...s, messages: s.messages.slice(-MAX_MESSAGES_PER_SESSION) };
             });
+          }
+        }
+        if (version < 8) {
+          // v8: 加"收藏管理"段落，防止 agent 把"生成 N 个角色"误解成"收藏 N 个角色"。
+          // 用户在设置面板里自定义的 systemPrompt 会被覆盖——这是有意为之，
+          // 收藏工具的误用风险高于保留用户自定义。用户之后仍可重新编辑。
+          if (persistedState.settings) {
+            persistedState.settings.systemPrompt = defaultSystemPrompt;
           }
         }
         return persistedState;

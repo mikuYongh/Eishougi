@@ -5,6 +5,7 @@ pub mod files;
 pub mod history;
 pub mod images;
 pub mod library;
+pub mod library_favorites;
 pub mod logging;
 pub mod mcp;
 pub mod prompts;

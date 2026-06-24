@@ -15,6 +15,7 @@ pub fn run(conn: &Connection) -> Result<()> {
         (MIGRATION_V9, 9),
         (MIGRATION_V10, 10),
         (MIGRATION_V11, 11),
+        (MIGRATION_V12, 12),
     ];
 
     for (sql, ver) in migrations {
@@ -224,4 +225,84 @@ WHERE is_default = 1
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_workflows_default_per_type
 ON workflows(type) WHERE is_default = 1;
+"#;
+
+// V12: 收藏角色/画师独立表。收藏不再依附 gallery，gallery_*_id 仅作软链。
+// 角色支持 tag 分组 (favorite_character_tags)；画师无 tag。
+// 迁移：把 characters/artists 上的 is_favorite=1 导入新表 (source='gallery',
+// gallery_*_id 回链)，保留老用户数据。gallery 上的 is_favorite 列保留
+// (老 UI 继续用)，新系统独立运作。
+const MIGRATION_V12: &str = r#"
+CREATE TABLE IF NOT EXISTS favorite_characters (
+    id                   TEXT PRIMARY KEY NOT NULL,
+    character_tag        TEXT NOT NULL UNIQUE,
+    display_name         TEXT,
+    source               TEXT NOT NULL,        -- 'gallery' | 'lora' | 'custom' | 'unknown'
+    gallery_character_id TEXT,                 -- 软链 characters.id，仅用于图片/元数据回查
+    "trigger"            TEXT,
+    example_image        TEXT,                 -- 用户/agent 提供的图片 (路径或 URL)
+    notes                TEXT,
+    created_at           INTEGER NOT NULL,
+    updated_at           INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_fav_chars_source ON favorite_characters(source);
+CREATE INDEX IF NOT EXISTS idx_fav_chars_created ON favorite_characters(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS favorite_character_tags (
+    character_id TEXT NOT NULL,
+    tag          TEXT NOT NULL,
+    PRIMARY KEY (character_id, tag),
+    FOREIGN KEY (character_id) REFERENCES favorite_characters(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_fav_char_tags_tag ON favorite_character_tags(tag);
+
+CREATE TABLE IF NOT EXISTS favorite_artists (
+    id                TEXT PRIMARY KEY NOT NULL,
+    artist_tag        TEXT NOT NULL UNIQUE,
+    display_name      TEXT,
+    source            TEXT NOT NULL,
+    gallery_artist_id TEXT,
+    "trigger"         TEXT,
+    example_image     TEXT,
+    notes             TEXT,
+    created_at        INTEGER NOT NULL,
+    updated_at        INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_fav_artists_source ON favorite_artists(source);
+CREATE INDEX IF NOT EXISTS idx_fav_artists_created ON favorite_artists(created_at DESC);
+
+-- 迁移老 favorites (gallery is_favorite=1) 进新表。INSERT OR IGNORE 保证
+-- 重复运行幂等（character_tag 唯一约束）。
+INSERT OR IGNORE INTO favorite_characters
+    (id, character_tag, display_name, source, gallery_character_id, "trigger", example_image, notes, created_at, updated_at)
+SELECT
+    'migr_char_' || id,
+    character_tag,
+    COALESCE(NULLIF(name_zh, ''), name_en),
+    'gallery',
+    id,
+    "trigger",
+    NULL,
+    NULL,
+    COALESCE(created_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+    COALESCE(created_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000)
+FROM characters WHERE is_favorite = 1;
+
+INSERT OR IGNORE INTO favorite_artists
+    (id, artist_tag, display_name, source, gallery_artist_id, "trigger", example_image, notes, created_at, updated_at)
+SELECT
+    'migr_artist_' || id,
+    artist_tag,
+    COALESCE(NULLIF(name_zh, ''), name_en),
+    'gallery',
+    id,
+    "trigger",
+    NULL,
+    NULL,
+    COALESCE(created_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+    COALESCE(created_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000)
+FROM artists WHERE is_favorite = 1;
 "#;

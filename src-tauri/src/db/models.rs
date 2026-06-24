@@ -159,3 +159,46 @@ pub struct Artist {
     pub is_favorite: bool,
     pub created_at: i64,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FavoriteCharacter {
+    pub id: String,
+    pub character_tag: String,
+    pub display_name: Option<String>,
+    /// 'gallery' | 'lora' | 'custom' | 'unknown'
+    pub source: String,
+    pub gallery_character_id: Option<String>,
+    pub trigger: Option<String>,
+    pub example_image: Option<String>,
+    pub notes: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    /// 非数据库字段：查询时按 gallery img_url → example_image → null 回落计算
+    pub resolved_image: Option<String>,
+    /// 非数据库字段：用户给该收藏打的标签
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FavoriteArtist {
+    pub id: String,
+    pub artist_tag: String,
+    pub display_name: Option<String>,
+    pub source: String,
+    pub gallery_artist_id: Option<String>,
+    pub trigger: Option<String>,
+    pub example_image: Option<String>,
+    pub notes: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub resolved_image: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FavoriteCharacterTagCount {
+    pub tag: String,
+    pub count: i64,
+}

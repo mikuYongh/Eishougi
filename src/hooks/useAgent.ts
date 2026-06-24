@@ -44,6 +44,78 @@ export interface ChatAttachment {
   isImage: boolean;   // Convenience flag (legacy images[] still used for image-only viewers)
 }
 
+// 兜底解析被 LLM 文本化的 tool_call。两种格式：
+//   1. 标准 Hermes JSON:  <tool_call>{"name":"x","arguments":{...}}</tool_call>
+//   2. XML 风格:          <tool_call><function=name><parameter=k>v</parameter>...</function></tool_call>
+// 返回解析出的 calls + 移除标签后的剩余文本。
+function parseEmbeddedToolCalls(content: string): {
+  calls: { id: string; type: 'function'; function: { name: string; arguments: string } }[];
+  remaining: string;
+} {
+  const calls: { id: string; type: 'function'; function: { name: string; arguments: string } }[] = [];
+  let remaining = content;
+
+  const blockRe = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+  const blocks = [...content.matchAll(blockRe)];
+  if (blocks.length === 0) return { calls, remaining };
+
+  for (let i = 0; i < blocks.length; i++) {
+    const raw = blocks[i][1].trim();
+    let name = '';
+    let argsObj: any = {};
+
+    // 优先尝试 JSON 解析（标准 Hermes 格式）
+    try {
+      const json = JSON.parse(raw);
+      if (json && typeof json === 'object') {
+        name = String(json.name || json.function || '');
+        if (json.arguments && typeof json.arguments === 'object') {
+          argsObj = json.arguments;
+        } else if (typeof json.arguments === 'string') {
+          try { argsObj = JSON.parse(json.arguments); } catch { argsObj = {}; }
+        } else if (json.parameters) {
+          argsObj = json.parameters;
+        }
+      }
+    } catch {
+      // 不是 JSON，尝试 XML 风格：<function=NAME>...</function> + <parameter=K>V</parameter>
+      const fnMatch = raw.match(/<function=([^>\s]+)>([\s\S]*?)<\/function>/);
+      if (fnMatch) {
+        name = fnMatch[1].trim();
+        const inner = fnMatch[2] || '';
+        const paramRe = /<parameter=([^>\s]+)>([\s\S]*?)<\/parameter>/g;
+        const params = [...inner.matchAll(paramRe)];
+        for (const p of params) {
+          const key = p[1].trim();
+          let val: any = p[2].trim();
+          // 尝试转 JSON（数组/对象/数字/布尔/null）
+          if (val === 'true') val = true;
+          else if (val === 'false') val = false;
+          else if (val === 'null') val = null;
+          else {
+            try {
+              const parsed = JSON.parse(val);
+              val = typeof parsed === 'number' || typeof parsed === 'object' ? parsed : val;
+            } catch { /* 保持字符串 */ }
+          }
+          argsObj[key] = val;
+        }
+      }
+    }
+
+    if (name) {
+      calls.push({
+        id: `recovered_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
+        type: 'function',
+        function: { name, arguments: JSON.stringify(argsObj) },
+      });
+    }
+  }
+
+  remaining = content.replace(blockRe, '');
+  return { calls, remaining };
+}
+
 export function useAgent() {
   const { sessions, activeSessionId, addMessage, setMessages, settings: agentSettings, isGenerating, setIsGenerating } = useAgentStore();
   const activeSession = sessions.find(s => s.id === activeSessionId);
@@ -507,6 +579,211 @@ export function useAgent() {
           }
         }
       }
+    },
+    // ===== 收藏角色 / 收藏画师 CRUD =====
+    // 收藏是一等实体，独立于 gallery。gallery_*_id 仅作软链，用于图片/元数据自动补全。
+    // 角色支持 tag 分组；画师无 tag。
+    {
+      type: "function",
+      function: {
+        name: "list_favorite_characters",
+        description: "List favorite characters. Supports tag filter (OR by default, AND via tag_match='and') and free-text search. Returns each character with resolved_image (gallery img_url → example_image → null) and tags.",
+        parameters: {
+          type: "object",
+          properties: {
+            tags: { type: "array", items: { type: "string" }, description: "Optional tag filter. Empty/omitted = no tag filter." },
+            tag_match: { type: "string", enum: ["or", "and"], description: "Tag filter mode. 'or' = any tag matches (default), 'and' = all tags must match." },
+            search: { type: "string", description: "Optional free-text search across character_tag/display_name/notes/trigger." },
+            limit: { type: "number", description: "Max results (default 50, cap 500)." },
+            offset: { type: "number", description: "Pagination offset (default 0)." }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "add_favorite_character",
+        description: "⚠️ ONLY use when the user EXPLICITLY says they want to 收藏/favorite a specific character (e.g. '收藏雷电将军', 'add X to favorites'). Do NOT use this tool when the user says '生成角色' / 'generate characters' / 'create characters' — that means use create_prompt + generate_image. This tool does NOT generate any image; it only registers a bookmark. The example_image field requires an EXISTING image path/URL (e.g. from a previous generate_image result) — it does not trigger generation.\n\nAdd a character to favorites, or update if the character_tag already exists (upsert). Source can be 'gallery' (from built-in character library), 'lora' (from a LoRA file), 'custom' (user-defined), or 'unknown'. The system auto-matches against the gallery by character_tag to fill gallery_character_id/trigger/display_name when possible. Tags are appended on upsert (not replaced).",
+        parameters: {
+          type: "object",
+          properties: {
+            character_tag: { type: "string", description: "Canonical character tag, e.g. 'hatsune_miku'. Must be unique." },
+            source: { type: "string", enum: ["gallery", "lora", "custom", "unknown"], description: "Where this favorite came from. Default 'unknown' (auto-upgraded to 'gallery' if tag matches gallery)." },
+            display_name: { type: "string", description: "Optional display name override. If omitted and gallery matches, gallery name_zh/name_en is used." },
+            trigger: { type: "string", description: "Optional trigger words. If omitted and gallery matches, gallery trigger is used." },
+            example_image: { type: "string", description: "Optional local file path or URL to a reference image. Used when gallery has no image." },
+            notes: { type: "string", description: "Optional free-form notes." },
+            tags: { type: "array", items: { type: "string" }, description: "Optional user tags to attach (e.g. ['vocaloid', 'cyberpunk']). Appended on upsert." }
+          },
+          required: ["character_tag"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "update_favorite_character",
+        description: "Update editable fields of a favorite character. Only display_name/trigger/example_image/notes can be changed — source/character_tag/gallery_character_id are immutable through this tool. At least one field must be provided.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Favorite character ID." },
+            display_name: { type: "string" },
+            trigger: { type: "string" },
+            example_image: { type: "string" },
+            notes: { type: "string" }
+          },
+          required: ["id"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "remove_favorite_character",
+        description: "Remove a favorite character by id or character_tag. Provide one of the two.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Favorite character ID." },
+            character_tag: { type: "string", description: "Alternative locator: the character tag." }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "relink_favorite_character",
+        description: "Re-attempt gallery match for a favorite character. Use after the gallery is updated (e.g. characters.json reimported) to re-link gallery_character_id and refresh trigger/display_name. Returns the updated record.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Favorite character ID." }
+          },
+          required: ["id"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "add_tags_to_favorite_character",
+        description: "Append tags to a favorite character. Idempotent — existing tags are kept, duplicates ignored.",
+        parameters: {
+          type: "object",
+          properties: {
+            character_id: { type: "string", description: "Favorite character ID." },
+            tags: { type: "array", items: { type: "string" }, description: "Tags to add." }
+          },
+          required: ["character_id", "tags"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "remove_tag_from_favorite_character",
+        description: "Remove a single tag from a favorite character.",
+        parameters: {
+          type: "object",
+          properties: {
+            character_id: { type: "string", description: "Favorite character ID." },
+            tag: { type: "string", description: "Tag to remove." }
+          },
+          required: ["character_id", "tag"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "set_favorite_character_tags",
+        description: "Overwrite all tags of a favorite character. Pass empty array to clear all tags.",
+        parameters: {
+          type: "object",
+          properties: {
+            character_id: { type: "string", description: "Favorite character ID." },
+            tags: { type: "array", items: { type: "string" }, description: "Complete new tag list." }
+          },
+          required: ["character_id", "tags"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "list_favorite_character_tags",
+        description: "List all distinct tags used across favorite characters, with reference counts. Useful for building filter UI or showing tag clouds.",
+        parameters: { type: "object", properties: {} }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "list_favorite_artists",
+        description: "List favorite artists. Supports free-text search. Returns each artist with resolved_image.",
+        parameters: {
+          type: "object",
+          properties: {
+            search: { type: "string", description: "Optional free-text search across artist_tag/display_name/notes/trigger." },
+            limit: { type: "number", description: "Max results (default 50, cap 500)." },
+            offset: { type: "number", description: "Pagination offset (default 0)." }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "add_favorite_artist",
+        description: "⚠️ ONLY use when the user EXPLICITLY says they want to 收藏/favorite a specific artist (e.g. '收藏画师X', 'add artist Y to favorites'). Do NOT use this tool to 'add' an artist to a prompt — for that use update_prompt_content/update_prompt_settings with artist_prompt. This tool only registers a bookmark; it does NOT generate anything.\n\nAdd an artist to favorites, or update if the artist_tag already exists (upsert). Source can be 'gallery'/'lora'/'custom'/'unknown'. Auto-matches gallery to fill gallery_artist_id/trigger/display_name when possible.",
+        parameters: {
+          type: "object",
+          properties: {
+            artist_tag: { type: "string", description: "Canonical artist tag, e.g. 'kantoku'. Must be unique." },
+            source: { type: "string", enum: ["gallery", "lora", "custom", "unknown"], description: "Default 'unknown' (auto-upgraded to 'gallery' if tag matches gallery)." },
+            display_name: { type: "string" },
+            trigger: { type: "string" },
+            example_image: { type: "string", description: "Optional local file path or URL." },
+            notes: { type: "string" }
+          },
+          required: ["artist_tag"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "update_favorite_artist",
+        description: "Update editable fields of a favorite artist. Only display_name/trigger/example_image/notes can be changed.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Favorite artist ID." },
+            display_name: { type: "string" },
+            trigger: { type: "string" },
+            example_image: { type: "string" },
+            notes: { type: "string" }
+          },
+          required: ["id"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "remove_favorite_artist",
+        description: "Remove a favorite artist by id or artist_tag. Provide one of the two.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            artist_tag: { type: "string" }
+          }
+        }
+      }
     }
   ];
 
@@ -949,6 +1226,25 @@ User input: ${userText}`;
       setMessages([...baseMessages, { ...assistantMessage }]);
 
       if (streamError) throw new Error(streamError);
+
+      // === Hermes-style tool_call 文本化兜底解析 ===
+      // 某些 LLM (尤其 agnes-2.0-flash 在长上下文+重复模式下) 会把 tool_call
+      // 当成纯文本写进 content，而不是走结构化 tool_calls 字段。常见两种格式：
+      //   1. 标准 Hermes JSON:  <tool_call>\n{"name":"x","arguments":{...}}\n</tool_call>
+      //   2. XML 风格:          <tool_call><function=name><parameter=key>val</parameter>...</function></tool_call>
+      // 这里兜底解析出来填进 tool_calls，让工具循环正常执行。否则 agent 会
+      // 认为"我说完了"直接结束，工具永远不会被调用 (上一轮卡死的原因)。
+      if ((!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0)
+          && typeof assistantMessage.content === 'string'
+          && assistantMessage.content.includes('<tool_call>')) {
+        const parsed = parseEmbeddedToolCalls(assistantMessage.content);
+        if (parsed.calls.length > 0) {
+          assistantMessage.tool_calls = parsed.calls;
+          assistantMessage.content = parsed.remaining.trim();
+          setMessages([...baseMessages, { ...assistantMessage }]);
+          console.warn(`[Agent] recovered ${parsed.calls.length} embedded tool_call(s) from content text`);
+        }
+      }
 
       if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
         const newMessages = [...currentMessages, assistantMessage];
@@ -1491,6 +1787,91 @@ User input: ${userText}`;
                 res = await invoke<any>('check_comfyui_status', {
                   url: parsedArgs.url || null
                 });
+              } else if (fnName === 'list_favorite_characters') {
+                res = await invoke<any[]>('list_favorite_characters', {
+                  tags: parsedArgs.tags || null,
+                  tagMatch: parsedArgs.tag_match || null,
+                  search: parsedArgs.search || null,
+                  limit: parsedArgs.limit ?? null,
+                  offset: parsedArgs.offset ?? null,
+                });
+              } else if (fnName === 'add_favorite_character') {
+                res = await invoke<any>('add_favorite_character', {
+                  characterTag: parsedArgs.character_tag,
+                  source: parsedArgs.source || null,
+                  displayName: parsedArgs.display_name || null,
+                  trigger: parsedArgs.trigger || null,
+                  exampleImage: parsedArgs.example_image || null,
+                  notes: parsedArgs.notes || null,
+                  tags: parsedArgs.tags || null,
+                });
+              } else if (fnName === 'update_favorite_character') {
+                await invoke('update_favorite_character', {
+                  id: parsedArgs.id,
+                  displayName: parsedArgs.display_name ?? null,
+                  trigger: parsedArgs.trigger ?? null,
+                  exampleImage: parsedArgs.example_image ?? null,
+                  notes: parsedArgs.notes ?? null,
+                });
+                res = { status: "success", id: parsedArgs.id };
+              } else if (fnName === 'remove_favorite_character') {
+                const removed = await invoke<boolean>('remove_favorite_character', {
+                  id: parsedArgs.id || null,
+                  characterTag: parsedArgs.character_tag || null,
+                });
+                res = { status: removed ? "success" : "not_found" };
+              } else if (fnName === 'relink_favorite_character') {
+                res = await invoke<any>('relink_favorite_character', { id: parsedArgs.id });
+              } else if (fnName === 'add_tags_to_favorite_character') {
+                const added = await invoke<number>('add_tags_to_favorite_character', {
+                  characterId: parsedArgs.character_id,
+                  tags: parsedArgs.tags,
+                });
+                res = { status: "success", added };
+              } else if (fnName === 'remove_tag_from_favorite_character') {
+                const removed = await invoke<boolean>('remove_tag_from_favorite_character', {
+                  characterId: parsedArgs.character_id,
+                  tag: parsedArgs.tag,
+                });
+                res = { status: removed ? "success" : "not_found" };
+              } else if (fnName === 'set_favorite_character_tags') {
+                const count = await invoke<number>('set_favorite_character_tags', {
+                  characterId: parsedArgs.character_id,
+                  tags: parsedArgs.tags,
+                });
+                res = { status: "success", count };
+              } else if (fnName === 'list_favorite_character_tags') {
+                res = await invoke<any[]>('list_favorite_character_tags', {});
+              } else if (fnName === 'list_favorite_artists') {
+                res = await invoke<any[]>('list_favorite_artists', {
+                  search: parsedArgs.search || null,
+                  limit: parsedArgs.limit ?? null,
+                  offset: parsedArgs.offset ?? null,
+                });
+              } else if (fnName === 'add_favorite_artist') {
+                res = await invoke<any>('add_favorite_artist', {
+                  artistTag: parsedArgs.artist_tag,
+                  source: parsedArgs.source || null,
+                  displayName: parsedArgs.display_name || null,
+                  trigger: parsedArgs.trigger || null,
+                  exampleImage: parsedArgs.example_image || null,
+                  notes: parsedArgs.notes || null,
+                });
+              } else if (fnName === 'update_favorite_artist') {
+                await invoke('update_favorite_artist', {
+                  id: parsedArgs.id,
+                  displayName: parsedArgs.display_name ?? null,
+                  trigger: parsedArgs.trigger ?? null,
+                  exampleImage: parsedArgs.example_image ?? null,
+                  notes: parsedArgs.notes ?? null,
+                });
+                res = { status: "success", id: parsedArgs.id };
+              } else if (fnName === 'remove_favorite_artist') {
+                const removed = await invoke<boolean>('remove_favorite_artist', {
+                  id: parsedArgs.id || null,
+                  artistTag: parsedArgs.artist_tag || null,
+                });
+                res = { status: removed ? "success" : "not_found" };
               } else {
                 const mcpTool = mcpTools.find((t: any) => t.function.name === fnName);
                 if (mcpTool?._mcp?.url) {
