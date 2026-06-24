@@ -288,7 +288,7 @@ export function PromptTagEditor({ label, value, onChange, type }: PromptTagEdito
                     </button>
                     <button
                       onClick={() => deleteFavorite(fav.id)}
-                      className="p-0.5 rounded text-[var(--text-secondary)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                      className="p-0.5 rounded text-[var(--text-secondary)] hover:text-red-400 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all"
                       title="删除收藏"
                     >
                       <X size={10} />

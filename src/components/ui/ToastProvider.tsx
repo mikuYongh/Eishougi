@@ -6,7 +6,7 @@ export function ToastProvider() {
       position="top-center"
       offset={80}
       expand={false}
-      richColors={false}
+      richColors={true}
       toastOptions={{
         className: 'glass-panel !bg-[var(--bg-layer-2)]/90 !border-[var(--glass-border)] !text-[var(--text-primary)] !shadow-[0_8px_30px_rgba(0,0,0,0.5)] !backdrop-blur-xl',
         style: {
