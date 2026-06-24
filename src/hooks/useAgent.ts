@@ -2059,6 +2059,21 @@ User input: ${userText}`;
     if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
       abortControllerRef.current.abort();
     }
+    // 删除"空 assistant 占位气泡"——content 空且无 tool_calls 的 pending 消息。
+    // UI 显示"思考中..."只看占位气泡是否存在，不查 isGenerating；不删的话即使
+    // 后台停了，气泡还挂着，用户看起来"停不下来"。
+    const sess = useAgentStore.getState();
+    if (sess.activeSessionId) {
+      const current = sess.sessions.find(s => s.id === sess.activeSessionId);
+      if (current) {
+        const cleaned = current.messages.filter(m =>
+          !(m.role === 'assistant' && (m.content ?? '') === '' && (!m.tool_calls || m.tool_calls.length === 0))
+        );
+        if (cleaned.length !== current.messages.length) {
+          useAgentStore.getState().setMessages(cleaned);
+        }
+      }
+    }
     setIsGenerating(false);
   };
 

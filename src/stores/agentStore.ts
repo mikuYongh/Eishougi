@@ -274,6 +274,10 @@ export const useAgentStore = create<AgentStore>()(
       // 超过 quota 静默失败 → 整个 store 写不进，用户感觉历史丢失。
       partialize: (state) => ({
         ...state,
+        // isGenerating 是瞬态运行时状态，不应持久化。
+        // 之前 ...state 把它一起存进 localStorage，导致 app 在生成中被关闭后，
+        // 下次启动读回 isGenerating=true，UI 永远卡在"生成中"。
+        isGenerating: false,
         sessions: state.sessions.map(s => {
           if (s.messages.length <= MAX_MESSAGES_PER_SESSION) return s;
           return {
