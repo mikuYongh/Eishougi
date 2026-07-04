@@ -119,42 +119,6 @@ fn known_model_urls() -> Vec<(&'static str, &'static str, &'static str)> {
     ]
 }
 
-fn extract_workflow_models(workflow_json: &str) -> Vec<String> {
-    let v: serde_json::Value = match serde_json::from_str(workflow_json) { Ok(v) => v, Err(_) => return vec![] };
-    let nodes = match v.get("nodes") { Some(n) => n.as_array(), None => return vec![] };
-    let Some(nodes) = nodes else { return vec![] };
-    let loader_types = ["VAELoader", "UNETLoader", "CLIPLoader", "CheckpointLoaderSimple",
-        "LoraLoader", "ControlNetLoader", "UpscaleModelLoader"];
-    let mut models = Vec::new();
-    for node in nodes {
-        let Some(nt) = node.get("type").and_then(|t| t.as_str()) else { continue };
-        if !loader_types.contains(&nt) { continue }
-        if let Some(wv) = node.get("widgets_values").and_then(|w| w.as_array()) {
-            for val in wv {
-                if let Some(s) = val.as_str() {
-                    let s = s.trim();
-                    if s.ends_with(".safetensors") || s.ends_with(".pt") || s.ends_with(".ckpt") || s.ends_with(".pth") {
-                        if !models.contains(&s.to_string()) { models.push(s.to_string()); }
-                    }
-                }
-            }
-        }
-        if let Some(inputs) = node.get("inputs").and_then(|i| i.as_array()) {
-            for input in inputs {
-                if let Some(w) = input.get("widget") {
-                    if let Some(v) = w.get("value").and_then(|v| v.as_str()) {
-                        let v = v.trim();
-                        if (v.ends_with(".safetensors") || v.ends_with(".pt")) && !models.contains(&v.to_string()) {
-                            models.push(v.to_string());
-                        }
-                    }
-                }
-            }
-        }
-    }
-    models
-}
-
 fn generate_download_script(comfy_dir: &str, wf_models: &[String]) -> Result<(), String> {
     let known = known_model_urls();
     #[cfg(target_os = "windows")]

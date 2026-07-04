@@ -53,36 +53,52 @@ pub async fn process_executed(app_clone: AppHandle, ctx: JobContext, images: Vec
         images_urls.push(img_url);
     }
 
+    // Resolve the canonical app data dir and AppState once.
+    // We use `state.app_data_dir` (hardcoded on Android) instead of `app.path().app_data_dir()`,
+    // because the Tauri runtime path API relies on the JNI/ndk_context which is unreliable on
+    // Android worker threads — that was silently failing image downloads and dropping history.
+    let app_state = app_clone.try_state::<AppState>();
+    let app_data_dir = app_state.as_ref().map(|s| s.app_data_dir.clone());
+
     let mut local_paths = Vec::new();
     for (i, url) in images_urls.iter().enumerate() {
-        if let Ok(local_path) = crate::commands::images::download_comfyui_image(app_clone.clone(), url.clone()).await {
-            let output_type = if local_path.ends_with(".mp4") || local_path.ends_with(".webm") || local_path.ends_with(".avi") || local_path.ends_with(".mov") || local_path.ends_with(".mkv") {
-                "video"
-            } else {
-                "image"
-            };
-            local_paths.push(local_path.clone());
-            
-            let img_record = GeneratedImage {
-                id: format!("img_{}_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(), i),
-                prompt_id: if ctx.project_id.starts_with("video_") { None } else { Some(ctx.project_id.clone()) },
-                workflow_id: ctx.workflow_id.clone(),
-                seed: ctx.seed.map(|s| s.to_string()),
-                output_path: local_path,
-                output_type: output_type.to_string(),
-                status: "completed".to_string(),
-                error_msg: None,
-                is_saved: false,
-                created_at: 0,
-            };
-            
-            if let Some(app_state) = app_clone.try_state::<AppState>() {
-                match crate::commands::history::save_generated_image(app_state, img_record.clone()).await {
-                    Ok(_) => info!("[ComfyWS] Saved to history: {}", img_record.output_path),
-                    Err(e) => error!("[ComfyWS] Failed to save to history: {}", e),
+        let Some(ref data_dir) = app_data_dir else {
+            error!("[ComfyWS] AppState not available, cannot resolve app_data_dir for download");
+            break;
+        };
+        match crate::commands::images::download_comfyui_image(data_dir.clone(), url.clone()).await {
+            Ok(local_path) => {
+                let output_type = if local_path.ends_with(".mp4") || local_path.ends_with(".webm") || local_path.ends_with(".avi") || local_path.ends_with(".mov") || local_path.ends_with(".mkv") {
+                    "video"
+                } else {
+                    "image"
+                };
+                local_paths.push(local_path.clone());
+
+                let img_record = GeneratedImage {
+                    id: format!("img_{}_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(), i),
+                    prompt_id: if ctx.project_id.starts_with("video_") { None } else { Some(ctx.project_id.clone()) },
+                    workflow_id: ctx.workflow_id.clone(),
+                    seed: ctx.seed.map(|s| s.to_string()),
+                    output_path: local_path,
+                    output_type: output_type.to_string(),
+                    status: "completed".to_string(),
+                    error_msg: None,
+                    is_saved: false,
+                    created_at: 0,
+                };
+
+                if let Some(ref app_state) = app_state {
+                    match crate::commands::history::save_generated_image(app_state.clone(), img_record.clone()).await {
+                        Ok(_) => info!("[ComfyWS] Saved to history: {}", img_record.output_path),
+                        Err(e) => error!("[ComfyWS] Failed to save to history: {}", e),
+                    }
+                } else {
+                    error!("[ComfyWS] AppState not available, cannot save to history");
                 }
-            } else {
-                error!("[ComfyWS] AppState not available, cannot save to history");
+            }
+            Err(e) => {
+                error!("[ComfyWS] Failed to download image from {}: {}", url, e);
             }
         }
     }

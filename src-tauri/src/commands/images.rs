@@ -1,9 +1,16 @@
 use std::fs;
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, State};
 
-#[tauri::command]
-pub async fn download_comfyui_image(app: AppHandle, url: String) -> Result<String, String> {
+/// Download a ComfyUI `/view?...` image into the app's uploads dir and return the absolute path.
+///
+/// `app_data_dir` MUST be the canonical app data dir (`state.app_data_dir`, which on Android is the
+/// hardcoded `/data/data/<pkg>/files`). It is passed in explicitly rather than read via
+/// `app.path().app_data_dir()` because that Tauri runtime API depends on the JNI/ndk_context being
+/// initialized, which is unreliable on Android worker threads — using it caused downloads to fail
+/// silently there, dropping generated images out of history and the completion toast.
+pub async fn download_comfyui_image(app_data_dir: PathBuf, url: String) -> Result<String, String> {
     // Extract original filename from ComfyUI URL to preserve correct extension.
     // Video workflows produce .mp4/.webm files, image workflows produce .png/.jpg;
     // using the original filename prevents videos being saved as .png.
@@ -21,8 +28,6 @@ pub async fn download_comfyui_image(app: AppHandle, url: String) -> Result<Strin
     // gen_ prefix for traceability, timestamp for uniqueness, original extension preserved
     let filename = format!("gen_{}_{}", timestamp, safe_name);
 
-    // Get the uploads directory
-    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let uploads_dir = app_data_dir.join("uploads");
 
     // Ensure the uploads directory exists
@@ -49,12 +54,14 @@ pub async fn download_comfyui_image(app: AppHandle, url: String) -> Result<Strin
 }
 
 #[tauri::command]
-pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<String, String> {
+pub async fn export_image_to_downloads(app: AppHandle, state: State<'_, crate::AppState>, url: String) -> Result<String, String> {
     #[cfg(target_os = "android")]
     {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-        let tmp_dir = app_data_dir.join("tmp");
+        let _ = &app; // app currently unused on Android; kept for signature stability.
+        // Use the canonical state dir (hardcoded on Android) instead of app.path().app_data_dir(),
+        // which is unreliable on Android worker/foreground threads (see download_comfyui_image).
+        let tmp_dir = state.app_data_dir.join("tmp");
         if !tmp_dir.exists() {
             std::fs::create_dir_all(&tmp_dir).map_err(|e| e.to_string())?;
         }
@@ -77,6 +84,7 @@ pub async fn export_image_to_downloads(app: AppHandle, url: String) -> Result<St
     #[cfg(not(target_os = "android"))]
     {
         use std::time::{SystemTime, UNIX_EPOCH};
+        let _ = &state; // state only used for the Android tmp dir; desktop uses the OS download dir.
         let download_dir = app
             .path()
             .download_dir()
