@@ -129,7 +129,6 @@ export function WorkflowEdit() {
         if (typeof finalJson === 'object') {
           finalJson = JSON.stringify(finalJson, null, 2);
         }
-        console.log("[WorkflowEdit] injectParameters completed, finalJson length:", finalJson?.length ?? 0);
       } catch (e) {
         console.error("[WorkflowEdit] injectParameters failed:", e);
         toast.error(`保存失败：参数注入失败 — ${String(e).substring(0, 200)}`);
@@ -155,7 +154,6 @@ export function WorkflowEdit() {
         });
         toast.success('工作流已创建');
       }
-      console.log("[WorkflowEdit] save complete, navigating to /workflows");
       navigate('/workflows');
     } catch (e) {
       console.error("[WorkflowEdit] save failed:", e);

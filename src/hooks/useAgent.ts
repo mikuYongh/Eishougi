@@ -1118,26 +1118,6 @@ User input: ${userText}`;
           payload.options = { num_ctx: 32768 };
         }
         bodyJson = JSON.stringify(payload);
-
-        // payload 诊断日志：记录 size / 消息数 / 图片 base64 数 / 工具数 / round。
-        // 用于排查 Agnes 500 / ERR_CONNECTION_CLOSED 是否由 payload 过大引起。
-        const imageCount = finalMessages.reduce((acc: number, m: any) => {
-          if (m.role === 'tool') return acc;
-          const imgs = m.role === 'assistant' && Array.isArray(m.content)
-            ? m.content.filter((c: any) => c?.type === 'image_url').length
-            : 0;
-          return acc + imgs;
-        }, 0);
-        console.log("[Agent] outgoing payload:", {
-          bytes: bodyJson.length,
-          kb: Math.round(bodyJson.length / 1024),
-          round: currentRound,
-          messages: finalMessages.length,
-          imageAttachments: imageCount,
-          tools: payload.tools?.length || 0,
-          model: payload.model,
-          maxTokens: payload.max_tokens,
-        });
       } catch (e) {
         console.error("[Agent] JSON.stringify failed:", e);
         throw e;
@@ -1351,33 +1331,6 @@ User input: ${userText}`;
                 const resolvedLoraConfigs: string | null = workflowParsedLoras.length > 0
                   ? JSON.stringify(workflowParsedLoras)
                   : null;
-
-                console.log("[Agent] create_prompt resolution:", {
-                  title: parsedArgs.title,
-                  agentBaseModel: parsedArgs.base_model,
-                  resolvedBaseModel,
-                  agentWorkflowId: parsedArgs.workflow_id,
-                  resolvedWorkflowId,
-                  defaultWorkflowExists: !!defaultWf,
-                  agentLoraConfigs: parsedArgs.lora_configs,
-                  workflowParsedLoras,
-                  resolvedLoraConfigs,
-                  localCheckpointsCount: localCheckpoints.length,
-                  workflowParsed: {
-                    baseModel: workflowParsedBaseModel,
-                    vae: workflowParsedVaeModel,
-                    sampler: workflowParsedSampler,
-                    scheduler: workflowParsedScheduler,
-                    width: workflowParsedWidth,
-                    height: workflowParsedHeight,
-                    steps: workflowParsedSteps,
-                    cfg: workflowParsedCfg,
-                  },
-                  resolved: {
-                    width: resolvedWidth, height: resolvedHeight, steps: resolvedSteps,
-                    cfg: resolvedCfg, sampler: resolvedSampler, scheduler: resolvedScheduler, vae: resolvedVae,
-                  },
-                });
 
                 const newPrompt = {
                   id: "p_" + Date.now().toString(),
@@ -1597,10 +1550,7 @@ User input: ${userText}`;
               } else if (fnName === 'auto_tag_all_prompts') {
             const { aiService } = await import('../services/aiService');
             // Run in background, return immediate response
-            aiService.batchAutoTagPrompts(
-              (curr, total) => console.log(`[AutoTag] ${curr}/${total}`),
-              (msg) => console.log(`[AutoTag] ${msg}`)
-            );
+            aiService.batchAutoTagPrompts();
             resultStr = JSON.stringify({ status: "success", message: "后台批量打标已启动，将自动为所有提示词生成标签" });
           } else if (fnName === 'list_local_models') {
             const store = useModelStore.getState();

@@ -167,18 +167,7 @@ export const usePromptStore = create<PromptStore>((set, get) => ({
       }
       const updatedPrompt = { ...currentPrompt, ...data, updatedAt: Date.now() };
       const rustPayload = toRustPrompt(updatedPrompt);
-      console.log("[updatePrompt] saving to backend:", {
-        id: rustPayload.id,
-        positivePrompt: rustPayload.positivePrompt?.substring(0, 80) + "...",
-        negativePrompt: rustPayload.negativePrompt?.substring(0, 80) + "...",
-        samplerName: rustPayload.samplerName,
-        scheduler: rustPayload.scheduler,
-        steps: rustPayload.steps,
-        width: rustPayload.width,
-        height: rustPayload.height,
-        baseModel: rustPayload.baseModel,
-      });
-      const result = await invoke('update_prompt', { prompt: rustPayload });
+      await invoke('update_prompt', { prompt: rustPayload });
       set((state) => ({
         prompts: state.prompts.map((p) => (p.id === id ? updatedPrompt : p)),
       }));
