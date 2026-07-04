@@ -56,7 +56,11 @@ const defaultSettings: AppSettings = {
   autoSave: true,
   llm: {
     provider: 'agnes',
-    apiKey: import.meta.env.VITE_LLM_API_KEY || '',
+    // SECURITY: apiKey MUST stay empty here. Never read it from import.meta.env at build time —
+    // Vite inlines VITE_* vars into the JS bundle, which gets shipped inside the APK. Anyone who
+    // unpacks the APK (jadx / unzip) could then read the key. Keys belong only in the user's own
+    // device storage (localStorage via zustand persist), entered through Settings.
+    apiKey: '',
     apiUrl: import.meta.env.VITE_LLM_API_URL || 'https://apihub.agnes-ai.com/v1',
     model: import.meta.env.VITE_LLM_MODEL || 'agnes-2.0-flash',
     temperature: 0.7,

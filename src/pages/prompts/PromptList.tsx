@@ -138,7 +138,6 @@ export function PromptList() {
           setTagProgress(`${curr}/${total}`);
           if (id) setTaggingItemId(id);
         },
-        console.log
       );
       setTagProgress("");
       setTaggingItemId(null);
@@ -172,12 +171,9 @@ export function PromptList() {
             <Sparkles size={16} className={isAutoTagging ? "animate-pulse text-blue-400" : "text-blue-400"} /> 
             {isAutoTagging ? `打标中 ${tagProgress}...` : "AI 自动打标"}
           </button>
-          <button className="px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)] hidden sm:block">
-            导入项目 JSON
-          </button>
-          <button 
+          <button
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all text-[var(--text-primary)] cursor-pointer"
-            style={{ background: "linear-gradient(135deg, #42A5F5, #7E57C2)", border: "1px solid rgba(255,255,255,0.2)" }}
+            style={{ background: "linear-gradient(135deg, #42A5F5, #7E57F2)", border: "1px solid rgba(255,255,255,0.2)" }}
             onClick={() => navigate('/prompts/new')}
           >
             <Plus size={16} /> 新建项目

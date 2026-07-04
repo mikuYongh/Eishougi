@@ -45,14 +45,21 @@ export function PromptEdit() {
   const tagContainerRef = useRef<HTMLDivElement>(null);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Guard so the new-prompt default-workflow init only runs ONCE. Previously this effect re-ran
+  // whenever `prompts` changed (e.g. Generate auto-saving another project, an agent creating a
+  // prompt, a favorite toggle), and the new-prompt branch would clobber the user's in-progress
+  // baseModel / sampler / lora selections with the workflow defaults again.
+  const newPromptInitDone = useRef(false);
 
   useEffect(() => {
-    if (id) {
+    if (id && id !== 'new') {
       const p = prompts.find(p => p.id === id);
       if (p) setProject(p);
     } else {
       // 新建提示词：用 text2img 默认工作流初始化所有可识别的参数
       // （baseModel / vaeModel / width / height / steps / cfgScale / sampler / scheduler / loras）。
+      // 只在首次（workflows/checkpoints 加载后）执行一次，避免覆盖用户后续编辑。
+      if (newPromptInitDone.current) return;
       const defaultWorkflow = workflows.find(w => w.type === 'text2img' && w.isDefault);
       setProject(prev => {
         const next: Partial<PromptProject> = { ...prev };
@@ -81,6 +88,7 @@ export function PromptEdit() {
         }
         return next;
       });
+      newPromptInitDone.current = true;
     }
   }, [id, prompts, workflows, checkpoints]);
 
@@ -115,16 +123,19 @@ export function PromptEdit() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSave = async () => {
+  // Returns the saved project's id on success, or null if save was skipped/failed.
+  const handleSave = async (): Promise<string | null> => {
     if (!project.title?.trim()) {
       toast.warning('请输入项目名称');
-      return;
+      return null;
     }
 
-    if (id) {
+    const isEditing = id && id !== 'new';
+    if (isEditing) {
       await updatePrompt(id, project);
       toast.success('项目已更新');
-      } else {
+      return id;
+    } else {
       // Create a new prompt project
       const newId = "p_" + Date.now().toString();
       const now = Date.now();
@@ -154,10 +165,13 @@ export function PromptEdit() {
         updatedAt: now,
         instanceImages: project.instanceImages || [],
       };
-await addPrompt(newProject);
+      await addPrompt(newProject);
       toast.success('项目已创建');
+      // Switch URL from /prompts/new to the real edit URL so subsequent saves update
+      // instead of creating duplicates.
       navigate(`/prompts/${newId}/edit`, { replace: true });
-      }
+      return newId;
+    }
   };
 
   const updateField = (key: keyof PromptProject, value: any) => {
@@ -213,8 +227,15 @@ await addPrompt(newProject);
           >
             <Save size={16} /> 保存项目
           </button>
-            <button 
-              onClick={() => { handleSave(); navigate(`/generate/${id}`); }}
+            <button
+              onClick={async () => {
+                // Must await save so the project exists in the store (with the right id)
+                // before Generate tries to load it by id. Previously this fired both calls
+                // without awaiting, so on create the project didn't exist yet AND the URL
+                // still carried the bogus id "new" — Generate showed "no project selected".
+                const savedId = await handleSave();
+                if (savedId) navigate(`/generate/${savedId}`);
+              }}
               className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] hover:scale-[1.02] transition-all text-[var(--text-primary)] cursor-pointer w-full sm:w-auto"
               style={{ background: "linear-gradient(135deg, #42A5F5, #7E57C2)", border: "1px solid rgba(255,255,255,0.2)" }}
             >

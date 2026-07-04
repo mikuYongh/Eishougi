@@ -1,4 +1,5 @@
 import { Plus, Search, Edit3, Trash2, Cpu, Video, Settings, Play, Star, Zap } from "lucide-react";
+import { useState } from "react";
 import { useWorkflowStore, type WorkflowType, type WorkflowProject } from "../../stores/workflowStore";
 import { usePromptStore } from "../../stores/promptStore";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +31,26 @@ export function WorkflowList() {
   const removeWorkflow = useWorkflowStore(state => state.removeWorkflow);
   const addPrompt = usePromptStore(state => state.addPrompt);
   const navigate = useNavigate();
+
+  // Category filter + search — previously these UI controls had no state and did nothing.
+  const [activeCategory, setActiveCategory] = useState<'all' | 'text2img' | 'video' | 'utility'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const filteredWorkflows = workflows.filter(w => {
+    if (activeCategory === 'text2img' && w.type !== 'text2img') return false;
+    if (activeCategory === 'video' && w.type !== 'img2video') return false;
+    if (activeCategory === 'utility' && w.type !== 'tagger' && w.type !== 'upscale') return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      if (!w.name.toLowerCase().includes(q) && !w.description.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+  const categoryTabs = [
+    { key: 'all', label: '全部' },
+    { key: 'text2img', label: '文生图' },
+    { key: 'video', label: '视频生成' },
+    { key: 'utility', label: '实用工具' },
+  ] as const;
 
   const handleTestWorkflow = async (w: WorkflowProject) => {
     if (w.type !== 'text2img') {
@@ -105,20 +126,23 @@ export function WorkflowList() {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--glass-border)] pb-2">
         <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
-          {["全部", "文生图", "视频生成", "实用工具"].map((tab, i) => (
-            <button 
-              key={i}
-              className={`px-4 py-1.5 text-[12px] font-bold rounded-full transition-colors cursor-pointer border ${i === 0 ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : "bg-[var(--glass-bg)] text-[var(--text-secondary)] border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]"}`}
+          {categoryTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveCategory(tab.key)}
+              className={`px-4 py-1.5 text-[12px] font-bold rounded-full transition-colors cursor-pointer border ${activeCategory === tab.key ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" : "bg-[var(--glass-bg)] text-[var(--text-secondary)] border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]"}`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
         <div className="glass-panel flex items-center gap-2 px-3 py-1.5 w-64 focus-within:border-yellow-400/50 transition-colors rounded-full">
           <Search size={14} className="text-[var(--text-secondary)]" />
-          <input 
-            type="text" 
-            placeholder="搜索工作流..." 
+          <input
+            type="text"
+            placeholder="搜索工作流..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="bg-transparent border-none outline-none text-[12px] text-[var(--text-primary)] w-full placeholder:text-[var(--text-secondary)]"
           />
         </div>
@@ -126,8 +150,14 @@ export function WorkflowList() {
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto pr-2 pb-4">
+        {filteredWorkflows.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-[var(--text-secondary)] gap-3 py-16">
+            <Search size={36} className="opacity-20" />
+            <p className="text-sm">没有匹配的工作流</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {workflows.map((wf) => (
+          {filteredWorkflows.map((wf) => (
             <div key={wf.id} className="glass-panel rounded-2xl flex flex-col group border border-[var(--glass-border)] hover:border-yellow-400/30 transition-all hover:shadow-[0_8px_30px_rgba(255,213,79,0.1)] overflow-hidden">
               
               {/* Thumbnail */}
@@ -201,6 +231,7 @@ export function WorkflowList() {
             </div>
           ))}
         </div>
+        )}
       </div>
 
     </div>

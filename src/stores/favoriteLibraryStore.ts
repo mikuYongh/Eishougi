@@ -127,9 +127,15 @@ export const useFavoriteLibraryStore = create<FavoriteState>((set, get) => ({
     set({ isCharactersLoading: true });
     try {
       const page = reset ? 0 : characterPage;
+      // Map the UI mode to the value the Rust backend understands.
+      // Rust's list_favorite_characters only treats the literal "and" (case-insensitive) as
+      // AND semantics; every other value (including the UI default "all") falls back to OR.
+      // Since the UI exposes multi-select tags expecting "match ALL", default "all" must map
+      // to "and" so multi-tag filtering actually intersects instead of unions.
+      const rustMode = tagMatchMode === 'all' ? 'and' : tagMatchMode === 'any' ? 'or' : tagMatchMode;
       const res = await invoke<FavoriteCharacter[]>('list_favorite_characters', {
         tags: selectedTags.length > 0 ? selectedTags : null,
-        tagMatch: tagMatchMode,
+        tagMatch: rustMode,
         limit: 50,
         offset: page * 50
       });
