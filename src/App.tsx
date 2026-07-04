@@ -13,7 +13,7 @@ import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 
 import { Dashboard } from "./pages/Dashboard";
 import {
-  PromptList, PromptEdit, PromptDetail,
+  PromptList, PromptEdit,
   WorkflowList, WorkflowEdit,
   Generate, VideoGenerate,
   Tagger, History, Settings,
@@ -123,7 +123,6 @@ function AppRoutes() {
       <Route path="/" element={<Dashboard />} />
       <Route path="/prompts" element={<PromptList />} />
       <Route path="/prompts/new" element={<PromptEdit />} />
-      <Route path="/prompts/:id" element={<PromptDetail />} />
       <Route path="/prompts/:id/edit" element={<PromptEdit />} />
       <Route path="/workflows" element={<WorkflowList />} />
       <Route path="/workflows/new" element={<WorkflowEdit />} />

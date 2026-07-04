@@ -8,6 +8,3 @@ export { VideoGenerate } from './generate/VideoGenerate';
 export { Tagger } from './tools/Tagger';
 export { History } from './history/History';
 export { Settings } from './Settings';
-
-// These two are still placeholders since they are sub-pages (edit/detail), not main menu items.
-export function PromptDetail()  { return <div className="text-[var(--text-secondary)] p-10 text-center">PromptDetail 页面开发中...</div>; }
