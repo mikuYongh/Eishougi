@@ -75,17 +75,17 @@ export function Vault() {
         ) : (
           <div className="columns-2 md:columns-3 xl:columns-4 gap-4 space-y-4">
             {images.map(img => {
-              const video = isVideo(img.output_path || (img as any).outputPath || '');
+              const video = isVideo(img.outputPath);
               return (
                 <div key={img.id} onClick={() => setPreviewImage(img)} className="break-inside-avoid relative group rounded-2xl overflow-hidden border border-[var(--glass-border)] bg-[var(--glass-bg)] hover:shadow-[0_8px_30px_rgba(var(--accent-1-rgb),0.15)] hover:border-[var(--accent-1)]/50 transition-all duration-300 cursor-pointer">
                   {video ? (
                     <div className="relative">
-                      <video 
-                        src={getImgSrc(img.output_path || (img as any).outputPath)} 
+                      <video
+                        src={getImgSrc(img.outputPath)}
                         className={`w-full object-cover transition-all duration-500 ${privacyMode ? 'blur-xl group-hover:blur-none' : ''}`}
-                        autoPlay 
-                        loop 
-                        muted 
+                        autoPlay
+                        loop
+                        muted
                         playsInline
                       />
                       <div className="absolute top-3 left-3 px-2 py-1 bg-black/50 backdrop-blur-md rounded-lg text-white flex items-center gap-1.5 text-xs font-bold border border-white/10 z-10">
@@ -93,23 +93,23 @@ export function Vault() {
                       </div>
                     </div>
                   ) : (
-                    <img 
-                      src={getImgSrc(img.output_path || (img as any).outputPath)} 
-                      alt="saved" 
+                    <img
+                      src={getImgSrc(img.outputPath)}
+                      alt="saved"
                       className={`w-full h-auto object-cover transition-all duration-500 ${privacyMode ? 'blur-xl group-hover:blur-none' : ''}`}
                     />
                   )}
-                  
+
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden md:flex flex-col justify-between p-3 z-20 pointer-events-none">
                     <div className="flex justify-end gap-2 pointer-events-auto">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); downloadImage(img.output_path || (img as any).outputPath, `vault_${img.id}.png`); }}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); downloadImage(img.outputPath, `vault_${img.id}.png`); }}
                         className="w-8 h-8 rounded-full bg-black/50 text-white/70 hover:text-[var(--accent-1)] hover:bg-black/80 flex items-center justify-center backdrop-blur-md transition-all cursor-pointer"
                         title="下载到本地"
                       >
                         <Download size={14} />
                       </button>
-                      <button 
+                      <button
                         onClick={(e) => { e.stopPropagation(); unsaveImage(img.id); }}
                         className="w-8 h-8 rounded-full bg-black/50 text-white/70 hover:text-red-400 hover:bg-black/80 flex items-center justify-center backdrop-blur-md transition-all cursor-pointer"
                         title="取消收藏"
@@ -118,22 +118,20 @@ export function Vault() {
                       </button>
                     </div>
                     <div className="text-[10px] text-white/50 font-mono flex items-center gap-2">
-                      {/* @ts-ignore */}
-                      <span>{new Date(img.createdAt || img.created_at || Date.now()).toLocaleDateString()}</span>
+                      <span>{new Date(img.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
 
                   {/* Mobile Actions */}
                   <div className="md:hidden p-2 flex items-center justify-between border-t border-[var(--glass-border)] bg-[var(--bg-layer-1)]">
                     <span className="text-[10px] text-[var(--text-secondary)] font-mono">
-                      {/* @ts-ignore */}
-                      {new Date(img.createdAt || img.created_at || Date.now()).toLocaleDateString()}
+                      {new Date(img.createdAt).toLocaleDateString()}
                     </span>
                     <div className="flex gap-2">
                       <button onClick={(e) => { e.stopPropagation(); setPreviewImage(img); }} className="w-6 h-6 rounded-full bg-[var(--accent-1)]/20 text-[var(--accent-1)] flex items-center justify-center">
                         <Maximize2 size={12} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); downloadImage(img.output_path || (img as any).outputPath, `vault_${img.id}.png`); }} className="w-6 h-6 rounded-full bg-blue-500/10 text-[var(--accent-1)] flex items-center justify-center">
+                      <button onClick={(e) => { e.stopPropagation(); downloadImage(img.outputPath, `vault_${img.id}.png`); }} className="w-6 h-6 rounded-full bg-blue-500/10 text-[var(--accent-1)] flex items-center justify-center">
                         <Download size={12} />
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); unsaveImage(img.id); }} className="w-6 h-6 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
@@ -170,23 +168,23 @@ export function Vault() {
             onClick={e => e.stopPropagation()}
           >
             <div className="w-full h-[45vh] flex-shrink-0 md:h-auto md:flex-1 flex items-center justify-center bg-black/50 p-4 relative overflow-hidden">
-              {isVideo(previewImage.output_path || (previewImage as any).outputPath || '') ? (
-                <video 
-                  src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)} 
+              {isVideo(previewImage.outputPath) ? (
+                <video
+                  src={getImgSrc(previewImage.outputPath)}
                   className={`max-w-full max-h-full object-contain shadow-2xl rounded-lg ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
                   autoPlay controls loop
                 />
               ) : (
-                <PhotoView src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)}>
-                  <img 
-                    src={getImgSrc(previewImage.output_path || (previewImage as any).outputPath)} 
-                    alt="Preview full" 
+                <PhotoView src={getImgSrc(previewImage.outputPath)}>
+                  <img
+                    src={getImgSrc(previewImage.outputPath)}
+                    alt="Preview full"
                     className={`max-w-full max-h-full object-contain shadow-2xl rounded-lg cursor-zoom-in ${privacyMode ? 'blur-sm hover:blur-none transition-all duration-300' : ''}`}
                   />
                 </PhotoView>
               )}
             </div>
-            
+
             <div className="w-full md:w-[350px] flex-1 md:flex-none min-h-0 bg-[var(--bg-layer-1)] p-6 flex flex-col gap-5 border-t md:border-t-0 md:border-l border-[var(--glass-border)] overflow-y-auto custom-scrollbar">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-[var(--text-primary)]">典藏详情</h3>
@@ -198,29 +196,29 @@ export function Vault() {
               <div>
                 <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">正向提示词</label>
                 <div className="text-[12px] text-[var(--text-primary)] font-mono leading-relaxed bg-[var(--glass-bg)] p-3 rounded-xl border border-[var(--glass-border)] max-h-40 overflow-y-auto custom-scrollbar">
-                  {(previewImage as any).prompt || previewImage.prompt_id || "暂无对应的提示词记录"}
+                  {previewImage.promptId || "暂无对应的提示词记录"}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">基础模型</label>
-                  <div className="text-[12px] font-bold text-[var(--text-primary)] truncate" title={(previewImage as any).model || "未知"}>{(previewImage as any).model || "未知"}</div>
+                  <div className="text-[12px] font-bold text-[var(--text-primary)] truncate" title="未知">未知</div>
                 </div>
                 <div>
                   <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">分辨率 / Seed</label>
-                  <div className="text-[12px] font-bold text-[var(--text-primary)]">{(previewImage as any).resolution || previewImage.seed || "未知"}</div>
+                  <div className="text-[12px] font-bold text-[var(--text-primary)]">{previewImage.seed || "未知"}</div>
                 </div>
               </div>
 
               <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-[var(--glass-border)]">
-                <button 
-                  onClick={() => downloadImage(previewImage.output_path || (previewImage as any).outputPath, `vault_${previewImage.id}.png`)}
+                <button
+                  onClick={() => downloadImage(previewImage.outputPath, `vault_${previewImage.id}.png`)}
                   className="w-full py-3 rounded-xl bg-[var(--accent-1)]/20 text-[var(--accent-1)] border border-[var(--accent-1)]/50 font-bold text-[13px] hover:bg-[var(--accent-1)] hover:text-white transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Download size={16} /> 保存到本地
                 </button>
-                <button 
+                <button
                   onClick={() => { unsaveImage(previewImage.id); setPreviewImage(null); }}
                   className="w-full py-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/30 font-bold text-[13px] hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >

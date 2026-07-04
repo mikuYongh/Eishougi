@@ -8,6 +8,7 @@ import { useSettingsStore } from "../../stores/settingsStore";
 import { useQueueStore } from "../../stores/queueStore";
 import { downloadImage } from "../../utils/download";
 import { getImgSrc, isVideoFile } from "../../utils/imageUtils";
+import type { GeneratedImage } from "../../types";
 
 
 
@@ -31,7 +32,7 @@ interface HistoryGroup {
 
 export function History() {
   const [history, setHistory] = useState<HistoryGroup[]>([]);
-  const [allData, setAllData] = useState<any[]>([]);
+  const [allData, setAllData] = useState<GeneratedImage[]>([]);
   const [limit, setLimit] = useState(50);
   const [previewImage, setPreviewImage] = useState<HistoryImage | null>(null);
   const [addingToPrompt, setAddingToPrompt] = useState<HistoryImage | null>(null);
@@ -52,14 +53,14 @@ export function History() {
 
   const fetchHistory = async () => {
     try {
-      const data = await invoke<any[]>('list_generated_images');
+      const data = await invoke<GeneratedImage[]>('list_generated_images');
       setAllData(data);
     } catch (error) {
       console.error("Failed to fetch history:", error);
     }
   };
 
-  const processData = (data: any[]) => {
+  const processData = (data: GeneratedImage[]) => {
     const promptsMap = new Map(prompts.map(p => [p.id, p]));
     const grouped = new Map<string, HistoryImage[]>();
     
@@ -68,12 +69,12 @@ export function History() {
     
     limitedData.forEach(item => {
       // Skip failed or pending items
-      if (item.status !== 'completed' && item.status !== 'completed') return;
+      if (item.status !== 'completed') return;
       
       const date = new Date(item.createdAt);
       const dateStr = date.toLocaleDateString();
       
-      const promptObj = promptsMap.get(item.promptId);
+      const promptObj = item.promptId ? promptsMap.get(item.promptId) : undefined;
       
       const img: HistoryImage = {
         id: item.id,

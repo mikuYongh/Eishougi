@@ -1,14 +1,16 @@
+// NOTE: Rust models use `#[serde(rename_all = "camelCase")]`, so the JSON the
+// frontend receives is camelCase. Keep this interface aligned with that.
 export interface GeneratedImage {
   id: string;
-  prompt_id: string | null;
-  workflow_id: string | null;
+  promptId: string | null;
+  workflowId: string | null;
   seed: string | null;
-  output_path: string;
-  output_type: "image" | "video";
+  outputPath: string;
+  outputType: "image" | "video";
   status: "completed" | "failed";
-  error_msg: string | null;
+  errorMsg: string | null;
   isSaved: boolean;
-  created_at: number;
+  createdAt: number;
 }
 
 export type TabId = "all" | "positive" | "negative" | "artist" | "favorite";
