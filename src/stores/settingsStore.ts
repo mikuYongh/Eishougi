@@ -21,6 +21,15 @@ export interface AppSettings {
     maxTokens: number;
   };
   mcpServers: McpServerConfig[];
+  // MCP server (exposing this app's tools to external AI clients like Claude Desktop / Cursor).
+  // The actual running state + token live in the Rust backend (persisted in mcp_server.json);
+  // these are just the UI-side toggles that mirror what the backend was last told.
+  mcpServer: {
+    port: number;
+    core: boolean;
+    query: boolean;
+    write: boolean;
+  };
   slimToolsMode: boolean;
   wallpaperPath: string;
   appTheme: 'dark' | 'light' | 'system';
@@ -74,6 +83,12 @@ const defaultSettings: AppSettings = {
       url: "https://sakizuki-danboorusearchonline.ms.show/mcp/mcp"
     }
   ],
+  mcpServer: {
+    port: 21434,
+    core: true,
+    query: true,
+    write: false,
+  },
   wallpaperPath: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2560&auto=format&fit=crop',
   appTheme: 'dark',
   colorTheme: 'sakura',

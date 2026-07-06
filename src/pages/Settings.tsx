@@ -9,6 +9,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { GlassDropdown } from "../components/ui/GlassDropdown";
+import { McpServerPanel } from "../components/settings/McpServerPanel";
 import { toast } from "sonner";
 
 const SETTINGS_TABS = [
@@ -37,6 +38,23 @@ export function Settings() {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [ollamaModels, setOllamaModels] = useState<{label: string, value: string}[]>([]);
   const [isTestingComfy, setIsTestingComfy] = useState(false);
+  // MCP server running indicator (null = unknown). Polled so the "模型与服务" tab dot stays live.
+  const [mcpRunning, setMcpRunning] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const s = await invoke<{ running: boolean }>("mcp_server_status");
+        if (alive) setMcpRunning(s.running);
+      } catch {
+        if (alive) setMcpRunning(null);
+      }
+    };
+    check();
+    const t = setInterval(check, 4000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
 
   const handleTestComfy = async (url: string) => {
     setIsTestingComfy(true);
@@ -271,6 +289,12 @@ export function Settings() {
                   {tab.icon}
                 </span>
                 {tab.label}
+                {tab.id === "models" && mcpRunning !== null && (
+                  <span
+                    title={mcpRunning ? "MCP 对外服务运行中" : "MCP 对外服务已停止"}
+                    className={`w-1.5 h-1.5 rounded-full ml-auto flex-shrink-0 ${mcpRunning ? "bg-green-400 animate-pulse" : "bg-gray-500"}`}
+                  />
+                )}
               </button>
             );
           })}
@@ -730,6 +754,9 @@ export function Settings() {
                   </div>
                 </div>
               </div>
+
+              {/* MCP Server — expose the app's tools to external AI clients */}
+              <McpServerPanel />
             </div>
           )}
 

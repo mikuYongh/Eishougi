@@ -25,6 +25,7 @@ import { MobileMenu } from "./pages/MobileMenu";
 import { usePromptStore } from "./stores/promptStore";
 import { useWorkflowStore } from "./stores/workflowStore";
 import { useDevice } from "./hooks/useDevice";
+import { useMcpServer } from "./hooks/useMcpServer";
 import { DesktopLayout } from "./components/layout/DesktopLayout";
 import { MobileLayout } from "./components/layout/MobileLayout";
 import { GlobalPhotoProvider } from "./components/ui/GlobalPhotoProvider";
@@ -37,6 +38,9 @@ export default function App() {
   const hasCompletedOnboarding = settings.hasCompletedOnboarding;
   const fetchPrompts = usePromptStore((state) => state.fetchPrompts);
   const fetchWorkflows = useWorkflowStore((state) => state.fetchWorkflows);
+  // Keep the MCP server status fresh + bridge external generate_image requests to the frontend
+  // generation queue. Mounted once at the app root so it is always active.
+  useMcpServer();
 
   useEffect(() => {
     fetchPrompts();
