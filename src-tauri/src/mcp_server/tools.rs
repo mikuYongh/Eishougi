@@ -211,13 +211,14 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     // ---- write (default off) ----
     ToolDef {
         name: "update_prompt_content",
-        description: "Update the textual content (title, positive/negative/artist prompts, syntax) of an existing prompt project.",
+        description: "Update the textual content (title, description, positive/negative/artist prompts, syntax) of an existing prompt project.",
         group: ToolGroup::Write,
         input_schema: json!({
             "type": "object",
             "properties": {
                 "prompt_id": { "type": "string" },
                 "title": { "type": "string" },
+                "description": { "type": "string" },
                 "positive_prompt": { "type": "string" },
                 "negative_prompt": { "type": "string" },
                 "artist_prompt": { "type": "string" },
@@ -228,7 +229,7 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     },
     ToolDef {
         name: "update_prompt_settings",
-        description: "Update generation settings (model, LoRAs, resolution, sampler) of an existing prompt project.",
+        description: "Update generation settings (model, LoRAs, resolution, sampler, seed) of an existing prompt project.",
         group: ToolGroup::Write,
         input_schema: json!({
             "type": "object",
@@ -241,7 +242,8 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
                 "width": { "type": "number" },
                 "height": { "type": "number" },
                 "steps": { "type": "number" },
-                "cfg_scale": { "type": "number" }
+                "cfg_scale": { "type": "number" },
+                "seed": { "type": "string", "description": "Use -1 for random" }
             },
             "required": ["prompt_id"]
         }),
@@ -324,10 +326,10 @@ pub async fn execute_tool(
     core: bool,
     query: bool,
     write: bool,
-) -> Vec<Value> {
+) -> (Vec<Value>, bool) {
     let tool = TOOLS.iter().find(|t| t.name == name);
     let Some(tool) = tool else {
-        return text_content(format!("Unknown tool: {}", name));
+        return text_err(format!("Unknown tool: {}", name));
     };
     let enabled = match tool.group {
         ToolGroup::Core => core,
@@ -335,7 +337,7 @@ pub async fn execute_tool(
         ToolGroup::Write => write,
     };
     if !enabled {
-        return text_content(format!(
+        return text_err(format!(
             "Tool '{}' is disabled in the server's settings (group: {}).",
             name,
             tool.group.as_str()
@@ -349,7 +351,7 @@ pub async fn execute_tool(
     }
 
     let Some(state) = app.try_state::<AppState>() else {
-        return text_content("Internal error: AppState unavailable.".to_string());
+        return text_err("Internal error: AppState unavailable.".to_string());
     };
 
     let result = match name {
@@ -367,11 +369,9 @@ pub async fn execute_tool(
         "create_prompt" => {
             let prompt = build_prompt_from_args(arguments);
             match commands::prompts::create_prompt(state, prompt).await {
-                Ok(p) => Ok(json!({"status": "created", "prompt": p}).to_string()),
-                Err(e) => Err(e),
+                Ok(p) => text_ok(json!({"status": "created", "prompt": p}).to_string()),
+                Err(e) => text_err(e),
             }
-            .map(text_content)
-            .unwrap_or_else(text_content)
         }
         "get_generated_images" => {
             let rows = commands::history::list_generated_images(state).await;
@@ -440,41 +440,32 @@ pub async fn execute_tool(
         "check_comfyui_status" => {
             let url = arg_opt_string(arguments, "url");
             match commands::auto_deploy::check_comfyui_status(url).await {
-                Ok(v) => Ok(v.to_string()),
-                Err(e) => Err(e),
+                Ok(v) => text_ok(v.to_string()),
+                Err(e) => text_err(e),
             }
-            .map(text_content)
-            .unwrap_or_else(text_content)
         }
         "list_local_models" => {
             let url = arg_opt_string(arguments, "url");
             match commands::auto_deploy::fetch_comfy_models(url).await {
-                Ok(v) => Ok(v.to_string()),
-                Err(e) => Err(e),
+                Ok(v) => text_ok(v.to_string()),
+                Err(e) => text_err(e),
             }
-            .map(text_content)
-            .unwrap_or_else(text_content)
         }
         // ===== write =====
         "update_prompt_content" | "update_prompt_settings" => {
-            // Both update paths go through update_prompt with a full Prompt struct.
-            // For the MCP surface we require the caller to pass prompt_id plus the fields they
-            // want to change; we read the existing row first, merge, then write.
             let id = arg_str(arguments, "prompt_id");
             let existing = match commands::prompts::get_prompt(state.clone(), id.clone()).await {
                 Ok(Some(p)) => p,
                 Ok(None) => {
-                    return text_content(format!("Prompt {} not found.", id));
+                    return text_err(format!("Prompt {} not found.", id));
                 }
-                Err(e) => return text_content(format!("Failed to load prompt: {}", e)),
+                Err(e) => return text_err(format!("Failed to load prompt: {}", e)),
             };
             let merged = merge_prompt_updates(existing, arguments, name == "update_prompt_settings");
             match commands::prompts::update_prompt(state, merged).await {
-                Ok(p) => Ok(json!({"status": "updated", "prompt": p}).to_string()),
-                Err(e) => Err(e),
+                Ok(p) => text_ok(json!({"status": "updated", "prompt": p}).to_string()),
+                Err(e) => text_err(e),
             }
-            .map(text_content)
-            .unwrap_or_else(text_content)
         }
         "add_favorite_character" => {
             let character_tag = arg_str(arguments, "character_tag");
@@ -496,11 +487,9 @@ pub async fn execute_tool(
             )
             .await
             {
-                Ok(r) => Ok(json!({"status": "added", "favorite": r}).to_string()),
-                Err(e) => Err(e),
+                Ok(r) => text_ok(json!({"status": "added", "favorite": r}).to_string()),
+                Err(e) => text_err(e),
             }
-            .map(text_content)
-            .unwrap_or_else(text_content)
         }
         "add_favorite_artist" => {
             let artist_tag = arg_str(arguments, "artist_tag");
@@ -520,34 +509,27 @@ pub async fn execute_tool(
             )
             .await
             {
-                Ok(r) => Ok(json!({"status": "added", "favorite": r}).to_string()),
-                Err(e) => Err(e),
+                Ok(r) => text_ok(json!({"status": "added", "favorite": r}).to_string()),
+                Err(e) => text_err(e),
             }
-            .map(text_content)
-            .unwrap_or_else(text_content)
         }
         "create_workflow" => {
             let wf = build_workflow_from_args(arguments);
             match commands::workflows::create_workflow(state, wf).await {
-                Ok(w) => Ok(json!({"status": "created", "workflow": w}).to_string()),
-                Err(e) => Err(e),
+                Ok(w) => text_ok(json!({"status": "created", "workflow": w}).to_string()),
+                Err(e) => text_err(e),
             }
-            .map(text_content)
-            .unwrap_or_else(text_content)
         }
-        _ => text_content(format!("Tool '{}' is defined but not implemented.", name)),
+        _ => text_err(format!("Tool '{}' is defined but not implemented.", name)),
     };
 
-    // `result` for the rows_to_text path is already a Vec<Value>; the match arms above that
-    // returned text_content(...) are already final. The non-rows arms went through map/unwrap.
-    // Re-bind to make the control flow explicit for the compiler.
     result
 }
 
 /// generate_image is delegated to the frontend, which owns the workflow-injection logic
 /// (comfyService.injectParameters) and the generation queue. The backend emits an event; the
 /// frontend picks it up, runs addJob, and replies via a follow-up event the handler awaits.
-async fn handle_generate_image(app: &AppHandle, arguments: &Value) -> Vec<Value> {
+async fn handle_generate_image(app: &AppHandle, arguments: &Value) -> (Vec<Value>, bool) {
     use tauri::Listener;
 
     let prompt_id = arg_str(arguments, "prompt_id");
@@ -595,23 +577,173 @@ async fn handle_generate_image(app: &AppHandle, arguments: &Value) -> Vec<Value>
 
     app_for_listen.unlisten(event_id);
     let _ = reply_key_for_unlisten;
-    text_content(payload.to_string())
+    let is_error = payload.get("status").and_then(|s| s.as_str()) != Some("completed");
+    (vec![json!({ "type": "text", "text": payload.to_string() })], is_error)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tools_list_payload_core_only() {
+        let tools = tools_list_payload(true, false, false);
+        assert!(!tools.is_empty());
+        for t in &tools {
+            assert_eq!(t["name"].as_str().unwrap(), "search_prompts");
+            break;
+        }
+        let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+        // Only core tools
+        assert!(names.contains(&"search_prompts"));
+        assert!(names.contains(&"get_prompt"));
+        assert!(names.contains(&"create_prompt"));
+        assert!(names.contains(&"generate_image"));
+        assert!(names.contains(&"get_generated_images"));
+        assert!(!names.contains(&"search_characters"));
+        assert!(!names.contains(&"list_workflows"));
+        assert!(!names.contains(&"update_prompt_content"));
+    }
+
+    #[test]
+    fn test_tools_list_payload_query_only() {
+        let tools = tools_list_payload(false, true, false);
+        let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+        assert!(names.contains(&"search_characters"));
+        assert!(names.contains(&"search_artists"));
+        assert!(names.contains(&"get_character_series"));
+        assert!(names.contains(&"list_favorite_characters"));
+        assert!(names.contains(&"list_favorite_artists"));
+        assert!(names.contains(&"list_workflows"));
+        assert!(names.contains(&"get_workflow"));
+        assert!(names.contains(&"check_comfyui_status"));
+        assert!(names.contains(&"list_local_models"));
+        assert!(!names.contains(&"search_prompts"));
+        assert!(!names.contains(&"update_prompt_content"));
+    }
+
+    #[test]
+    fn test_tools_list_payload_write_only() {
+        let tools = tools_list_payload(false, false, true);
+        let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+        assert!(names.contains(&"update_prompt_content"));
+        assert!(names.contains(&"update_prompt_settings"));
+        assert!(names.contains(&"add_favorite_character"));
+        assert!(names.contains(&"add_favorite_artist"));
+        assert!(names.contains(&"create_workflow"));
+        assert!(!names.contains(&"search_prompts"));
+    }
+
+    #[test]
+    fn test_tools_list_payload_all_disabled() {
+        let tools = tools_list_payload(false, false, false);
+        assert!(tools.is_empty());
+    }
+
+    #[test]
+    fn test_tools_list_payload_schema_format() {
+        let tools = tools_list_payload(true, false, false);
+        let t = &tools[0];
+        // MCP expects "inputSchema" key (not "input_schema")
+        assert!(t.get("inputSchema").is_some(), "MCP spec requires inputSchema");
+        assert!(t.get("name").is_some());
+        assert!(t.get("description").is_some());
+    }
+
+    #[test]
+    fn test_arg_str() {
+        let v = json!({"name": "test", "count": 42, "empty": ""});
+        assert_eq!(arg_str(&v, "name"), "test");
+        assert_eq!(arg_str(&v, "missing"), "");
+        assert_eq!(arg_str(&v, "count"), "");
+        assert_eq!(arg_str(&v, "empty"), "");
+    }
+
+    #[test]
+    fn test_arg_opt_string() {
+        let v = json!({"name": "test", "empty": "", "null_val": null});
+        assert_eq!(arg_opt_string(&v, "name"), Some("test".to_string()));
+        assert_eq!(arg_opt_string(&v, "missing"), None);
+        assert_eq!(arg_opt_string(&v, "empty"), None);
+        assert_eq!(arg_opt_string(&v, "null_val"), None);
+    }
+
+    #[test]
+    fn test_arg_opt_bool() {
+        let v = json!({"yes": true, "no": false, "str": "true"});
+        assert_eq!(arg_opt_bool(&v, "yes"), Some(true));
+        assert_eq!(arg_opt_bool(&v, "no"), Some(false));
+        assert_eq!(arg_opt_bool(&v, "missing"), None);
+        assert_eq!(arg_opt_bool(&v, "str"), None);
+    }
+
+    #[test]
+    fn test_arg_usize() {
+        let v = json!({"count": 42, "zero": 0, "str": "42"});
+        assert_eq!(arg_usize(&v, "count", 10), 42);
+        assert_eq!(arg_usize(&v, "missing", 10), 10);
+        assert_eq!(arg_usize(&v, "zero", 10), 0);
+        assert_eq!(arg_usize(&v, "str", 10), 10); // string returns default
+    }
+
+    #[test]
+    fn test_arg_u64_default() {
+        let v = json!({"count": 1.0});
+        // JSON number 1.0 as float → as_u64 returns None → defaults to 1
+        // This is a known edge case: some MCP clients send integers as floats
+        assert_eq!(arg_u64(&v, "count", 1), 1);
+    }
+
+    #[test]
+    fn test_arg_opt_string_array() {
+        let v = json!({"tags": ["a", "b", "c"]});
+        let result = arg_opt_string_array(&v, "tags");
+        assert_eq!(result, Some(vec!["a".into(), "b".into(), "c".into()]));
+
+        let v2 = json!({"tags": []});
+        assert_eq!(arg_opt_string_array(&v2, "tags"), None);
+
+        let v3 = json!({});
+        assert_eq!(arg_opt_string_array(&v3, "tags"), None);
+    }
+
+    #[test]
+    fn test_build_prompt_filter() {
+        let v = json!({"search": "test", "tags": ["tag1"], "limit": 10});
+        let filter = build_prompt_filter(&v);
+        assert!(filter.is_some());
+        let f = filter.unwrap();
+        assert_eq!(f.search, Some("test".into()));
+        assert_eq!(f.limit, Some(10));
+    }
+
+    #[test]
+    fn test_build_prompt_filter_empty_returns_none() {
+        let v = json!({});
+        assert!(build_prompt_filter(&v).is_none());
+    }
 }
 
 // ============================ helpers ============================
 
-fn text_content(text: String) -> Vec<Value> {
-    vec![json!({ "type": "text", "text": text })]
+/// Success text content (is_error = false).
+fn text_ok(text: String) -> (Vec<Value>, bool) {
+    (vec![json!({ "type": "text", "text": text })], false)
+}
+
+/// Error text content (is_error = true).
+fn text_err(text: String) -> (Vec<Value>, bool) {
+    (vec![json!({ "type": "text", "text": text })], true)
 }
 
 /// Serialise any serialisable result (or an error) into the MCP text content shape.
-fn rows_to_text<T: serde::Serialize>(res: Result<T, String>) -> Vec<Value> {
+fn rows_to_text<T: serde::Serialize>(res: Result<T, String>) -> (Vec<Value>, bool) {
     match res {
         Ok(v) => {
             let pretty = serde_json::to_string_pretty(&v).unwrap_or_else(|_| "{}".to_string());
-            text_content(pretty)
+            (vec![json!({ "type": "text", "text": pretty })], false)
         }
-        Err(e) => text_content(format!("Error: {}", e)),
+        Err(e) => (vec![json!({ "type": "text", "text": format!("Error: {}", e) })], true),
     }
 }
 
@@ -728,6 +860,9 @@ fn merge_prompt_updates(
         if let Some(t) = arg_opt_string(args, "title") {
             existing.title = t;
         }
+        if let Some(d) = arg_opt_string(args, "description") {
+            existing.description = d;
+        }
         if let Some(p) = arg_opt_string(args, "positive_prompt") {
             existing.positive_prompt = p;
         }
@@ -764,6 +899,9 @@ fn merge_prompt_updates(
         }
         if let Some(c) = args.get("cfg_scale").and_then(|v| v.as_f64()) {
             existing.cfg_scale = c;
+        }
+        if let Some(s) = arg_opt_string(args, "seed") {
+            existing.seed = s;
         }
         if let Some(r) = arg_opt_string(args, "resolution") {
             existing.resolution = Some(r);

@@ -83,8 +83,8 @@ pub async fn handle(
                 let cfg = srv.config.read().await;
                 (cfg.core, cfg.query, cfg.write)
             };
-            let content = tools::execute_tool(&srv.app, name, &arguments, core, query, write).await;
-            json!({ "content": content, "isError": false })
+            let (content, is_error) = tools::execute_tool(&srv.app, name, &arguments, core, query, write).await;
+            json!({ "content": content, "isError": is_error })
         }
         _ => {
             // Unknown method → JSON-RPC error.
@@ -112,4 +112,51 @@ fn check_bearer(headers: &HeaderMap, expected: &str) -> bool {
     let token = auth.strip_prefix("Bearer ").unwrap_or("").trim();
     // Constant-time-ish comparison to avoid timing leaks of the token.
     token.len() == expected.len() && token == expected
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::HeaderMap;
+
+    fn make_header(token: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert("authorization", format!("Bearer {}", token).parse().unwrap());
+        h
+    }
+
+    #[test]
+    fn test_check_bearer_valid() {
+        let headers = make_header("mytoken123");
+        assert!(check_bearer(&headers, "mytoken123"));
+    }
+
+    #[test]
+    fn test_check_bearer_invalid() {
+        let headers = make_header("wrongtoken");
+        assert!(!check_bearer(&headers, "mytoken123"));
+    }
+
+    #[test]
+    fn test_check_bearer_missing() {
+        let headers = HeaderMap::new();
+        assert!(!check_bearer(&headers, "mytoken123"));
+    }
+
+    #[test]
+    fn test_check_bearer_empty_token() {
+        let headers = make_header("");
+        assert!(!check_bearer(&headers, "mytoken123"));
+
+        // When expected is empty (no auth configured) and no header
+        let headers2 = HeaderMap::new();
+        assert!(check_bearer(&headers2, ""));
+    }
+
+    #[test]
+    fn test_check_bearer_malformed_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "NotBearer token".parse().unwrap());
+        assert!(!check_bearer(&headers, "token"));
+    }
 }
