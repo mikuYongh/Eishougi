@@ -88,7 +88,7 @@ function toRustPrompt(p: PromptProject): any {
 }
 
 // Mapper from Rust
-function fromRustPrompt(r: any): PromptProject {
+export function fromRustPrompt(r: any): PromptProject {
   let loras = [];
   try { 
     let loraRaw = r.loraConfigs ?? r.lora_configs ?? '[]';

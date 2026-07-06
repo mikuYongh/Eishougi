@@ -58,16 +58,30 @@ export function useMcpServer() {
         reply_key: string;
       }>("mcp-generate-request", async (event) => {
         const { prompt_id, batch_count, reply_key } = event.payload;
-        const prompts = usePromptStore.getState().prompts;
-        const workflows = useWorkflowStore.getState().workflows;
-        const prompt = prompts.find((p) => p.id === prompt_id);
+        if (cancelled) return;
+
+        // Try to resolve the prompt: first from the local store, then from the backend.
+        let prompt = usePromptStore.getState().prompts.find((p) => p.id === prompt_id);
+        if (!prompt) {
+          try {
+            const rustPrompt = await invoke<any>("get_prompt", { id: prompt_id });
+            if (rustPrompt) {
+              // Convert from Rust camelCase format using the store's mapper.
+              const { fromRustPrompt } = await import("../stores/promptStore");
+              prompt = fromRustPrompt(rustPrompt);
+            }
+          } catch (e) {
+            console.warn("[MCP] failed to fetch prompt from backend:", e);
+          }
+        }
 
         if (!prompt) {
           await emit(reply_key, { status: "error", message: `Prompt ${prompt_id} not found.` }).catch(() => {});
           return;
         }
 
-        // Resolve a workflow to use (mirror the queueStore.addJob default logic).
+        // Resolve a workflow to use.
+        const workflows = useWorkflowStore.getState().workflows;
         const workflowId =
           prompt.workflowId ||
           workflows.find((w) => w.type === "text2img" && w.isDefault)?.id ||
@@ -89,7 +103,6 @@ export function useMcpServer() {
     return () => {
       cancelled = true;
       if (unlisten) unlisten();
-      void cancelled;
     };
   }, []);
 
