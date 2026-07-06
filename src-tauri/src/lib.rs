@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod comfy_ws;
+mod mcp_server;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -347,6 +348,12 @@ pub fn run() {
             commands::library_favorites::remove_favorite_artist,
             comfy_ws::queue_prompt_and_track,
             comfy_ws::upload_image_to_comfy,
+            mcp_server::mcp_server_status,
+            mcp_server::mcp_server_set_enabled,
+            mcp_server::mcp_server_regenerate_token,
+            mcp_server::mcp_server_clear_token,
+            mcp_server::mcp_server_set_tool_groups,
+            mcp_server::mcp_server_set_port,
         ])
         .setup(|app| {
             // Background: sync library data (characters / artists) from embedded JSON.
@@ -362,6 +369,15 @@ pub fn run() {
             // Auto-backup DB to external storage (survives pm clear).
             #[cfg(target_os = "android")]
             crate::jvm_plugin::backup_database(&state.app_data_dir.join("prompt-muse.db"));
+
+            // MCP HTTP server: load persisted config + spawn the listener if enabled.
+            // Non-fatal if it fails (e.g. port busy); the user can retry from Settings.
+            {
+                let app_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    mcp_server::init(&app_handle).await;
+                });
+            }
             Ok(())
         });
 
