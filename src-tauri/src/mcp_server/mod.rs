@@ -327,3 +327,30 @@ fn config_file_path(app: &AppHandle) -> PathBuf {
     }
     PathBuf::from("mcp_server.json")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let cfg = PersistedConfig::default();
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.port, DEFAULT_PORT);
+        assert!(cfg.core);
+        assert!(cfg.query);
+        assert!(!cfg.write);
+        assert!(cfg.token.is_none());
+    }
+
+    #[test]
+    fn test_persisted_config_default_true_fn() {
+        assert!(default_true());
+    }
+
+    #[test]
+    fn test_default_port_fn() {
+        assert_eq!(default_port(), DEFAULT_PORT);
+    }
+}
+
