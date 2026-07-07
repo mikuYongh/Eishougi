@@ -10,8 +10,27 @@ use tauri::{AppHandle, Manager, State, Emitter};
 use tokio::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use tauri_plugin_notification::NotificationExt;
-use log::{info, error};
+use log::{info, error, warn};
 use std::time::Duration;
+
+/// Id prefixes that mark a `project_id` as synthetic — i.e. NOT backed by a row in the `prompts`
+/// table. The frontend generates these for short-lived jobs that should never be linked into
+/// `generated_images.prompt_id` (which has `FOREIGN KEY → prompts(id)`).
+///
+/// When you add a new temporary-job path on the frontend, register its prefix HERE — do not
+/// inline a `starts_with(...)` check. Otherwise the FK will silently reject the image INSERT and
+/// the user gets a downloaded file that never appears in history.
+///
+/// Current producers:
+///   - `video_`     → `Img2VideoModal.tsx`, `VideoGenerate.tsx`, `useAgent.ts` (temp video jobs)
+///   - `mcp_temp_`  → `useMcpServer.ts` (MCP direct-generation mode, no prompt created)
+const SYNTHETIC_PROJECT_ID_PREFIXES: &[&str] = &["video_", "mcp_temp_"];
+
+/// True if `id` refers to a throwaway job rather than a persisted prompt. Such ids must NOT be
+/// written into FK columns that reference `prompts(id)`.
+fn is_synthetic_project_id(id: &str) -> bool {
+    SYNTHETIC_PROJECT_ID_PREFIXES.iter().any(|p| id.starts_with(p))
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct JobContext {
@@ -78,11 +97,10 @@ pub async fn process_executed(app_clone: AppHandle, ctx: JobContext, images: Vec
                 let img_record = GeneratedImage {
                     id: format!("img_{}_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(), i),
                     // prompt_id is nullable and has a FOREIGN KEY → prompts(id). Only store it when
-                    // the id refers to a real, persisted project. Synthetic ids ("video_..." for
-                    // temp video jobs, "mcp_temp_..." for MCP direct-generation jobs) have no row
-                    // in prompts, so storing them would trip the FK constraint and silently drop
-                    // the image out of history. Drop the link in those cases instead.
-                    prompt_id: if ctx.project_id.starts_with("video_") || ctx.project_id.starts_with("mcp_temp_") {
+                    // the id refers to a real, persisted project; synthetic ids (see
+                    // `is_synthetic_project_id`) have no row in prompts, so storing them would
+                    // trip the FK constraint and silently drop the image out of history.
+                    prompt_id: if is_synthetic_project_id(&ctx.project_id) {
                         None
                     } else {
                         Some(ctx.project_id.clone())
@@ -100,7 +118,16 @@ pub async fn process_executed(app_clone: AppHandle, ctx: JobContext, images: Vec
                 if let Some(ref app_state) = app_state {
                     match crate::commands::history::save_generated_image(app_state.clone(), img_record.clone()).await {
                         Ok(_) => info!("[ComfyWS] Saved to history: {}", img_record.output_path),
-                        Err(e) => error!("[ComfyWS] Failed to save to history: {}", e),
+                        Err(e) => {
+                            // DB write failed (typically a FK violation from a synthetic project_id
+                            // that slipped past `is_synthetic_project_id`, or a schema mismatch).
+                            // The image file is already on disk; if we leave it there with no DB
+                            // record it becomes an orphan the user can never see or clean up. Remove
+                            // it so we fail clean rather than leaking bytes. Upgrade to `warn` so
+                            // this surfaces above routine noise.
+                            warn!("[ComfyWS] Failed to save to history (removing orphan file {}): {}", img_record.output_path, e);
+                            let _ = tokio::fs::remove_file(&img_record.output_path).await;
+                        }
                     }
                 } else {
                     error!("[ComfyWS] AppState not available, cannot save to history");
@@ -534,5 +561,33 @@ pub async fn upload_image_to_comfy(
     let json: serde_json::Value = res.json().await.map_err(|e| e.to_string())?;
     let name = json["name"].as_str().unwrap_or(&filename).to_string();
     Ok(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn synthetic_ids_are_detected() {
+        assert!(is_synthetic_project_id("video_1234567890"));
+        assert!(is_synthetic_project_id("mcp_temp_1234567890"));
+    }
+
+    #[test]
+    fn real_prompt_ids_are_not_synthetic() {
+        // Real persisted ids — whatever format the app uses — must NOT be classified as synthetic,
+        // otherwise the image→prompt FK link would be silently dropped.
+        assert!(!is_synthetic_project_id("prompt_abc123"));
+        assert!(!is_synthetic_project_id("550e8400-e29b-41d4-a716-446655440000"));
+    }
+
+    #[test]
+    fn prefix_guard_is_exact_prefix_not_substring() {
+        // The check must be a real prefix, not a substring. "my_video_x" or "pre_mcp_temp_" should
+        // NOT match — they could be legitimate prompt ids that happen to contain these strings.
+        assert!(!is_synthetic_project_id("my_video_123"));
+        assert!(!is_synthetic_project_id("pre_mcp_temp_123"));
+        assert!(!is_synthetic_project_id(""));
+    }
 }
 
