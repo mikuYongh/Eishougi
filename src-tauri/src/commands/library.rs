@@ -231,13 +231,50 @@ pub struct SeriesOption {
 }
 
 #[tauri::command]
-pub async fn get_character_series(state: State<'_, AppState>) -> Result<Vec<SeriesOption>, String> {
+pub async fn get_character_series(
+    state: State<'_, AppState>,
+    search: Option<String>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+) -> Result<Vec<SeriesOption>, String> {
     let db = state.db.lock().await;
-    let mut stmt = db.conn.prepare(
-        "SELECT series, series_zh, COUNT(id) as count FROM characters WHERE series IS NOT NULL AND series != '' GROUP BY series, series_zh ORDER BY count DESC"
-    ).map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map([], |row| {
+    // Build a paged, optionally-filtered query. All params are optional so the original
+    // "return everything" behaviour is preserved when callers pass nothing — but the MCP layer
+    // (the only real consumer now) always supplies limit+offset to keep the payload bounded.
+    let mut query = String::from(
+        "SELECT series, series_zh, COUNT(id) as count FROM characters WHERE series IS NOT NULL AND series != ''",
+    );
+    let mut args: Vec<String> = Vec::new();
+    if let Some(s) = search.as_ref() {
+        if !s.trim().is_empty() {
+            query.push_str(" AND (series LIKE ? OR series_zh LIKE ?)");
+            let pattern = format!("%{}%", s);
+            args.push(pattern.clone());
+            args.push(pattern);
+        }
+    }
+    query.push_str(" GROUP BY series, series_zh ORDER BY count DESC");
+
+    // Declare the numeric bindings in the SAME scope as `rusqlite_args` — if they lived inside the
+    // `if` blocks below, the borrows would dangle before `query_map` runs.
+    let limit_i64 = limit.map(|l| l as i64);
+    let offset_i64 = offset.map(|o| o as i64);
+    let mut rusqlite_args: Vec<&dyn rusqlite::ToSql> = Vec::new();
+    for a in &args {
+        rusqlite_args.push(a);
+    }
+    if let Some(ref l) = limit_i64 {
+        query.push_str(" LIMIT ?");
+        rusqlite_args.push(l);
+        if let Some(ref o) = offset_i64 {
+            query.push_str(" OFFSET ?");
+            rusqlite_args.push(o);
+        }
+    }
+
+    let mut stmt = db.conn.prepare(&query).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(rusqlite_args.as_slice(), |row| {
         Ok(SeriesOption {
             series: row.get("series")?,
             series_zh: row.get("series_zh")?,

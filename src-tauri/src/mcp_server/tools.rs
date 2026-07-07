@@ -142,36 +142,31 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     },
     // ---- query ----
     ToolDef {
-        name: "search_characters",
-        description: "Search the character library (50k+ characters with English/Chinese names, series, trigger tags). Useful for finding the correct character tag before generating.",
+        name: "list_character_series",
+        description: "List character series/copyrights (e.g. Genshin Impact, Arknights) with their character counts, paginated. Use this FIRST to discover which series exist and pick one, then call search_characters_in_series with that series name. The full library has thousands of series — always page; do not request huge limits.",
         group: ToolGroup::Query,
         input_schema: json!({
             "type": "object",
             "properties": {
-                "search": { "type": "string", "description": "Name keyword (Chinese or English)" },
-                "series": { "type": "string", "description": "Series/copyright filter" },
-                "limit": { "type": "number" },
-                "offset": { "type": "number" }
+                "search": { "type": "string", "description": "Optional. Fuzzy-match series name (English or Chinese) to narrow results before paging." },
+                "limit": { "type": "number", "description": "Page size. Default 30, max 100." },
+                "offset": { "type": "number", "description": "Pagination offset. Default 0." }
             }
         }),
     },
     ToolDef {
-        name: "get_character_series",
-        description: "List all character series/copyrights with their character counts, for browsing.",
-        group: ToolGroup::Query,
-        input_schema: json!({ "type": "object", "properties": {} }),
-    },
-    ToolDef {
-        name: "search_artists",
-        description: "Search the artist library for style trigger tags.",
+        name: "search_characters_in_series",
+        description: "Search for characters WITHIN a specific series (e.g. all characters in 'Genshin Impact'). `series` is REQUIRED — this constraint keeps the result set small (a single series usually has tens to low-hundreds of characters). Use list_character_series first if you don't know the exact series name.",
         group: ToolGroup::Query,
         input_schema: json!({
             "type": "object",
             "properties": {
-                "search": { "type": "string" },
-                "limit": { "type": "number" },
-                "offset": { "type": "number" }
-            }
+                "series": { "type": "string", "description": "REQUIRED. Exact series/copyright name (English or Chinese) as returned by list_character_series." },
+                "search": { "type": "string", "description": "Optional. Further filter characters within the series by name (Chinese or English)." },
+                "limit": { "type": "number", "description": "Page size. Default 20, max 50." },
+                "offset": { "type": "number", "description": "Pagination offset. Default 0." }
+            },
+            "required": ["series"]
         }),
     },
     ToolDef {
@@ -427,30 +422,35 @@ pub async fn execute_tool(
             rows_to_text(rows)
         }
         // ===== query =====
-        "search_characters" => {
-            let rows = commands::library::search_characters(
+        "list_character_series" => {
+            // Clamp limit so an over-easy LLM can't pull thousands of series at once.
+            let limit = arg_usize(arguments, "limit", 30).min(100);
+            let rows = commands::library::get_character_series(
                 state,
                 arg_opt_string(arguments, "search"),
-                arg_opt_string(arguments, "series"),
-                arg_usize(arguments, "limit", 20),
-                arg_usize(arguments, "offset", 0),
-                arg_opt_bool(arguments, "favorite"),
+                Some(limit),
+                Some(arg_usize(arguments, "offset", 0)),
             )
             .await;
             rows_to_text(rows)
         }
-        "get_character_series" => {
-            let rows = commands::library::get_character_series(state).await;
-            rows_to_text(rows)
-        }
-        "search_artists" => {
-            let rows = commands::library::search_artists(
+        "search_characters_in_series" => {
+            // `series` is REQUIRED per schema; empty means the caller skipped it.
+            let series = arg_str(arguments, "series");
+            if series.is_empty() {
+                return text_err(
+                    "series is required. Call list_character_series first to find the exact name."
+                        .to_string(),
+                );
+            }
+            let limit = arg_usize(arguments, "limit", 20).min(50);
+            let rows = commands::library::search_characters(
                 state,
                 arg_opt_string(arguments, "search"),
-                arg_opt_string(arguments, "series"),
-                arg_usize(arguments, "limit", 20),
+                Some(series),
+                limit,
                 arg_usize(arguments, "offset", 0),
-                arg_opt_bool(arguments, "favorite"),
+                None,
             )
             .await;
             rows_to_text(rows)
@@ -704,15 +704,18 @@ mod tests {
     fn test_tools_list_payload_query_only() {
         let tools = tools_list_payload(false, true, false);
         let names: Vec<&str> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
-        assert!(names.contains(&"search_characters"));
-        assert!(names.contains(&"search_artists"));
-        assert!(names.contains(&"get_character_series"));
+        assert!(names.contains(&"list_character_series"));
+        assert!(names.contains(&"search_characters_in_series"));
         assert!(names.contains(&"list_favorite_characters"));
         assert!(names.contains(&"list_favorite_artists"));
         assert!(names.contains(&"list_workflows"));
         assert!(names.contains(&"get_workflow"));
         assert!(names.contains(&"check_comfyui_status"));
         assert!(names.contains(&"list_local_models"));
+        // Removed browsability tools must NOT come back.
+        assert!(!names.contains(&"search_characters"));
+        assert!(!names.contains(&"search_artists"));
+        assert!(!names.contains(&"get_character_series"));
         assert!(!names.contains(&"search_prompts"));
         assert!(!names.contains(&"update_prompt_content"));
     }
@@ -745,6 +748,62 @@ mod tests {
         assert!(t.get("inputSchema").is_some(), "MCP spec requires inputSchema");
         assert!(t.get("name").is_some());
         assert!(t.get("description").is_some());
+    }
+
+    /// Verify the post-refactor tool table shape: the old browsability tools are gone, the new
+    /// drill-down + remove tools exist and land in the right group, and their schemas are legal.
+    /// This guards against accidental regressions when tools are added/removed later.
+    #[test]
+    fn test_tool_table_shape_after_refactor() {
+        let all_tools = tools_list_payload(true, true, true);
+        let names: Vec<&str> = all_tools.iter().filter_map(|t| t["name"].as_str()).collect();
+
+        // Removed browsability tools must NOT come back.
+        for removed in ["search_characters", "get_character_series", "search_artists"] {
+            assert!(
+                !names.contains(&removed),
+                "{} should have been removed in the refactor",
+                removed
+            );
+        }
+
+        // New drill-down tools present.
+        assert!(names.contains(&"list_character_series"), "missing list_character_series");
+        assert!(names.contains(&"search_characters_in_series"), "missing search_characters_in_series");
+        // New remove tools present.
+        assert!(names.contains(&"remove_favorite_character"), "missing remove_favorite_character");
+        assert!(names.contains(&"remove_favorite_artist"), "missing remove_favorite_artist");
+
+        // Group placement: drill-down in Query-only, remove in Write-only.
+        let query_only = tools_list_payload(false, true, false);
+        let q_names: Vec<&str> = query_only.iter().filter_map(|t| t["name"].as_str()).collect();
+        assert!(q_names.contains(&"list_character_series"));
+        assert!(q_names.contains(&"search_characters_in_series"));
+        assert!(!q_names.contains(&"remove_favorite_character"));
+
+        let write_only = tools_list_payload(false, false, true);
+        let w_names: Vec<&str> = write_only.iter().filter_map(|t| t["name"].as_str()).collect();
+        assert!(w_names.contains(&"remove_favorite_character"));
+        assert!(w_names.contains(&"remove_favorite_artist"));
+        assert!(!w_names.contains(&"list_character_series"));
+    }
+
+    /// `search_characters_in_series` MUST declare `series` as required — without it the LLM could
+    /// call the tool with no series and pull an unbounded slice of the 50k+ character table.
+    #[test]
+    fn test_search_characters_in_series_requires_series() {
+        let tools = tools_list_payload(false, true, false);
+        let t = tools
+            .iter()
+            .find(|t| t["name"].as_str() == Some("search_characters_in_series"))
+            .expect("tool not found");
+        let required: Vec<&str> = t["inputSchema"]["required"]
+            .as_array()
+            .expect("required must be an array")
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect();
+        assert!(required.contains(&"series"), "series must be required");
     }
 
     /// `remove_favorite_*` schemas must accept EITHER id or tag — neither should be required
@@ -788,15 +847,6 @@ mod tests {
         assert_eq!(arg_opt_string(&v, "missing"), None);
         assert_eq!(arg_opt_string(&v, "empty"), None);
         assert_eq!(arg_opt_string(&v, "null_val"), None);
-    }
-
-    #[test]
-    fn test_arg_opt_bool() {
-        let v = json!({"yes": true, "no": false, "str": "true"});
-        assert_eq!(arg_opt_bool(&v, "yes"), Some(true));
-        assert_eq!(arg_opt_bool(&v, "no"), Some(false));
-        assert_eq!(arg_opt_bool(&v, "missing"), None);
-        assert_eq!(arg_opt_bool(&v, "str"), None);
     }
 
     #[test]
@@ -895,10 +945,6 @@ fn arg_opt_string(args: &Value, key: &str) -> Option<String> {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
         .filter(|s| !s.is_empty())
-}
-
-fn arg_opt_bool(args: &Value, key: &str) -> Option<bool> {
-    args.get(key).and_then(|v| v.as_bool())
 }
 
 fn arg_usize(args: &Value, key: &str, default: usize) -> usize {
