@@ -77,7 +77,16 @@ pub async fn process_executed(app_clone: AppHandle, ctx: JobContext, images: Vec
 
                 let img_record = GeneratedImage {
                     id: format!("img_{}_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(), i),
-                    prompt_id: if ctx.project_id.starts_with("video_") { None } else { Some(ctx.project_id.clone()) },
+                    // prompt_id is nullable and has a FOREIGN KEY → prompts(id). Only store it when
+                    // the id refers to a real, persisted project. Synthetic ids ("video_..." for
+                    // temp video jobs, "mcp_temp_..." for MCP direct-generation jobs) have no row
+                    // in prompts, so storing them would trip the FK constraint and silently drop
+                    // the image out of history. Drop the link in those cases instead.
+                    prompt_id: if ctx.project_id.starts_with("video_") || ctx.project_id.starts_with("mcp_temp_") {
+                        None
+                    } else {
+                        Some(ctx.project_id.clone())
+                    },
                     workflow_id: ctx.workflow_id.clone(),
                     seed: ctx.seed.map(|s| s.to_string()),
                     output_path: local_path,
