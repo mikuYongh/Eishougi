@@ -12,11 +12,13 @@
 use crate::mcp_server::state::McpServerState;
 use crate::mcp_server::tools;
 use axum::{
-    extract::State,
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Json, Response},
 };
+use serde::Deserialize;
 use serde_json::{json, Value};
+use tauri::Manager;
 
 /// Version of the MCP protocol we advertise. Matches what our client sends.
 const PROTOCOL_VERSION: &str = "2024-11-05";
@@ -112,6 +114,105 @@ fn check_bearer(headers: &HeaderMap, expected: &str) -> bool {
     let token = auth.strip_prefix("Bearer ").unwrap_or("").trim();
     // Constant-time-ish comparison to avoid timing leaks of the token.
     token.len() == expected.len() && token == expected
+}
+
+/// Query params for the image endpoint. Images are referenced from <img src="..."> tags that the
+/// external LLM client renders, which cannot set custom headers — so in addition to the Bearer
+/// header we also accept the token as a `?token=` query param.
+#[derive(Deserialize)]
+pub struct ImageQuery {
+    pub token: Option<String>,
+}
+
+/// `GET /image/<filename>?token=...` — serves a generated image to external MCP clients.
+///
+/// External LLM clients (Claude Desktop, etc.) receive image PATHS from `generate_image` but
+/// cannot read local files. This endpoint exposes each image over HTTP so the client can render
+/// it inline in the chat. Auth mirrors the MCP endpoint (Bearer header OR ?token= query).
+pub async fn serve_image(
+    State(srv): State<McpServerState>,
+    Path(filename): Path<String>,
+    Query(query): Query<ImageQuery>,
+    headers: HeaderMap,
+) -> Response {
+    // Auth: Bearer header first, then ?token= query fallback.
+    if let Some(expected) = srv.config.read().await.token.as_deref() {
+        let header_ok = check_bearer(&headers, expected);
+        let query_ok = query.token.as_deref().map(|t| t == expected).unwrap_or(false);
+        if !header_ok && !query_ok {
+            return (StatusCode::UNAUTHORIZED, "invalid or missing token").into_response();
+        }
+    }
+
+    // Resolve the uploads dir from the canonical AppState (same dir download_comfyui_image writes to).
+    let Some(app_state) = srv.app.try_state::<crate::AppState>() else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "AppState unavailable").into_response();
+    };
+    let file_path = app_state.app_data_dir.join("uploads").join(&filename);
+
+    // Prevent path traversal: only allow a bare filename, no separators.
+    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+        return (StatusCode::BAD_REQUEST, "invalid filename").into_response();
+    }
+    if !file_path.exists() {
+        return (StatusCode::NOT_FOUND, "image not found").into_response();
+    }
+
+    // Guess content type from extension, default to octet-stream.
+    let ct = match filename.rsplit('.').next().map(|e| e.to_lowercase()).as_deref() {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("gif") => "image/gif",
+        Some("mp4") => "video/mp4",
+        Some("webm") => "video/webm",
+        _ => "application/octet-stream",
+    };
+
+    match tokio::fs::read(&file_path).await {
+        Ok(bytes) => (
+            StatusCode::OK,
+            [
+                ("content-type", ct.to_string()),
+                ("cache-control", "public, max-age=86400".to_string()),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(e) => {
+            log::warn!("[MCP] failed to read image {}: {}", filename, e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "failed to read image").into_response()
+        }
+    }
+}
+
+/// Build the public HTTP URL for a generated image, given its local filesystem path, the
+/// server's port, and optional token. The token is appended as ?token= so rendered <img> tags
+/// authenticate without being able to set Authorization headers.
+pub fn image_url(local_path: &str, port: u16, token: Option<&str>) -> String {
+    // Extract just the filename (the path is absolute, e.g. C:\...\uploads\gen_xxx.png).
+    let filename = local_path
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(local_path);
+    match token {
+        Some(t) if !t.is_empty() => {
+            format!("http://127.0.0.1:{}/image/{}?token={}", port, filename, t)
+        }
+        _ => format!("http://127.0.0.1:{}/image/{}", port, filename),
+    }
+}
+
+/// Rewrite every local image path in a generate_image reply payload into an HTTP URL.
+/// `payload` is the JSON the frontend emitted back; this rewrites its `images` array in place.
+pub fn rewrite_image_urls(payload: &mut Value, port: u16, token: Option<&str>) {
+    if let Some(images) = payload.get_mut("images").and_then(|v| v.as_array_mut()) {
+        for img in images.iter_mut() {
+            if let Some(s) = img.as_str() {
+                *img = Value::String(image_url(s, port, token));
+            }
+        }
+    }
 }
 
 #[cfg(test)]

@@ -93,15 +93,27 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     },
     ToolDef {
         name: "generate_image",
-        description: "Generate image(s) using an existing prompt project. Triggers the app's bound ComfyUI workflow. Returns when generation completes (may take 10-60s). Requires the app window to be reachable.",
+        description: "Generate image(s) either from an existing prompt project (pass prompt_id) OR directly from parameters (omit prompt_id and pass positive_prompt). Triggers the app's bound ComfyUI workflow. Returns when generation completes (may take 10-60s). Requires the app window to be reachable.\n\nRESOLUTION RULE (important): Keep width/height at the model's native ~1024 range by default (e.g. 832x1216, 1024x1024, 1216x832). ONLY use a larger size (up to 1536 max) when the user EXPLICITLY asks for a bigger/high-resolution/4K image. Never exceed 1536 on either edge — very large sizes can crash the GPU. When unsure, omit width/height and let the workflow decide.",
         group: ToolGroup::Core,
         input_schema: json!({
             "type": "object",
             "properties": {
-                "prompt_id": { "type": "string" },
+                "prompt_id": { "type": "string", "description": "Optional. ID of an existing prompt project to generate from. If omitted, generates directly from the provided parameters (no project is created)." },
+                "positive_prompt": { "type": "string", "description": "REQUIRED when prompt_id is omitted (ignored when prompt_id is given). The positive prompt text, English Danbooru tags recommended." },
+                "negative_prompt": { "type": "string", "description": "Optional override. Default: standard low-quality negatives." },
+                "artist_prompt": { "type": "string", "description": "Optional. Artist/style trigger words." },
+                "base_model": { "type": "string", "description": "Optional. Override the workflow's checkpoint." },
+                "width": { "type": "number", "description": "Optional. Image width in px. Default: the workflow's native size (~1024 range). Do NOT set this above 1024 unless the user explicitly requests a larger image; never exceed 1536." },
+                "height": { "type": "number", "description": "Optional. Image height in px. Default: the workflow's native size (~1024 range). Do NOT set this above 1024 unless the user explicitly requests a larger image; never exceed 1536." },
+                "steps": { "type": "number", "description": "Optional. Default 25." },
+                "cfg_scale": { "type": "number", "description": "Optional. Default 5.0." },
+                "seed": { "type": "string", "description": "Optional. Use -1 for random (default)." },
+                "sampler_name": { "type": "string", "description": "Optional, e.g. euler, euler_ancestral, dpmpp_2m." },
+                "scheduler": { "type": "string", "description": "Optional, e.g. normal, karras, beta57." },
+                "workflow_id": { "type": "string", "description": "Optional. Specific workflow to use; defaults to the app's default text2img workflow." },
                 "batch_count": { "type": "number", "description": "Number of images (default 1)" }
             },
-            "required": ["prompt_id"]
+            "required": []
         }),
     },
     ToolDef {
@@ -364,7 +376,7 @@ pub async fn execute_tool(
         "get_prompt" => {
             let id = arg_str(arguments, "prompt_id");
             let row = commands::prompts::get_prompt(state, id).await;
-            rows_to_text(row)
+            optional_row_to_text("Prompt", row)
         }
         "create_prompt" => {
             let prompt = build_prompt_from_args(arguments);
@@ -435,7 +447,7 @@ pub async fn execute_tool(
         "get_workflow" => {
             let id = arg_str(arguments, "workflow_id");
             let row = commands::workflows::get_workflow(state, id).await;
-            rows_to_text(row)
+            optional_row_to_text("Workflow", row)
         }
         "check_comfyui_status" => {
             let url = arg_opt_string(arguments, "url");
@@ -529,11 +541,27 @@ pub async fn execute_tool(
 /// generate_image is delegated to the frontend, which owns the workflow-injection logic
 /// (comfyService.injectParameters) and the generation queue. The backend emits an event; the
 /// frontend picks it up, runs addJob, and replies via a follow-up event the handler awaits.
+///
+/// Two modes:
+///   - `prompt_id` given: load that project and generate from it (other params override its values).
+///   - `prompt_id` omitted: generate directly from the supplied parameters (no project created).
+///     In this mode `positive_prompt` is required.
 async fn handle_generate_image(app: &AppHandle, arguments: &Value) -> (Vec<Value>, bool) {
     use tauri::Listener;
 
     let prompt_id = arg_str(arguments, "prompt_id");
     let batch_count = arg_u64(arguments, "batch_count", 1);
+
+    // Direct-generation mode validation: without a prompt_id the caller MUST supply a positive
+    // prompt — otherwise we'd inject an empty prompt into the workflow and produce garbage.
+    if prompt_id.is_empty() {
+        let positive = arg_opt_string(arguments, "positive_prompt");
+        if positive.is_none() {
+            return text_err(
+                "When prompt_id is omitted, positive_prompt is required.".to_string(),
+            );
+        }
+    }
 
     // One-shot reply channel. The frontend emits a uniquely-keyed event when generation finishes.
     let (tx, rx) = tokio::sync::oneshot::channel::<Value>();
@@ -558,18 +586,20 @@ async fn handle_generate_image(app: &AppHandle, arguments: &Value) -> (Vec<Value
         }
     });
 
-    // Ask the frontend to run the generation.
+    // Forward the WHOLE arguments object so the frontend can build a temp project in direct mode
+    // or apply per-field overrides on top of a loaded project.
     let _ = app.emit(
         "mcp-generate-request",
         json!({
             "prompt_id": prompt_id,
             "batch_count": batch_count,
             "reply_key": reply_key,
+            "params": arguments,
         }),
     );
 
     // Wait for the reply, with a generous timeout for slow generations.
-    let payload = match tokio::time::timeout(std::time::Duration::from_secs(180), rx).await {
+    let mut payload = match tokio::time::timeout(std::time::Duration::from_secs(180), rx).await {
         Ok(Ok(v)) => v,
         Ok(Err(_)) => json!({"status": "error", "message": "Internal: reply channel closed."}),
         Err(_) => json!({"status": "timeout", "message": "Generation timed out waiting for the frontend (is the app window open?)."}),
@@ -577,6 +607,15 @@ async fn handle_generate_image(app: &AppHandle, arguments: &Value) -> (Vec<Value
 
     app_for_listen.unlisten(event_id);
     let _ = reply_key_for_unlisten;
+
+    // The frontend returns local filesystem paths in `images`. External MCP clients can't read
+    // those, so rewrite each into an HTTP URL served by this server's /image/<filename> endpoint.
+    // The token is appended as ?token= so rendered <img src="..."> tags can authenticate without
+    // being able to set Authorization headers.
+    let port = crate::mcp_server::current_port().await;
+    let token = crate::mcp_server::current_token().await;
+    crate::mcp_server::handler::rewrite_image_urls(&mut payload, port, token.as_deref());
+
     let is_error = payload.get("status").and_then(|s| s.as_str()) != Some("completed");
     (vec![json!({ "type": "text", "text": payload.to_string() })], is_error)
 }
@@ -741,9 +780,23 @@ fn rows_to_text<T: serde::Serialize>(res: Result<T, String>) -> (Vec<Value>, boo
     match res {
         Ok(v) => {
             let pretty = serde_json::to_string_pretty(&v).unwrap_or_else(|_| "{}".to_string());
-            (vec![json!({ "type": "text", "text": pretty })], false)
+            text_ok(pretty)
         }
-        Err(e) => (vec![json!({ "type": "text", "text": format!("Error: {}", e) })], true),
+        Err(e) => text_err(format!("Error: {}", e)),
+    }
+}
+
+/// For lookup-by-id tools: a `None` result means "not found", which the MCP client should treat
+/// as an error (otherwise an LLM will happily consume `null` as a valid payload and hallucinate).
+/// `Some(x)` serialises normally; `Err` stays an error.
+fn optional_row_to_text<T: serde::Serialize>(label: &str, res: Result<Option<T>, String>) -> (Vec<Value>, bool) {
+    match res {
+        Ok(Some(v)) => {
+            let pretty = serde_json::to_string_pretty(&v).unwrap_or_else(|_| "{}".to_string());
+            text_ok(pretty)
+        }
+        Ok(None) => text_err(format!("{} not found.", label)),
+        Err(e) => text_err(format!("Error: {}", e)),
     }
 }
 

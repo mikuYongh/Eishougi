@@ -228,6 +228,21 @@ fn controller() -> Option<&'static Arc<Controller>> {
     CONTROLLER.get()
 }
 
+/// Current server port (read from the controller). Returns the default if not initialised.
+pub async fn current_port() -> u16 {
+    if let Some(c) = controller() {
+        return *c.port.read().await;
+    }
+    DEFAULT_PORT
+}
+
+/// Current configured token, if any.
+pub async fn current_token() -> Option<String> {
+    let c = controller()?;
+    let cfg = c.config.read().await;
+    cfg.token.clone()
+}
+
 async fn start_server(app: AppHandle) -> Result<(), String> {
     let controller = controller().ok_or("MCP server not initialised")?;
     let mut task_guard = controller.task.lock().await;
@@ -247,6 +262,7 @@ async fn start_server(app: AppHandle) -> Result<(), String> {
     let cors = tower_http::cors::CorsLayer::very_permissive();
     let app_router = axum::Router::new()
         .route("/mcp", axum::routing::post(handler::handle))
+        .route("/image/:filename", axum::routing::get(handler::serve_image))
         .layer(cors)
         .with_state(state);
 
