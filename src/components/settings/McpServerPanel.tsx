@@ -279,7 +279,7 @@ function ToolToggle({
         onClick={() => onChange(!checked)}
         className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${checked ? "bg-[var(--accent-1)]" : "bg-[var(--glass-bg-hover)]"}`}
       >
-        <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
+        <span className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${checked ? "translate-x-5" : "translate-x-0"}`} />
       </button>
     </div>
   );
