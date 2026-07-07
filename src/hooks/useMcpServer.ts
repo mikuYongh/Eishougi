@@ -36,6 +36,8 @@ function buildTempProject(params: any): PromptProject {
   let wfBaseModel = "";
   let wfVae = "";
   let wfLoras: any[] = [];
+  let wfWidth: number | null = null;
+  let wfHeight: number | null = null;
   if (defaultWorkflow?.jsonContent) {
     try {
       const a = comfyService.analyzeWorkflow(defaultWorkflow.jsonContent);
@@ -44,10 +46,18 @@ function buildTempProject(params: any): PromptProject {
       wfBaseModel = a.baseModel || "";
       wfVae = a.vaeModel || "";
       wfLoras = a.loras || [];
+      wfWidth = a.width;
+      wfHeight = a.height;
     } catch (e) {
       console.warn("[MCP direct-gen] failed to analyze default workflow:", e);
     }
   }
+
+  // Default size: prefer the workflow's native latent size; otherwise fall back to a portrait
+  // 832×1216 (the most common SDXL/illustration aspect — taller than wide), NOT a square. The
+  // MCP schema's resolution rule keeps both edges ≤ ~1024 by default.
+  const defaultWidth = wfWidth ?? 832;
+  const defaultHeight = wfHeight ?? 1216;
 
   return {
     id: `mcp_temp_${now}`,
@@ -57,8 +67,8 @@ function buildTempProject(params: any): PromptProject {
     negativePrompt: params.negative_prompt ?? DEFAULT_NEGATIVE,
     artistPrompt: params.artist_prompt || "",
     promptSyntax: "danbooru",
-    width: Number(params.width) || 1024,
-    height: Number(params.height) || 1024,
+    width: Number(params.width) || defaultWidth,
+    height: Number(params.height) || defaultHeight,
     resolution: params.resolution,
     steps: Number(params.steps) || 25,
     cfgScale: Number(params.cfg_scale) || 5.0,
@@ -162,6 +172,8 @@ export function useMcpServer() {
               ...(params.negative_prompt != null ? { negativePrompt: params.negative_prompt } : {}),
               ...(params.artist_prompt != null ? { artistPrompt: params.artist_prompt } : {}),
               ...(params.base_model != null ? { baseModel: params.base_model } : {}),
+              ...(params.vae_model != null ? { vaeModel: params.vae_model } : {}),
+              ...(Array.isArray(params.lora_configs) ? { loraConfigs: params.lora_configs } : {}),
               ...(params.width != null ? { width: Number(params.width) } : {}),
               ...(params.height != null ? { height: Number(params.height) } : {}),
               ...(params.steps != null ? { steps: Number(params.steps) } : {}),

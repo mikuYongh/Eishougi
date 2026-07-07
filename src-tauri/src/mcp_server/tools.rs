@@ -93,7 +93,7 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     },
     ToolDef {
         name: "generate_image",
-        description: "Generate image(s) either from an existing prompt project (pass prompt_id) OR directly from parameters (omit prompt_id and pass positive_prompt). Triggers the app's bound ComfyUI workflow. Returns when generation completes (may take 10-60s). Requires the app window to be reachable.\n\nRESOLUTION RULE (important): Keep width/height at the model's native ~1024 range by default (e.g. 832x1216, 1024x1024, 1216x832). ONLY use a larger size (up to 1536 max) when the user EXPLICITLY asks for a bigger/high-resolution/4K image. Never exceed 1536 on either edge — very large sizes can crash the GPU. When unsure, omit width/height and let the workflow decide.",
+        description: "Generate image(s) either from an existing prompt project (pass prompt_id) OR directly from parameters (omit prompt_id and pass positive_prompt). Triggers the app's bound ComfyUI workflow. Returns when generation completes (may take 10-60s). Requires the app window to be reachable.\n\nRESOLUTION RULE (important): Keep width/height at the model's native ~1024 range by default (e.g. 832x1216 portrait, 1024x1024 square, 1216x832 landscape). The default when omitted is portrait 832x1216 (most common for character illustration). ONLY use a larger size (up to 1536 max) when the user EXPLICITLY asks for a bigger/high-resolution/4K image. Never exceed 1536 on either edge — very large sizes can crash the GPU. When unsure, omit width/height.",
         group: ToolGroup::Core,
         input_schema: json!({
             "type": "object",
@@ -103,8 +103,21 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
                 "negative_prompt": { "type": "string", "description": "Optional override. Default: standard low-quality negatives." },
                 "artist_prompt": { "type": "string", "description": "Optional. Artist/style trigger words." },
                 "base_model": { "type": "string", "description": "Optional. Override the workflow's checkpoint." },
-                "width": { "type": "number", "description": "Optional. Image width in px. Default: the workflow's native size (~1024 range). Do NOT set this above 1024 unless the user explicitly requests a larger image; never exceed 1536." },
-                "height": { "type": "number", "description": "Optional. Image height in px. Default: the workflow's native size (~1024 range). Do NOT set this above 1024 unless the user explicitly requests a larger image; never exceed 1536." },
+                "vae_model": { "type": "string", "description": "Optional. Override the workflow's VAE. Use 'auto' to let the workflow decide." },
+                "lora_configs": {
+                    "type": "array",
+                    "description": "Optional. LoRAs to apply in direct-generation mode. Each entry: { name: string (checkpoint filename), strength: number (0-2, default 1), enabled: boolean (default true) }. When omitted in direct mode, the default workflow's bound LoRAs are used.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": { "type": "string" },
+                            "strength": { "type": "number" },
+                            "enabled": { "type": "boolean" }
+                        }
+                    }
+                },
+                "width": { "type": "number", "description": "Optional. Image width in px. Default: the workflow's native width, or 832 if unknown. Do NOT set this above 1024 unless the user explicitly requests a larger image; never exceed 1536." },
+                "height": { "type": "number", "description": "Optional. Image height in px. Default: the workflow's native height, or 1216 if unknown. Do NOT set this above 1024 unless the user explicitly requests a larger image; never exceed 1536." },
                 "steps": { "type": "number", "description": "Optional. Default 25." },
                 "cfg_scale": { "type": "number", "description": "Optional. Default 5.0." },
                 "seed": { "type": "string", "description": "Optional. Use -1 for random (default)." },
