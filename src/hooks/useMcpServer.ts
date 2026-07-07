@@ -3,8 +3,79 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { usePromptStore } from "../stores/promptStore";
+import type { PromptProject } from "../stores/promptStore";
 import { useQueueStore } from "../stores/queueStore";
 import { useWorkflowStore } from "../stores/workflowStore";
+import { comfyService } from "../services/comfyService";
+
+// Default negative prompt used in direct-generation mode when none is supplied.
+const DEFAULT_NEGATIVE = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry";
+
+/**
+ * Build a throwaway PromptProject from raw MCP params (direct-generation mode).
+ * Nothing is persisted; this object only exists long enough to drive addJob + injectParameters.
+ *
+ * IMPORTANT: sampler / scheduler / baseModel / vaeModel are seeded from the bound workflow's own
+ * nodes (via analyzeWorkflow) — NOT left as empty strings. injectParameters treats "" as a real
+ * value and would write it into the workflow, making ComfyUI reject the prompt with an invalid
+ * sampler/model. When the caller doesn't override them, we want the workflow's original values
+ * to survive, which means pre-filling them here from the workflow JSON.
+ */
+function buildTempProject(params: any): PromptProject {
+  const now = Date.now();
+  const workflows = useWorkflowStore.getState().workflows;
+  const defaultWorkflowId =
+    params.workflow_id ||
+    workflows.find((w) => w.type === "text2img" && w.isDefault)?.id;
+  const defaultWorkflow = workflows.find((w) => w.id === defaultWorkflowId);
+
+  // Parse the default workflow so unset generation fields inherit the workflow's real values
+  // (sampler, scheduler, baseModel, vae, size). This mirrors what PromptEdit does on new-project.
+  let wfSampler = "";
+  let wfScheduler = "";
+  let wfBaseModel = "";
+  let wfVae = "";
+  let wfLoras: any[] = [];
+  if (defaultWorkflow?.jsonContent) {
+    try {
+      const a = comfyService.analyzeWorkflow(defaultWorkflow.jsonContent);
+      wfSampler = a.samplerName || "";
+      wfScheduler = a.scheduler || "";
+      wfBaseModel = a.baseModel || "";
+      wfVae = a.vaeModel || "";
+      wfLoras = a.loras || [];
+    } catch (e) {
+      console.warn("[MCP direct-gen] failed to analyze default workflow:", e);
+    }
+  }
+
+  return {
+    id: `mcp_temp_${now}`,
+    title: params.title || "MCP 直接生成",
+    description: "",
+    positivePrompt: params.positive_prompt || "",
+    negativePrompt: params.negative_prompt ?? DEFAULT_NEGATIVE,
+    artistPrompt: params.artist_prompt || "",
+    promptSyntax: "danbooru",
+    width: Number(params.width) || 1024,
+    height: Number(params.height) || 1024,
+    resolution: params.resolution,
+    steps: Number(params.steps) || 25,
+    cfgScale: Number(params.cfg_scale) || 5.0,
+    seed: params.seed != null ? String(params.seed) : "-1",
+    sampler: params.sampler_name || wfSampler,
+    scheduler: params.scheduler || wfScheduler,
+    baseModel: params.base_model || wfBaseModel,
+    vaeModel: params.vae_model || wfVae || "auto",
+    loraConfigs: Array.isArray(params.lora_configs) ? params.lora_configs : wfLoras,
+    workflowId: defaultWorkflowId,
+    tags: [],
+    isFavorite: false,
+    createdAt: now,
+    updatedAt: now,
+    instanceImages: [],
+  };
+}
 
 export interface McpServerStatus {
   running: boolean;
@@ -56,31 +127,57 @@ export function useMcpServer() {
         prompt_id: string;
         batch_count: number;
         reply_key: string;
+        params?: any;
       }>("mcp-generate-request", async (event) => {
-        const { prompt_id, batch_count, reply_key } = event.payload;
+        const { prompt_id, batch_count, reply_key, params } = event.payload;
         if (cancelled) return;
 
-        // Try to resolve the prompt: first from the local store, then from the backend.
-        let prompt = usePromptStore.getState().prompts.find((p) => p.id === prompt_id);
-        if (!prompt) {
-          try {
-            const rustPrompt = await invoke<any>("get_prompt", { id: prompt_id });
-            if (rustPrompt) {
-              // Convert from Rust camelCase format using the store's mapper.
-              const { fromRustPrompt } = await import("../stores/promptStore");
-              prompt = fromRustPrompt(rustPrompt);
+        // ---- Two modes ----
+        // (A) prompt_id given: load the project (store → backend fallback), then apply param overrides.
+        // (B) prompt_id empty: build a throwaway project directly from params (no DB row created).
+        let prompt: PromptProject | undefined;
+
+        if (prompt_id) {
+          prompt = usePromptStore.getState().prompts.find((p) => p.id === prompt_id);
+          if (!prompt) {
+            try {
+              const rustPrompt = await invoke<any>("get_prompt", { id: prompt_id });
+              if (rustPrompt) {
+                const { fromRustPrompt } = await import("../stores/promptStore");
+                prompt = fromRustPrompt(rustPrompt);
+              }
+            } catch (e) {
+              console.warn("[MCP] failed to fetch prompt from backend:", e);
             }
-          } catch (e) {
-            console.warn("[MCP] failed to fetch prompt from backend:", e);
           }
+          if (!prompt) {
+            await emit(reply_key, { status: "error", message: `Prompt ${prompt_id} not found.` }).catch(() => {});
+            return;
+          }
+          // Apply per-field overrides on top of the loaded project.
+          if (params) {
+            prompt = {
+              ...prompt,
+              ...(params.positive_prompt != null ? { positivePrompt: params.positive_prompt } : {}),
+              ...(params.negative_prompt != null ? { negativePrompt: params.negative_prompt } : {}),
+              ...(params.artist_prompt != null ? { artistPrompt: params.artist_prompt } : {}),
+              ...(params.base_model != null ? { baseModel: params.base_model } : {}),
+              ...(params.width != null ? { width: Number(params.width) } : {}),
+              ...(params.height != null ? { height: Number(params.height) } : {}),
+              ...(params.steps != null ? { steps: Number(params.steps) } : {}),
+              ...(params.cfg_scale != null ? { cfgScale: Number(params.cfg_scale) } : {}),
+              ...(params.seed != null ? { seed: String(params.seed) } : {}),
+              ...(params.sampler_name != null ? { sampler: params.sampler_name } : {}),
+              ...(params.scheduler != null ? { scheduler: params.scheduler } : {}),
+              ...(params.workflow_id != null ? { workflowId: params.workflow_id } : {}),
+            };
+          }
+        } else {
+          // Direct mode: params is required and must contain positive_prompt (backend validates this).
+          prompt = buildTempProject(params || {});
         }
 
-        if (!prompt) {
-          await emit(reply_key, { status: "error", message: `Prompt ${prompt_id} not found.` }).catch(() => {});
-          return;
-        }
-
-        // Resolve a workflow to use.
+        // Resolve a workflow to use: the project's binding, or the default text2img workflow.
         const workflows = useWorkflowStore.getState().workflows;
         const workflowId =
           prompt.workflowId ||
