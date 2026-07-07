@@ -306,6 +306,30 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
         }),
     },
     ToolDef {
+        name: "remove_favorite_character",
+        description: "Remove a character from the user's favorites. Pass EITHER character_id (the favorite row id from list_favorite_characters) OR character_tag.",
+        group: ToolGroup::Write,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "character_id": { "type": "string", "description": "Favorite row id (from list_favorite_characters). Preferred when known." },
+                "character_tag": { "type": "string", "description": "The character's Danbooru tag. Used if id is unknown." }
+            }
+        }),
+    },
+    ToolDef {
+        name: "remove_favorite_artist",
+        description: "Remove an artist from the user's favorites. Pass EITHER artist_id (the favorite row id from list_favorite_artists) OR artist_tag.",
+        group: ToolGroup::Write,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "artist_id": { "type": "string", "description": "Favorite row id (from list_favorite_artists). Preferred when known." },
+                "artist_tag": { "type": "string", "description": "The artist's Danbooru tag. Used if id is unknown." }
+            }
+        }),
+    },
+    ToolDef {
         name: "create_workflow",
         description: "Create a new ComfyUI workflow from raw JSON content.",
         group: ToolGroup::Write,
@@ -538,6 +562,25 @@ pub async fn execute_tool(
                 Err(e) => text_err(e),
             }
         }
+        "remove_favorite_character" => {
+            // Either id or tag; backend errors if neither is supplied.
+            let id = arg_opt_string(arguments, "character_id");
+            let tag = arg_opt_string(arguments, "character_tag");
+            match commands::library_favorites::remove_favorite_character(state, id, tag).await {
+                Ok(true) => text_ok(json!({"status": "removed"}).to_string()),
+                Ok(false) => text_err("Favorite not found.".to_string()),
+                Err(e) => text_err(e),
+            }
+        }
+        "remove_favorite_artist" => {
+            let id = arg_opt_string(arguments, "artist_id");
+            let tag = arg_opt_string(arguments, "artist_tag");
+            match commands::library_favorites::remove_favorite_artist(state, id, tag).await {
+                Ok(true) => text_ok(json!({"status": "removed"}).to_string()),
+                Ok(false) => text_err("Favorite not found.".to_string()),
+                Err(e) => text_err(e),
+            }
+        }
         "create_workflow" => {
             let wf = build_workflow_from_args(arguments);
             match commands::workflows::create_workflow(state, wf).await {
@@ -682,6 +725,8 @@ mod tests {
         assert!(names.contains(&"update_prompt_settings"));
         assert!(names.contains(&"add_favorite_character"));
         assert!(names.contains(&"add_favorite_artist"));
+        assert!(names.contains(&"remove_favorite_character"));
+        assert!(names.contains(&"remove_favorite_artist"));
         assert!(names.contains(&"create_workflow"));
         assert!(!names.contains(&"search_prompts"));
     }
@@ -700,6 +745,31 @@ mod tests {
         assert!(t.get("inputSchema").is_some(), "MCP spec requires inputSchema");
         assert!(t.get("name").is_some());
         assert!(t.get("description").is_some());
+    }
+
+    /// `remove_favorite_*` schemas must accept EITHER id or tag — neither should be required
+    /// (the backend errors if both are missing, but the schema must not force one).
+    #[test]
+    fn test_remove_favorite_schemas_allow_id_or_tag() {
+        let tools = tools_list_payload(false, false, true);
+        for tool_name in ["remove_favorite_character", "remove_favorite_artist"] {
+            let t = tools
+                .iter()
+                .find(|t| t["name"].as_str() == Some(tool_name))
+                .expect("tool not found");
+            // No "required" field, or an empty one — both id and tag are optional.
+            let required = t["inputSchema"].get("required");
+            assert!(
+                required.is_none() || required.unwrap().as_array().map(|a| a.is_empty()).unwrap_or(true),
+                "{} must not require id or tag",
+                tool_name
+            );
+            let props = &t["inputSchema"]["properties"];
+            let id_key = if tool_name == "remove_favorite_character" { "character_id" } else { "artist_id" };
+            let tag_key = if tool_name == "remove_favorite_character" { "character_tag" } else { "artist_tag" };
+            assert!(props.get(id_key).is_some(), "{} missing {}", tool_name, id_key);
+            assert!(props.get(tag_key).is_some(), "{} missing {}", tool_name, tag_key);
+        }
     }
 
     #[test]
