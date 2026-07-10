@@ -1,0 +1,14 @@
+{
+  "version": "0.2.3",
+  "notes": "当前版本，无可用更新。",
+  "pub_date": "2026-07-07T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "",
+      "url": ""
+    },
+    "android-universal": {
+      "url": ""
+    }
+  }
+}
