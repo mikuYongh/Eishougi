@@ -9,103 +9,246 @@
 </p>
 
 <p align="center">
+  A cross-platform AI art workstation that turns ComfyUI's complex node-graph workflow into an elegant prompt-project experience — with a built-in AI agent and an MCP server that exposes your entire creative pipeline to external AI tools.
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Tauri-2.0-24C8D8?style=for-the-badge&logo=tauri&logoColor=white" alt="Tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
   <img src="https://img.shields.io/badge/Rust-Backend-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust" />
   <img src="https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind" />
   <img src="https://img.shields.io/badge/Platform-Win%20%7C%20Mac%20%7C%20Android-4CAF50?style=for-the-badge" alt="Platform" />
+  <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License" />
+</p>
+
+<p align="center">
+  <a href="#-核心特性">核心特性</a> ·
+  <a href="#-界面预览">界面预览</a> ·
+  <a href="#-快速开始">快速开始</a> ·
+  <a href="#-mcp-对外服务">MCP 服务</a> ·
+  <a href="#-本地开发">本地开发</a>
 </p>
 
 ---
 
-## 🌍 Language
+## 🌟 核心特性
 
-- [简体中文 (Simplified Chinese)](#) (Current)
-- *English documentation coming soon*
+### 🔮 提示词项目管理 (Prompt Projects)
+
+告别散乱的文本文件。将你的每个创作灵感组织为一个**项目**，包含正向/负向提示词、画师风格、生成参数（尺寸 / 步数 / CFG / Seed / 采样器）、LoRA 配置等，一键注入绑定的 ComfyUI 工作流。
+
+- **多语法支持**：Danbooru 标签、自然语言 (Natural)、XML 结构化提示词
+- **参数注入**：自动将项目参数写入 ComfyUI 工作流 JSON 的对应节点（KSampler、CLIPTextEncode、Loader、SizePicker、Power Lora Loader 等）
+- **实时进度**：深度对接 ComfyUI WebSocket，生成进度实时反馈
+- **批量生成**：支持一次生成多张，Seed 自动递增
+
+### 🤖 内置 AI 助手 (NEXUS Agent)
+
+接入任何 OpenAI 兼容 API（支持 GPT、Claude、DeepSeek-R1、O 系列推理模型等），让 AI 成为你专属的提示词架构师。
+
+- **自然语言生图**：直接对 AI 说"画一个躺在床上的蕾姆"，AI 自动查询角色库、组装 trigger + 画面描述、触发生成
+- **角色保护机制**：AI 自动识别知名 IP 角色，只使用正确的 trigger tag，不会画蛇添足地瞎改发色/瞳色
+- **深度思考**：支持调节推理模型的"思考深度"（reasoning_effort）
+- **视觉理解**：支持图片附件，AI 能"看到"参考图并据此生成
+
+### 🔌 MCP 对外服务 (MCP Server)
+
+这是咏唱机的杀手级功能——**将你的整个创作能力暴露为 MCP 工具**，让外部 AI 工具（Claude Desktop、Cursor、AstrBot 等）通过标准 MCP 协议调用。
+
+内置 **28+ 个工具**：
+
+| 类别 | 能力 |
+|------|------|
+| **提示词** | 搜索 / 查看 / 创建 / 更新项目 |
+| **生图** | 直接用参数生图（无需项目）、查看生成历史 |
+| **角色库** | 36,000+ 角色按系列下钻查询、随机抽角色、收藏管理 |
+| **画师库** | 15,000+ 画师 trigger 搜索、收藏管理 |
+| **工作流** | 查询 / 创建 ComfyUI 工作流 |
+| **模型** | 查询 ComfyUI 本地 checkpoints / LoRAs |
+| **环境** | 检查 ComfyUI 连接状态 |
+
+- **Token 鉴权**：支持 Bearer Header 和 URL query 双重认证
+- **图片 HTTP 返回**：生成的图片以 HTTP URL 返回，外部客户端可直接内联展示
+- **工具分组**：核心 / 查询 / 写入三组，可独立开关
+
+<details>
+<summary>📖 Claude Desktop / AstrBot 配置示例</summary>
+
+```json
+{
+  "mcpServers": {
+    "prompt-muse": {
+      "url": "http://127.0.0.1:21434/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-token>"
+      }
+    }
+  }
+}
+```
+
+在应用内 **设置 → 模型与服务 → MCP 对外服务** 点击「复制配置」即可一键获取。
+</details>
+
+### 📚 角色与画师资产库
+
+内置庞大的离线角色/画师数据库，无需联网即可搜索：
+
+- **36,000+ 角色**：含中英文名、系列、触发词 (trigger)、核心外观标签 (coreTags)
+- **15,000+ 画师**：含触发词，按使用热度排序
+- **按系列浏览**：原神、明日方舟、Vocaloid、宝可梦…… 先选系列再选角色
+- **收藏管理**：收藏喜爱的角色/画师，自定义备注和标签
+- **随机灵感**：随机抽一个角色 + 画师，给 AI 一个创作起点
+
+### 💾 本地优先 & 资产管理
+
+- **历史回溯**：所有生成的图片自动记录到本地 SQLite 数据库，含完整参数和 Seed
+- **典藏库**：瀑布流画廊展示你的收藏佳作
+- **原生保存**：PC 和 Android 均通过 Rust 底层直接保存到系统相册/下载目录，绕过 Web 端限制
+- **数据导入/导出**：一键备份/迁移所有项目和工作流
+
+### 🎨 精致 UI
+
+- **赛博朋克 + 毛玻璃美学**：5 套配色主题（樱花 / 经典 / 翠绿 / 暗夜 / 赛博）
+- **全平台自适应**：桌面端侧边栏布局，移动端底部导航，沉浸式全屏
+- **壁纸自定义**：支持本地图片 / 网络图片 / 模糊度调节
+- **流畅动效**：进度条、状态指示器、过渡动画
 
 ---
 
-## 🌟 核心愿景 (Vision)
+## 🖼️ 界面预览
 
-**詠唱机 (EISHOUGI)** 是一款专为 AI 绘画（特别是基于 ComfyUI 的高端创作者）打造的跨平台工作台。
-我们将繁杂冰冷的技术参数温柔剥离，赋予纯粹的文字以魔法般的重构力量。您只需尽情倾诉创意，它便会静候在侧，将思绪编织为精准的视觉咒语，并于指尖召唤出突破现实的绚丽画卷。
+| 仪表盘 | 提示词编辑 |
+|:---:|:---:|
+| <img src="docs/screenshots/dashboard.png" width="400" /> | <img src="docs/screenshots/prompt-edit.png" width="400" /> |
 
----
+| AI 助手对话 | 典藏库画廊 |
+|:---:|:---:|
+| <img src="docs/screenshots/agent.png" width="400" /> | <img src="docs/screenshots/vault.png" width="400" /> |
 
-## ✨ 核心特性 (Features)
-
-### 🔮 魔法级提示词管理 (Prompt Project)
-- **多语法支持**: 完美兼容 Danbooru 标准标签、自然语言 (Natural)、以及高级 XML 结构提示词。
-- **一键注入 ComfyUI**: 可将项目中的提示词、尺寸、Seed、以及复杂的 LoRA 配置动态注入到绑定的 ComfyUI 工作流 (JSON) 中。
-- **动态响应**: 深度对接 ComfyUI WebSocket，实时监控生成进度。
-
-### 🤖 内置智能 AI 助手 (NEXUS Agent)
-- **顶级逻辑规划**: 通过配置 OpenAI 兼容 API（支持如 `o1`, `o3-mini`, `DeepSeek-R1`, `Claude 3.5` 等），让 AI 替你自动拆解镜头语言并生成复杂的提示词结构。
-- **深度思考 (Reasoning Effort)**: 完美支持并可直接调节 O 系列或 R1 推理模型的“思考深度”，为您获取最高质量的提示词构架。
-- **零负担应用**: AI 生成的提示词和参数只需点击“一键应用”，即可无缝同步到当前项目中。
-
-### 📚 全能资产库与典藏库 (Assets & Vault)
-- **历史回溯**: 所有通过咏唱机生成的图片都会被无感记录（本地 SQLite 数据库），支持查看完整生成参数和 Seed。
-- **原生下载保存**: 彻底解决 Web 端下载限制，移动端与 PC 端均直接调用 Rust 底层指令，将美图一键无损保存至系统相册/下载目录。
-- **画廊展示**: 赛博朋克 + 毛玻璃美学的瀑布流画廊。
+> 📸 截图后续补充
 
 ---
 
-## 🚀 使用指南与快速开始 (Usage Guide)
+## 🚀 快速开始
 
 ### 1. 环境准备
-使用本软件的生图功能，您必须在本地或远端拥有一套正常运行的 **ComfyUI** 实例。
-- 启动您的 ComfyUI 服务（默认地址为 `http://127.0.0.1:8188`，可在软件右上角设置中更改）。
-- 下载或构建本项目的安装包（见后文打包说明）。
 
-### 2. 导入与绑定工作流 (Workflow)
-软件通过**解析并覆盖 ComfyUI 工作流 JSON 文件（API 格式）**来实现动态生图。
-我们在项目中提供了一个官方的演示工作流，您可以直接导入测试：
+- 一套正常运行的 **[ComfyUI](https://github.com/comfyanonymous/ComfyUI)** 实例（默认 `http://127.0.0.1:8188`）
+- 下载或编译本项目的安装包
 
-📁 **示例文件路径**: [`docs/workflows/Anima+Preview3_Txt2Img_Example.json`](./docs/workflows/Anima+Preview3_Txt2Img_Example.json)
+### 2. 导入工作流
 
-**如何在软件中使用它？**
-1. 打开《詠唱机 EISHOUGI》的 **Workflows (工作流)** 菜单。
-2. 点击新建，导入上述的 `Anima+Preview3_Txt2Img_Example.json`。
-3. 保存后，前往 **Prompts (提示词项目)** 页面新建一个项目，在底部工作流下拉框中选择刚刚绑定的工作流。
-4. 现在，您可以输入提示词并点击 **“生成 (Generate)”**，系统将自动把参数注入节点并投递至您的 ComfyUI 队列。
+软件通过解析并覆盖 ComfyUI 工作流 JSON（API 格式）来实现参数注入。
 
-### 3. 🧩 示例工作流依赖节点说明 (Required ComfyUI Nodes)
-如果您使用的是本项目的示例工作流 `Anima+Preview3_Txt2Img_Example.json`，请确保您的 ComfyUI 中已安装以下关键自定义节点（可通过 *ComfyUI Manager* 搜索并安装）：
+📁 **示例工作流**：[`docs/workflows/Anima+Preview3_Txt2Img_Example.json`](./docs/workflows/Anima+Preview3_Txt2Img_Example.json)
 
-- **rgthree-comfy** (`Power Lora Loader (rgthree)` 节点)
-- **ComfyUI Custom Scripts (pysssss)** 或等效工具 (`Simple String` 文本输入节点)
-- **Inspire Pack / 类似拓展** (`SDXLEmptyLatentSizePicker+` 高级分辨率节点)
-- **ToriiGate_Captioner** (用于特定提示词翻译或预处理的节点，如果缺失，可以在工作流中将其替换为原生的 `CLIP Text Encode` 节点并重新导出 API JSON)
+1. 打开 **Workflows** 页面 → 新建 → 导入 JSON
+2. 新建一个提示词项目，在底部选择绑定的工作流
+3. 输入提示词，点击生成
 
-*注：您完全可以使用自己平时的 ComfyUI 工作流，只需在 ComfyUI 中开启 "Enable Dev mode Options"，然后点击 "Save (API format)" 导出 JSON 并在本软件中导入即可！软件会自动识别核心文本与参数节点。*
+> 你也可以用自己的工作流——在 ComfyUI 中开启 "Enable Dev mode Options"，点击 "Save (API format)" 导出 JSON 即可。
+
+<details>
+<summary>🧩 示例工作流依赖的自定义节点</summary>
+
+- **rgthree-comfy** — `Power Lora Loader (rgthree)`
+- **pysssss** — `Simple String` 文本输入节点
+- **Inspire Pack** — `SDXLEmptyLatentSizePicker+` 高级分辨率节点
+- **ToriiGate_Captioner** — 提示词预处理（可替换为原生 CLIP Text Encode）
+
+可通过 *ComfyUI Manager* 搜索安装。
+</details>
+
+### 3. 配置 AI 助手（可选）
+
+在 **设置 → 模型与服务** 中配置 OpenAI 兼容 API：
+
+- **API URL**：如 `https://api.openai.com/v1`
+- **API Key**：你的密钥（仅存储在本地，不会被打进安装包）
+- **模型**：如 `gpt-4o`、`deepseek-chat`、`claude-3.5-sonnet`
+
+### 4. 开启 MCP 服务（可选）
+
+**设置 → 模型与服务 → MCP 对外服务** → 启动服务 → 复制配置 → 粘贴到你的 AI 客户端。
 
 ---
 
-## 🛠️ 本地开发与编译打包
+## 🔧 本地开发
 
-### 1. 基础环境
-- 安装 [Node.js](https://nodejs.org/) (推荐 v20+)
-- 安装 [Rust 语言工具链](https://rustup.rs/)
+### 环境要求
 
-### 2. 启动开发模式
+- [Node.js](https://nodejs.org/) v20+
+- [Rust](https://rustup.rs/) 工具链
+- [Android Studio](https://developer.android.com/studio) SDK & NDK（Android 构建）
+
+### 启动开发模式
+
 ```bash
-git clone https://github.com/your-repo/prompt-muse.git
-cd prompt-muse
+git clone https://github.com/mikuYongh/Eishougi.git
+cd Eishougi
 npm install
 
-# 启动桌面端开发模式
+# 桌面端
 npm run tauri dev
+
+# Android
+npm run tauri android dev
 ```
 
-### 3. 编译发布版应用
+### 构建发布版
+
 ```bash
-# 构建 Windows (exe/msi) 或 macOS (app/dmg)
+# Windows (exe/msi) 或 macOS (app/dmg)
 npm run tauri build
 
-# 构建 Android (apk/aab) - 需配置好 Android Studio SDK & NDK
+# Android (apk/aab)
 npm run tauri android build
 ```
+
+### 项目结构
+
+```
+prompt-muse/
+├── src/                    # React 前端
+│   ├── components/         #   UI 组件（Agent / Library / Settings / ...）
+│   ├── hooks/              #   React hooks（useAgent / useMcpServer / ...）
+│   ├── pages/              #   页面（Dashboard / Generate / Vault / ...）
+│   ├── stores/             #   Zustand 状态管理
+│   └── services/           #   ComfyUI 集成 / AI 服务
+├── src-tauri/              # Rust 后端
+│   ├── src/
+│   │   ├── commands/       #   Tauri 命令（prompts / workflows / history / library / ...）
+│   │   ├── mcp_server/     #   MCP HTTP Server（axum）
+│   │   ├── comfy_ws.rs     #   ComfyUI WebSocket 追踪
+│   │   ├── update.rs       #   应用更新检查
+│   │   └── db/             #   SQLite 数据库（migrations / models）
+│   └── resources/          #   内置数据（characters.json / artists.json / 默认工作流）
+├── update/                 #   更新清单（latest.json）
+└── docs/                   #   文档
+```
+
+---
+
+## 🛠️ 技术栈
+
+| 层 | 技术 |
+|----|------|
+| 桌面/移动框架 | Tauri 2.0 |
+| 前端 | React 19 + TypeScript + Tailwind CSS v4 |
+| 状态管理 | Zustand |
+| 后端 | Rust（tokio async runtime） |
+| 数据库 | SQLite（rusqlite, WAL 模式） |
+| MCP Server | axum（JSON-RPC 2.0 over HTTP） |
+| ComfyUI 集成 | WebSocket + REST API |
+| 虚拟列表 | react-virtuoso |
+| 图片预览 | react-photo-view |
+
+---
+
+## 📜 开源协议
+
+MIT License — 自由使用、修改、分发。
 
 ---
 
