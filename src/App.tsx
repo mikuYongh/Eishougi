@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useSettingsStore } from "./stores/settingsStore";
 import { TitleBar } from "./components/layout/TitleBar";
@@ -26,6 +26,7 @@ import { usePromptStore } from "./stores/promptStore";
 import { useWorkflowStore } from "./stores/workflowStore";
 import { useDevice } from "./hooks/useDevice";
 import { useMcpServer } from "./hooks/useMcpServer";
+import { useUpdateCheck } from "./hooks/useUpdateCheck";
 import { DesktopLayout } from "./components/layout/DesktopLayout";
 import { MobileLayout } from "./components/layout/MobileLayout";
 import { GlobalPhotoProvider } from "./components/ui/GlobalPhotoProvider";
@@ -122,6 +123,19 @@ export default function App() {
 
 // Extract routes to avoid duplication
 function AppRoutes() {
+  // Startup update check: a few seconds after the app loads, silently look for a newer release and
+  // toast the user if one exists (24h cooldown). The "查看" action jumps to Settings → 关于 where
+  // the full UpdatePanel lives. Lives inside <BrowserRouter> so useNavigate works.
+  const navigate = useNavigate();
+  const { silentCheckOnStartup } = useUpdateCheck(() => {
+    localStorage.setItem("settings_open_tab", "about");
+    navigate("/settings");
+  });
+  useEffect(() => {
+    const t = setTimeout(() => { silentCheckOnStartup(); }, 3000);
+    return () => clearTimeout(t);
+  }, [silentCheckOnStartup]);
+
   return (
     <Routes>
       <Route path="/" element={<Dashboard />} />

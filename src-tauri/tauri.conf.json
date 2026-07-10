@@ -48,5 +48,17 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFEQ0NDOUIxM0JBMTRGNkMKUldSc1Q2RTdzY25NclR3TGZFWnQ1SkpCMzhoYUc3THQzWkdJTFFZRkQrZ3VFcTFCbVRnRFl0cjgK",
+      "endpoints": [
+        "https://cdn.jsdelivr.net/gh/mikuYongh/Eishougi@main/update/latest.json",
+        "https://raw.githubusercontent.com/mikuYongh/Eishougi/main/update/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

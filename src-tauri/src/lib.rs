@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod comfy_ws;
 mod mcp_server;
+mod update;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -53,6 +54,40 @@ pub mod jvm_plugin {
                     let res_string = result.l().unwrap();
                     let rust_string: String = env.get_string((&res_string).into()).unwrap().into();
                     return Ok(rust_string);
+                }
+                return Err("MAIN_ACTIVITY_CLASS not initialized".to_string());
+            }
+            Err("JVM not initialized".to_string())
+        }
+    }
+
+    /// Trigger the Android system installer for a downloaded APK. Calls
+    /// `MainActivity.installApk(filePath)` (Kotlin), which builds a FileProvider URI + ACTION_VIEW
+    /// intent. Returns the Kotlin method's status string ("ok" on success).
+    pub fn install_apk(file_path: &str) -> Result<(), String> {
+        unsafe {
+            if let Some(vm) = &JVM {
+                let mut env = vm.attach_current_thread().map_err(|e| e.to_string())?;
+                let _ = env.exception_clear();
+                if let Some(class) = &MAIN_ACTIVITY_CLASS {
+                    let path_j = env.new_string(file_path).map_err(|e| e.to_string())?;
+                    let result = env
+                        .call_static_method(
+                            class,
+                            "installApk",
+                            "(Ljava/lang/String;)Ljava/lang/String;",
+                            &[jni::objects::JValue::from(&path_j)],
+                        )
+                        .map_err(|e| e.to_string())?;
+                    if env.exception_check().unwrap_or(false) {
+                        let _ = env.exception_clear();
+                    }
+                    let res_string = result.l().map_err(|e| e.to_string())?;
+                    let rust_string: String = env.get_string((&res_string).into()).map_err(|e| e.to_string())?.into();
+                    if rust_string.starts_with("ok") || rust_string.starts_with("OK") {
+                        return Ok(());
+                    }
+                    return Err(rust_string);
                 }
                 return Err("MAIN_ACTIVITY_CLASS not initialized".to_string());
             }
@@ -275,6 +310,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init());
 
+    // The updater plugin only ships desktop installers; register it desktop-only so Android builds
+    // don't pull in unsupported platform code. A small helper keeps the builder chain readable.
+    let builder = register_updater(builder);
+
     let app = builder
         .manage(state)
         .manage(comfy_ws::ComfyState::new())
@@ -354,6 +393,8 @@ pub fn run() {
             mcp_server::mcp_server_clear_token,
             mcp_server::mcp_server_set_tool_groups,
             mcp_server::mcp_server_set_port,
+            update::check_for_updates,
+            update::download_and_install_apk,
         ])
         .setup(|app| {
             // Background: sync library data (characters / artists) from embedded JSON.
@@ -415,6 +456,19 @@ pub fn run() {
             .expect("error while running tauri application");
     }
 }
+
+/// Register the updater plugin on desktop only. The official plugin ships no Android/iOS installer
+/// backend, so loading it there would be dead weight (and its permissions aren't granted on mobile).
+#[cfg(not(target_os = "android"))]
+fn register_updater(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+    builder.plugin(tauri_plugin_updater::Builder::new().build())
+}
+
+#[cfg(target_os = "android")]
+fn register_updater(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
+    builder
+}
+
 fn get_app_data_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     {

@@ -83,6 +83,32 @@ class MainActivity : TauriActivity() {
           }
           return "Context is null"
       }
+
+      @JvmStatic
+      fun installApk(filePath: String): String {
+          appContext?.let { context ->
+              try {
+                  val file = java.io.File(filePath)
+                  if (!file.exists()) return "Error: APK file not found at $filePath"
+
+                  // Build a content:// URI via FileProvider (required since Android 7 for file:// intents).
+                  val authority = context.packageName + ".fileprovider"
+                  val uri = androidx.core.content.FileProvider.getUriForFile(context, authority, file)
+
+                  val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                      setDataAndType(uri, "application/vnd.android.package-archive")
+                      addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                      addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                  }
+                  context.startActivity(intent)
+                  return "ok"
+              } catch (e: Exception) {
+                  e.printStackTrace()
+                  return "Error: " + e.message
+              }
+          }
+          return "Error: Context is null"
+      }
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
