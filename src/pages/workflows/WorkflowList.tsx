@@ -1,4 +1,4 @@
-import { Plus, Search, Edit3, Trash2, Cpu, Video, Settings, Play, Star, Zap } from "lucide-react";
+import { Plus, Search, Edit3, Trash2, Copy, Cpu, Video, Settings, Play, Star, Zap } from "lucide-react";
 import { useState } from "react";
 import { useWorkflowStore, type WorkflowType, type WorkflowProject } from "../../stores/workflowStore";
 import { usePromptStore } from "../../stores/promptStore";
@@ -29,6 +29,7 @@ export function WorkflowList() {
   const workflows = useWorkflowStore(state => state.workflows);
   const setDefaultWorkflow = useWorkflowStore(state => state.setDefaultWorkflow);
   const removeWorkflow = useWorkflowStore(state => state.removeWorkflow);
+  const addWorkflow = useWorkflowStore(state => state.addWorkflow);
   const addPrompt = usePromptStore(state => state.addPrompt);
   const navigate = useNavigate();
 
@@ -83,6 +84,28 @@ export function WorkflowList() {
       updatedAt: Date.now()
     });
     navigate(`/generate/${newId}`);
+  };
+
+  // Clone a workflow: deep-copy it under a new id, name suffixed with "(克隆)", and reset
+  // isDefault so the clone doesn't fight the original for the default slot. Builtin workflows
+  // become editable copies (isBuiltin=false) when cloned.
+  const handleCloneWorkflow = async (w: WorkflowProject) => {
+    try {
+      const now = Date.now();
+      const clone: WorkflowProject = {
+        ...w,
+        id: "wf_" + now.toString(),
+        name: `${w.name} (克隆)`,
+        isDefault: false,
+        isBuiltin: false,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await addWorkflow(clone);
+      toast.success("工作流已克隆");
+    } catch (e: any) {
+      toast.error(`克隆失败: ${e.message}`);
+    }
   };
 
   const handleImportClipboard = async () => {
@@ -201,16 +224,26 @@ export function WorkflowList() {
 
                 {/* Actions */}
                 <div className="flex items-center justify-between mt-auto pt-4 border-t border-[var(--glass-border)]">
-                  <button 
-                    onClick={() => {
-                      if (confirm(`确定要删除工作流 "${wf.name}" 吗？`)) {
-                        removeWorkflow(wf.id);
-                      }
-                    }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/5 hover:bg-red-500/10 text-red-400/70 hover:text-red-400 transition-colors cursor-pointer"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleCloneWorkflow(wf)}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-500/5 hover:bg-blue-500/10 text-blue-400/70 hover:text-blue-400 transition-colors cursor-pointer"
+                      title="克隆工作流"
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`确定要删除工作流 "${wf.name}" 吗？`)) {
+                          removeWorkflow(wf.id);
+                        }
+                      }}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/5 hover:bg-red-500/10 text-red-400/70 hover:text-red-400 transition-colors cursor-pointer"
+                      title="删除工作流"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => navigate(`/workflows/${wf.id}/edit`)}
