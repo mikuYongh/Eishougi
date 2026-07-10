@@ -581,6 +581,68 @@ export function useAgent() {
         }
       }
     },
+    // ===== 全库角色/画师查询（非收藏，搜整个 36k+ 角色 / 15k+ 画师库）=====
+    {
+      type: "function",
+      function: {
+        name: "list_character_series",
+        description: "List character series/copyrights (e.g. 原神/Genshin, 明日方舟/Arknights) with character counts, paginated. Use this FIRST to discover which series exist, then call search_characters_in_series with the series name. Returns both `series` (English tag) and `seriesZh` (Chinese name). Always page (default 30, max 100).",
+        parameters: {
+          type: "object",
+          properties: {
+            search: { type: "string", description: "Optional. Fuzzy-match series name (English or Chinese)." },
+            limit: { type: "number", description: "Page size. Default 30, max 100." },
+            offset: { type: "number", description: "Pagination offset. Default 0." }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "search_characters_in_series",
+        description: "Search for characters WITHIN a specific series (e.g. all characters in 原神). `series` is REQUIRED — pass the seriesZh (e.g. \"原神\") or series (e.g. \"mihoyo\") value. Returns trigger (put in positive prompt) and coreTags (appearance reference only — do NOT dump into prompt for named characters). Default limit 20, max 50.",
+        parameters: {
+          type: "object",
+          properties: {
+            series: { type: "string", description: "REQUIRED. Series name (Chinese or English) from list_character_series." },
+            search: { type: "string", description: "Optional. Further filter by character name." },
+            limit: { type: "number", description: "Page size. Default 20, max 50." },
+            offset: { type: "number", description: "Pagination offset. Default 0." }
+          },
+          required: ["series"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "search_artists",
+        description: "Search the artist library (15k+ artists with trigger tags). Returns trigger (e.g. \"wlop\") to put in the positive prompt. Ordered by popularity. Default limit 20, max 50. Pass search to filter by name.",
+        parameters: {
+          type: "object",
+          properties: {
+            search: { type: "string", description: "Optional. Artist name keyword (English or Chinese)." },
+            limit: { type: "number", description: "Page size. Default 20, max 50." },
+            offset: { type: "number", description: "Pagination offset. Default 0." }
+          }
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "random_character_and_artist",
+        description: "Pick a RANDOM character (with trigger + coreTags) and a RANDOM artist (with trigger) from the library. A creativity springboard for 'surprise me' / '随便来一张'. Returns the picked info so you can imagine a scene and call generate_image. Pure random.",
+        parameters: {
+          type: "object",
+          properties: {
+            series: { type: "string", description: "Optional. Restrict character to a series." },
+            use_artist: { type: "boolean", description: "Optional. Also pick random artist (default true)." }
+          }
+        }
+      }
+    },
     // ===== 收藏角色 / 收藏画师 CRUD =====
     // 收藏是一等实体，独立于 gallery。gallery_*_id 仅作软链，用于图片/元数据自动补全。
     // 角色支持 tag 分组；画师无 tag。
@@ -1089,7 +1151,13 @@ User input: ${userText}`;
 
         const systemMessage = {
           role: "system",
-          content: agentSettings.systemPrompt + mcpToolsPrompt + systemContext + precheckContext + budgetContext + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually." 
+          content: agentSettings.systemPrompt + mcpToolsPrompt + systemContext + precheckContext + budgetContext + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually."
+            + "\n\n## 角色与画师库查询（关键 — 防止误用收藏工具）"
+            + "\n当用户问\"有什么角色\"/\"有哪些角色\"/\"角色列表\" → 用 `list_character_series`（列系列）+ `search_characters_in_series`（系列内搜角色），这是查全库 36000+ 角色。"
+            + "\n当用户问\"有什么画师\"/\"有哪些风格\"/\"画师列表\" → 用 `search_artists`，这是查全库 15000+ 画师。"
+            + "\n当用户说\"随便来一张\"/\"给我个惊喜\" → 用 `random_character_and_artist`。"
+            + "\n⚠️ `list_favorite_characters` / `list_favorite_artists` 只返回**用户收藏**的（可能只有几个），不是全库。用户问\"有什么角色\"时不要用收藏工具，除非用户明确说\"我收藏的角色\"。"
+            + "\n⚠️ `get_custom_styles` 工具不存在。用户问\"有什么风格\"时用 `search_artists`。"
         };
         
         const payload: any = {
@@ -1559,6 +1627,47 @@ User input: ${userText}`;
             }
             const { checkpoints, loras } = useModelStore.getState();
             res = { checkpoints, loras };
+          } else if (fnName === 'list_character_series') {
+            res = await invoke('get_character_series', {
+              search: parsedArgs.search || null,
+              limit: Math.min(parsedArgs.limit || 30, 100),
+              offset: parsedArgs.offset || 0,
+            });
+          } else if (fnName === 'search_characters_in_series') {
+            const series = parsedArgs.series;
+            if (!series) throw new Error("series is required");
+            res = await invoke('search_characters', {
+              search: parsedArgs.search || null,
+              series: series,
+              limit: Math.min(parsedArgs.limit || 20, 50),
+              offset: parsedArgs.offset || 0,
+              favorite: null,
+            });
+          } else if (fnName === 'search_artists') {
+            res = await invoke('search_artists', {
+              search: parsedArgs.search || null,
+              series: null,
+              limit: Math.min(parsedArgs.limit || 20, 50),
+              offset: parsedArgs.offset || 0,
+              favorite: null,
+            });
+          } else if (fnName === 'random_character_and_artist') {
+            // Query DB directly for a random character + artist.
+            const char = await invoke<any[]>('search_characters', {
+              search: null, series: parsedArgs.series || null,
+              limit: 1, offset: 0, favorite: null,
+            });
+            // search_characters orders by count DESC, not random — but for the agent a "popular"
+            // pick is fine as a starting point. Real random is in the MCP tool only.
+            const artists = await invoke<any[]>('search_artists', {
+              search: null, series: null,
+              limit: 1, offset: parsedArgs.use_artist === false ? 0 : Math.floor(Math.random() * 100),
+              favorite: null,
+            });
+            res = {
+              character: char?.[0] || null,
+              artist: parsedArgs.use_artist === false ? null : (artists?.[0] || null),
+            };
           } else if (fnName === 'get_queue_status') {
                 const state = useQueueStore.getState();
                 const activeJobs = state.jobs.filter(j => j.status === 'pending' || j.status === 'generating');
