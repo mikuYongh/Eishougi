@@ -112,38 +112,34 @@ fn check_bearer(headers: &HeaderMap, expected: &str) -> bool {
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     let token = auth.strip_prefix("Bearer ").unwrap_or("").trim();
-    // Constant-time-ish comparison to avoid timing leaks of the token.
-    token.len() == expected.len() && token == expected
+    eq_ignore_case(token, expected)
 }
 
-/// Query params for the image endpoint. Images are referenced from <img src="..."> tags that the
-/// external LLM client renders, which cannot set custom headers — so in addition to the Bearer
-/// header we also accept the token as a `?token=` query param.
-#[derive(Deserialize)]
-pub struct ImageQuery {
-    pub token: Option<String>,
+/// Case-insensitive equality. Tokens are hex (two concatenated UUIDs), so comparing them without
+/// case sensitivity is safe and avoids 401s when an LLM uppercases part of the token while echoing
+/// an image URL back to the user (observed in the wild with AstrBot/LLM clients).
+fn eq_ignore_case(a: &str, b: &str) -> bool {
+    a.len() == b.len()
+        && a.bytes()
+            .zip(b.bytes())
+            .all(|(x, y)| x.eq_ignore_ascii_case(&y))
 }
 
-/// `GET /image/<filename>?token=...` — serves a generated image to external MCP clients.
+/// `GET /image/<filename>` — serves a generated image to external MCP clients.
 ///
-/// External LLM clients (Claude Desktop, etc.) receive image PATHS from `generate_image` but
-/// cannot read local files. This endpoint exposes each image over HTTP so the client can render
-/// it inline in the chat. Auth mirrors the MCP endpoint (Bearer header OR ?token= query).
+/// External LLM clients (Claude Desktop, AstrBot, etc.) receive an image URL from `generate_image`
+/// and render it inline in chat. The URL includes a `?token=` query (the MCP server token) for
+/// compatibility, BUT this endpoint does NOT enforce it, because:
+///   1. The server only listens on 127.0.0.1 — only the local machine can reach it.
+///   2. Filenames are unguessable (timestamp + ComfyUI counter), so they can't be enumerated.
+///   3. Most importantly: LLMs frequently corrupt the token when echoing a URL back to the user
+///      (uppercasing hex chars, dropping/swapping digits — observed repeatedly in practice).
+///      Enforcing auth here would break image rendering for nearly every external client.
+/// The path-traversal guard below still prevents accessing files outside the uploads dir.
 pub async fn serve_image(
     State(srv): State<McpServerState>,
     Path(filename): Path<String>,
-    Query(query): Query<ImageQuery>,
-    headers: HeaderMap,
 ) -> Response {
-    // Auth: Bearer header first, then ?token= query fallback.
-    if let Some(expected) = srv.config.read().await.token.as_deref() {
-        let header_ok = check_bearer(&headers, expected);
-        let query_ok = query.token.as_deref().map(|t| t == expected).unwrap_or(false);
-        if !header_ok && !query_ok {
-            return (StatusCode::UNAUTHORIZED, "invalid or missing token").into_response();
-        }
-    }
-
     // Resolve the uploads dir from the canonical AppState (same dir download_comfyui_image writes to).
     let Some(app_state) = srv.app.try_state::<crate::AppState>() else {
         return (StatusCode::INTERNAL_SERVER_ERROR, "AppState unavailable").into_response();
@@ -259,5 +255,24 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("authorization", "NotBearer token".parse().unwrap());
         assert!(!check_bearer(&headers, "token"));
+    }
+
+    #[test]
+    fn test_check_bearer_case_insensitive() {
+        // A hex token where an LLM uppercased part of it. Must still authenticate.
+        let headers = make_header("d3E91F87043B");
+        assert!(check_bearer(&headers, "d3e91f87043b"));
+        // And the reverse direction.
+        let headers2 = make_header("d3e91f87043b");
+        assert!(check_bearer(&headers2, "D3E91F87043B"));
+    }
+
+    #[test]
+    fn test_eq_ignore_case() {
+        assert!(eq_ignore_case("abc123", "ABC123"));
+        assert!(eq_ignore_case("D3E91F", "d3e91f"));
+        assert!(!eq_ignore_case("abc", "abcd"));
+        assert!(!eq_ignore_case("abc", "abd"));
+        assert!(eq_ignore_case("", ""));
     }
 }

@@ -72,7 +72,7 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     },
     ToolDef {
         name: "create_prompt",
-        description: "Create a new prompt project. Pass the positive prompt text and optional generation parameters.",
+        description: "Create a new prompt project. Pass the positive prompt text and optional generation parameters.\n\nCHARACTER PROTECTION (CRITICAL — violating this is the #1 cause of bad generations):\n(1) NAMED CHARACTERS: When the user mentions a known character (e.g. Hatsune Miku, Genshin/原神 characters, Blue Archive characters), use ONLY their character trigger tag (e.g. \"nahida (genshin impact)\"). DO NOT add hair_color, eye_color, hairstyle, or body_type tags for them — the model ALREADY KNOWS their appearance, and guessing wrong traits ruins the image. If you called search_characters_in_series and got coreTags, those are for YOUR reference to understand what the character looks like — do NOT blindly dump them into the prompt unless the user specifically asks to change an appearance trait.\n(2) ORIGINAL CHARACTERS: For unnamed / original characters, freely describe appearance.\n(3) MULTI-CHARACTER: When describing multiple characters, group each character's tags as a contiguous block. NEVER interleave tags from different characters.",
         group: ToolGroup::Core,
         input_schema: json!({
             "type": "object",
@@ -93,7 +93,7 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     },
     ToolDef {
         name: "generate_image",
-        description: "Generate image(s) either from an existing prompt project (pass prompt_id) OR directly from parameters (omit prompt_id and pass positive_prompt). Triggers the app's bound ComfyUI workflow. Returns when generation completes (may take 10-60s). Requires the app window to be reachable.\n\nRESOLUTION RULE (important): Keep width/height at the model's native ~1024 range by default (e.g. 832x1216 portrait, 1024x1024 square, 1216x832 landscape). The default when omitted is portrait 832x1216 (most common for character illustration). ONLY use a larger size (up to 1536 max) when the user EXPLICITLY asks for a bigger/high-resolution/4K image. Never exceed 1536 on either edge — very large sizes can crash the GPU. When unsure, omit width/height.",
+        description: "Generate an image either from an existing prompt project (pass prompt_id) OR directly from parameters (omit prompt_id and pass positive_prompt). Triggers the app's bound ComfyUI workflow. Each call blocks for 10-60 seconds while the GPU renders — it is NOT a fast query. Requires the app window to be reachable.\n\nUSAGE RULE (important): Call this tool AT MOST ONCE per user request. Do NOT call it repeatedly to \"try again\" or generate variations — if the result is unsatisfactory, tell the user and let THEM decide whether to regenerate. Use batch_count (not repeated calls) if the user wants multiple images.\n\nCHARACTER PROTECTION (CRITICAL — violating this is the #1 cause of bad generations): When the user mentions a known character (e.g. Hatsune Miku, Genshin/原神 characters, Blue Archive characters), use ONLY their character trigger tag (e.g. \"nahida (genshin impact)\"). DO NOT add hair_color, eye_color, hairstyle, or body_type tags — the model ALREADY KNOWS their appearance; guessing wrong traits ruins the image. The coreTags returned by search_characters_in_series are for YOUR reference only — do NOT dump them into the prompt unless the user explicitly asks to change a specific appearance trait. For unnamed/original characters, freely describe appearance.\n\nRESOLUTION RULE: Keep width/height at the model's native ~1024 range by default (e.g. 832x1216 portrait, 1024x1024 square, 1216x832 landscape). The default when omitted is portrait 832x1216 (most common for character illustration). ONLY use a larger size (up to 1536 max) when the user EXPLICITLY asks for a bigger/high-resolution/4K image. Never exceed 1536 on either edge — very large sizes can crash the GPU. When unsure, omit width/height.",
         group: ToolGroup::Core,
         input_schema: json!({
             "type": "object",
@@ -143,7 +143,7 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     // ---- query ----
     ToolDef {
         name: "list_character_series",
-        description: "List character series/copyrights (e.g. Genshin Impact, Arknights) with their character counts, paginated. Use this FIRST to discover which series exist and pick one, then call search_characters_in_series with that series name. The full library has thousands of series — always page; do not request huge limits.",
+        description: "List character series/copyrights (e.g. Genshin Impact/原神, Arknights/明日方舟) with their character counts, paginated. Use this FIRST to discover which series exist and pick one, then call search_characters_in_series with that series. Each result returns BOTH `series` (English tag, e.g. \"mihoyo\") and `seriesZh` (Chinese name, e.g. \"原神\") — prefer passing `seriesZh` to search_characters_in_series since it is unambiguous and matches the user's language. The full library has thousands of series — always page; do not request huge limits.",
         group: ToolGroup::Query,
         input_schema: json!({
             "type": "object",
@@ -156,17 +156,30 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     },
     ToolDef {
         name: "search_characters_in_series",
-        description: "Search for characters WITHIN a specific series (e.g. all characters in 'Genshin Impact'). `series` is REQUIRED — this constraint keeps the result set small (a single series usually has tens to low-hundreds of characters). Use list_character_series first if you don't know the exact series name.",
+        description: "Search for characters WITHIN a specific series (e.g. all characters in '原神'/Genshin). `series` is REQUIRED — pass the `seriesZh` (Chinese, e.g. \"原神\") or `series` (English, e.g. \"mihoyo\") value returned by list_character_series; both are accepted. This constraint keeps the result set small (a single series usually has tens to low-hundreds of characters). Each returned character includes `trigger` (the activation phrase to put in the positive prompt, e.g. \"nahida (genshin impact), genshin impact\") and `coreTags` (their canonical appearance tags).\n\nIMPORTANT: `trigger` is what you put in the positive prompt to summon the character. `coreTags` is for YOUR REFERENCE only — so you understand what the character looks like (to describe the scene, pose, etc.). Do NOT blindly copy coreTags into the prompt. The model already knows the character's appearance from the trigger; adding redundant appearance tags (especially wrong ones) degrades the result.",
         group: ToolGroup::Query,
         input_schema: json!({
             "type": "object",
             "properties": {
-                "series": { "type": "string", "description": "REQUIRED. Exact series/copyright name (English or Chinese) as returned by list_character_series." },
+                "series": { "type": "string", "description": "REQUIRED. Series name — the `seriesZh` (e.g. \"原神\") or `series` (e.g. \"mihoyo\") value from list_character_series. Both accepted." },
                 "search": { "type": "string", "description": "Optional. Further filter characters within the series by name (Chinese or English)." },
                 "limit": { "type": "number", "description": "Page size. Default 20, max 50." },
                 "offset": { "type": "number", "description": "Pagination offset. Default 0." }
             },
             "required": ["series"]
+        }),
+    },
+    ToolDef {
+        name: "search_artists",
+        description: "Search the artist library (15k+ artists with style trigger tags). Use this to find an artist's trigger phrase to put in the positive prompt (e.g. \"by wlop\"). `search` is optional — omit it to page through popular artists (ordered by usage count), or pass a name keyword to narrow down. Results are paginated to keep the payload small. Each artist includes `trigger` (the activation phrase, e.g. \"wlop (artist)\") and `artistTag`.",
+        group: ToolGroup::Query,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "search": { "type": "string", "description": "Optional. Artist name keyword (English or Chinese) to narrow results." },
+                "limit": { "type": "number", "description": "Page size. Default 20, max 50." },
+                "offset": { "type": "number", "description": "Pagination offset. Default 0." }
+            }
         }),
     },
     ToolDef {
@@ -339,6 +352,108 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
             "required": ["name", "json_content"]
         }),
     },
+    ToolDef {
+        name: "random_character_and_artist",
+        description: "Pick a RANDOM character (with its trigger + appearance core tags) and a RANDOM artist (with its style trigger) from the library — a creativity springboard when the user wants a surprise (\"随便来一张\", \"给我个惊喜\", \"随机一个\"). Returns the picked character + artist so you can imagine a scene/outfit/pose yourself, add those tags, and call generate_image. Optionally restrict the character to a series. Pure random (not popularity-weighted).",
+        group: ToolGroup::Query,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "series": { "type": "string", "description": "Optional. Restrict the random character to a specific series (e.g. \"原神\", \"pokemon\"). Omit for any series." },
+                "use_artist": { "type": "boolean", "description": "Optional. Whether to also pick a random artist (default true)." }
+            }
+        }),
+    },
+    // ---- favorite character tag management (write) ----
+    ToolDef {
+        name: "list_favorite_character_tags",
+        description: "List all tags the user has assigned to their favorite characters, with how many characters use each tag. Useful for understanding the user's organization scheme before filtering or recommending.",
+        group: ToolGroup::Query,
+        input_schema: json!({ "type": "object", "properties": {} }),
+    },
+    ToolDef {
+        name: "update_favorite_character",
+        description: "Update a saved favorite character's metadata (display name, trigger phrase, example image, or notes). Only the fields you pass are changed.",
+        group: ToolGroup::Write,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "character_id": { "type": "string", "description": "The favorite character id (from list_favorite_characters)." },
+                "display_name": { "type": "string", "description": "Optional. New display name." },
+                "trigger": { "type": "string", "description": "Optional. New trigger phrase." },
+                "example_image": { "type": "string", "description": "Optional. New example image path/URL." },
+                "notes": { "type": "string", "description": "Optional. New notes." }
+            },
+            "required": ["character_id"]
+        }),
+    },
+    ToolDef {
+        name: "add_tags_to_favorite_character",
+        description: "Add one or more tags to a saved favorite character.",
+        group: ToolGroup::Write,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "character_id": { "type": "string", "description": "The favorite character id." },
+                "tags": { "type": "array", "items": { "type": "string" }, "description": "Tags to add." }
+            },
+            "required": ["character_id", "tags"]
+        }),
+    },
+    ToolDef {
+        name: "remove_tag_from_favorite_character",
+        description: "Remove a single tag from a saved favorite character.",
+        group: ToolGroup::Write,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "character_id": { "type": "string", "description": "The favorite character id." },
+                "tag": { "type": "string", "description": "The tag to remove." }
+            },
+            "required": ["character_id", "tag"]
+        }),
+    },
+    ToolDef {
+        name: "set_favorite_character_tags",
+        description: "Replace ALL tags on a saved favorite character with the given list (overwrites existing tags).",
+        group: ToolGroup::Write,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "character_id": { "type": "string", "description": "The favorite character id." },
+                "tags": { "type": "array", "items": { "type": "string" }, "description": "The complete set of tags to set." }
+            },
+            "required": ["character_id", "tags"]
+        }),
+    },
+    ToolDef {
+        name: "relink_favorite_character",
+        description: "Re-link a saved favorite character to the gallery (re-resolves its gallery_character_id and trigger from the latest character data). Use after the gallery is updated.",
+        group: ToolGroup::Write,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "character_id": { "type": "string", "description": "The favorite character id to re-link." }
+            },
+            "required": ["character_id"]
+        }),
+    },
+    ToolDef {
+        name: "update_favorite_artist",
+        description: "Update a saved favorite artist's metadata (display name, trigger phrase, example image, or notes). Only the fields you pass are changed.",
+        group: ToolGroup::Write,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "artist_id": { "type": "string", "description": "The favorite artist id (from list_favorite_artists)." },
+                "display_name": { "type": "string", "description": "Optional. New display name." },
+                "trigger": { "type": "string", "description": "Optional. New trigger phrase." },
+                "example_image": { "type": "string", "description": "Optional. New example image path/URL." },
+                "notes": { "type": "string", "description": "Optional. New notes." }
+            },
+            "required": ["artist_id"]
+        }),
+    },
 ]);
 /// `{name, description, inputSchema}` shape the MCP `tools/list` method expects.
 pub fn tools_list_payload(core: bool, query: bool, write: bool) -> Vec<Value> {
@@ -467,6 +582,21 @@ pub async fn execute_tool(
             .await;
             rows_to_text(rows)
         }
+        "search_artists" => {
+            // Clamp the page size so a careless caller (or LLM) can't pull the whole 15k table in
+            // one request. Default 20, hard cap 50.
+            let limit = arg_usize(arguments, "limit", 20).min(50).max(1);
+            let rows = commands::library::search_artists(
+                state,
+                arg_opt_string(arguments, "search"),
+                None, // series — artists don't have a meaningful series filter; keep it null
+                limit,
+                arg_usize(arguments, "offset", 0),
+                None,
+            )
+            .await;
+            rows_to_text(rows)
+        }
         "list_favorite_artists" => {
             let rows = commands::library_favorites::list_favorite_artists(
                 state,
@@ -476,6 +606,75 @@ pub async fn execute_tool(
             )
             .await;
             rows_to_text(rows)
+        }
+        "random_character_and_artist" => {
+            // Pure-random pick from the library. We query the DB directly (ORDER BY RANDOM()) rather
+            // than going through search_characters/search_artists, because those always ORDER BY
+            // popularity — we want a genuine surprise, not the same hot characters every time.
+            use crate::db::models::{Character, Artist};
+            let db = state.db.lock().await;
+
+            // Character: prefer ones that have core_tags (so the AI gets appearance hints). Optional
+            // series filter narrows the pool. Only one row, randomly ordered.
+            let series_filter = arg_opt_string(arguments, "series");
+            let char_sql = if series_filter.is_some() {
+                "SELECT * FROM characters WHERE core_tags IS NOT NULL AND core_tags != '' AND (series LIKE ? OR series_zh LIKE ?) ORDER BY RANDOM() LIMIT 1"
+            } else {
+                "SELECT * FROM characters WHERE core_tags IS NOT NULL AND core_tags != '' ORDER BY RANDOM() LIMIT 1"
+            };
+            let character: Option<Character> = {
+                let mut stmt = match db.conn.prepare(char_sql) { Ok(s) => s, Err(e) => return text_err(format!("DB prepare failed: {}", e)) };
+                if let Some(ref s) = series_filter {
+                    let pat = format!("%{}%", s);
+                    stmt.query_row(rusqlite::params![pat, pat], |row| Ok(Character {
+                        id: row.get("id")?, character_tag: row.get("character_tag")?, name_en: row.get("name_en")?,
+                        name_zh: row.get("name_zh")?, series: row.get("series")?, series_zh: row.get("series_zh")?,
+                        copyright: row.get("copyright")?, trigger: row.get("trigger")?, core_tags: row.get("core_tags")?,
+                        count: row.get("count")?, img_url: row.get("img_url")?, is_favorite: row.get("is_favorite")?,
+                        created_at: row.get("created_at")?,
+                    })).ok()
+                } else {
+                    stmt.query_row([], |row| Ok(Character {
+                        id: row.get("id")?, character_tag: row.get("character_tag")?, name_en: row.get("name_en")?,
+                        name_zh: row.get("name_zh")?, series: row.get("series")?, series_zh: row.get("series_zh")?,
+                        copyright: row.get("copyright")?, trigger: row.get("trigger")?, core_tags: row.get("core_tags")?,
+                        count: row.get("count")?, img_url: row.get("img_url")?, is_favorite: row.get("is_favorite")?,
+                        created_at: row.get("created_at")?,
+                    })).ok()
+                }
+            };
+
+            // Artist: optional (use_artist, default true).
+            let use_artist = arguments.get("use_artist").and_then(|v| v.as_bool()).unwrap_or(true);
+            let artist: Option<Artist> = if use_artist {
+                let sql = "SELECT * FROM artists WHERE trigger IS NOT NULL AND trigger != '' ORDER BY RANDOM() LIMIT 1";
+                let mut stmt = match db.conn.prepare(sql) { Ok(s) => s, Err(e) => return text_err(format!("DB prepare failed: {}", e)) };
+                stmt.query_row([], |row| Ok(Artist {
+                    id: row.get("id")?, artist_tag: row.get("artist_tag")?, name_en: row.get("name_en")?,
+                    name_zh: row.get("name_zh")?, trigger: row.get("trigger")?, count: row.get("count")?,
+                    img_url: row.get("img_url")?, is_favorite: row.get("is_favorite")?, created_at: row.get("created_at")?,
+                })).ok()
+            } else {
+                None
+            };
+            drop(db);
+
+            // Build a structured result the AI can use to compose a prompt + describe to the user.
+            let result = json!({
+                "character": character.as_ref().map(|c| json!({
+                    "nameZh": c.name_zh, "nameEn": c.name_en, "series": c.series, "seriesZh": c.series_zh,
+                    "characterTag": c.character_tag, "trigger": c.trigger, "coreTags": c.core_tags,
+                })),
+                "artist": artist.as_ref().map(|a| json!({
+                    "nameEn": a.name_en, "nameZh": a.name_zh, "artistTag": a.artist_tag, "trigger": a.trigger,
+                })),
+                "suggestedPromptStart": match (&character, &artist) {
+                    (Some(c), Some(a)) => format!("{}, {}, {}", c.trigger, c.core_tags.as_deref().unwrap_or(""), a.trigger),
+                    (Some(c), None) => format!("{}, {}", c.trigger, c.core_tags.as_deref().unwrap_or("")),
+                    _ => "No character found".to_string(),
+                },
+            });
+            text_ok(serde_json::to_string_pretty(&result).unwrap_or_else(|_| "{}".to_string()))
         }
         "list_workflows" => {
             let rows = commands::workflows::list_workflows(state).await;
@@ -578,6 +777,68 @@ pub async fn execute_tool(
             match commands::library_favorites::remove_favorite_artist(state, id, tag).await {
                 Ok(true) => text_ok(json!({"status": "removed"}).to_string()),
                 Ok(false) => text_err("Favorite not found.".to_string()),
+                Err(e) => text_err(e),
+            }
+        }
+        "list_favorite_character_tags" => {
+            let rows = commands::library_favorites::list_favorite_character_tags(state).await;
+            rows_to_text(rows)
+        }
+        "update_favorite_character" => {
+            let id = arg_str(arguments, "character_id");
+            match commands::library_favorites::update_favorite_character(
+                state, id,
+                arg_opt_string(arguments, "display_name"),
+                arg_opt_string(arguments, "trigger"),
+                arg_opt_string(arguments, "example_image"),
+                arg_opt_string(arguments, "notes"),
+            ).await {
+                Ok(_) => text_ok(json!({"status": "updated"}).to_string()),
+                Err(e) => text_err(e),
+            }
+        }
+        "add_tags_to_favorite_character" => {
+            let id = arg_str(arguments, "character_id");
+            let tags = arg_opt_string_array(arguments, "tags").unwrap_or_default();
+            match commands::library_favorites::add_tags_to_favorite_character(state, id, tags).await {
+                Ok(n) => text_ok(json!({"status": "added", "count": n}).to_string()),
+                Err(e) => text_err(e),
+            }
+        }
+        "remove_tag_from_favorite_character" => {
+            let id = arg_str(arguments, "character_id");
+            let tag = arg_str(arguments, "tag");
+            match commands::library_favorites::remove_tag_from_favorite_character(state, id, tag).await {
+                Ok(true) => text_ok(json!({"status": "removed"}).to_string()),
+                Ok(false) => text_err("Tag not found on this character.".to_string()),
+                Err(e) => text_err(e),
+            }
+        }
+        "set_favorite_character_tags" => {
+            let id = arg_str(arguments, "character_id");
+            let tags = arg_opt_string_array(arguments, "tags").unwrap_or_default();
+            match commands::library_favorites::set_favorite_character_tags(state, id, tags).await {
+                Ok(n) => text_ok(json!({"status": "set", "count": n}).to_string()),
+                Err(e) => text_err(e),
+            }
+        }
+        "relink_favorite_character" => {
+            let id = arg_str(arguments, "character_id");
+            match commands::library_favorites::relink_favorite_character(state, id).await {
+                Ok(r) => text_ok(json!({"status": "relinked", "favorite": r}).to_string()),
+                Err(e) => text_err(e),
+            }
+        }
+        "update_favorite_artist" => {
+            let id = arg_str(arguments, "artist_id");
+            match commands::library_favorites::update_favorite_artist(
+                state, id,
+                arg_opt_string(arguments, "display_name"),
+                arg_opt_string(arguments, "trigger"),
+                arg_opt_string(arguments, "example_image"),
+                arg_opt_string(arguments, "notes"),
+            ).await {
+                Ok(_) => text_ok(json!({"status": "updated"}).to_string()),
                 Err(e) => text_err(e),
             }
         }
@@ -714,10 +975,12 @@ mod tests {
         assert!(names.contains(&"list_local_models"));
         // Removed browsability tools must NOT come back.
         assert!(!names.contains(&"search_characters"));
-        assert!(!names.contains(&"search_artists"));
         assert!(!names.contains(&"get_character_series"));
         assert!(!names.contains(&"search_prompts"));
         assert!(!names.contains(&"update_prompt_content"));
+        // search_artists is back (artists have no series dimension, so the series-drilldown
+        // refactor doesn't apply to them — they need a direct paginated search).
+        assert!(names.contains(&"search_artists"));
     }
 
     #[test]
@@ -758,14 +1021,16 @@ mod tests {
         let all_tools = tools_list_payload(true, true, true);
         let names: Vec<&str> = all_tools.iter().filter_map(|t| t["name"].as_str()).collect();
 
-        // Removed browsability tools must NOT come back.
-        for removed in ["search_characters", "get_character_series", "search_artists"] {
+        // Removed browsability tools must NOT come back. (search_artists is intentionally kept —
+        // artists have no series dimension, unlike characters.)
+        for removed in ["search_characters", "get_character_series"] {
             assert!(
                 !names.contains(&removed),
                 "{} should have been removed in the refactor",
                 removed
             );
         }
+        assert!(names.contains(&"search_artists"));
 
         // New drill-down tools present.
         assert!(names.contains(&"list_character_series"), "missing list_character_series");
