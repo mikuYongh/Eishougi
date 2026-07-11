@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 // ComfyUI-aki download URL (placeholder — replace with actual network drive URL)
-const AKI_DOWNLOAD_URL = "https://pan.baidu.com/s/PLACEHOLDER";
+const AKI_DOWNLOAD_URL = "https://pan.quark.cn/s/df057d5baeab";
 
 type StepId = 0 | 1 | 2 | 3;
 type CheckStatus = 'pending' | 'checking' | 'pass' | 'fail';

@@ -83,16 +83,19 @@ $winSig = $null
 
 if (-not $SkipWindows) {
     Write-Host "`n=== [2/7] 构建 Windows 安装包（NSIS + 免安装便携版，带签名）===" -ForegroundColor Cyan
-    npx tauri build --bundles nsis,portable 2>&1 | Out-Default
+    npx tauri build 2>&1 | Out-Default
 
     # 查找产物 — NSIS 安装包
     $nsisDir = "src-tauri\target\release\bundle\nsis"
     $winExe = Get-ChildItem "$nsisDir\*.exe" | Where-Object { $_.Name -notmatch "uninstall" } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     $winSig = Get-ChildItem "$nsisDir\*.sig" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
-    # 查找产物 — 免安装便携版
-    $portableDir = "src-tauri\target\release\bundle\portable"
-    $portableExe = Get-ChildItem "$portableDir\*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    # 查找产物 — 免安装便携版（直接从 target/release 取编译好的 exe）
+    $portableSrc = "src-tauri\target\release\prompt-muse.exe"
+    $portableExe = $null
+    if (Test-Path $portableSrc) {
+        $portableExe = Get-Item $portableSrc
+    }
 
     if ($winExe) {
         $sizeMB = [math]::Round($winExe.Length / 1MB, 1)
