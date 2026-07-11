@@ -3,7 +3,7 @@ import { useSettingsStore, type McpServerConfig } from "../stores/settingsStore"
 import { useQueueStore } from "../stores/queueStore";
 import { useModelStore } from "../stores/modelStore";
 import { appLog } from "../utils/appLog";
-import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database, Wand2 } from "lucide-react";
+import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database, Wand2, RefreshCw } from "lucide-react";
 import { useAppVersion } from "../hooks/useAppVersion";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -862,6 +862,24 @@ export function Settings() {
               {/* Update check + install panel */}
               <div className="max-w-2xl mx-auto">
                 <UpdatePanel />
+              </div>
+
+              {/* Re-run onboarding */}
+              <div className="max-w-2xl mx-auto">
+                <button
+                  onClick={() => { updateSettings({ hasCompletedOnboarding: false } as any); setTimeout(() => window.location.reload(), 100); }}
+                  className="w-full p-4 rounded-2xl bg-[var(--glass-bg)] border border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] hover:border-[var(--accent-1)]/30 transition-all text-left cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-[var(--accent-1)]/10 text-[var(--accent-1)] group-hover:scale-110 transition-transform">
+                      <RefreshCw size={18} />
+                    </div>
+                    <div>
+                      <h4 className="text-[14px] font-bold text-[var(--text-primary)]">重新运行配置引导</h4>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">重新检测 ComfyUI 环境、补全组件、测试生图</p>
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
           )}
