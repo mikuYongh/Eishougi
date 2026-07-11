@@ -136,6 +136,28 @@ pub async fn check_environment(url: Option<String>) -> Result<serde_json::Value,
         .as_array()
         .map(|a| a.len())
         .unwrap_or(0);
+    let vaes: Vec<String> = models["vaes"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+    let clips: Vec<String> = models["clips"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+
+    // The default Anima workflow needs these specific model files. Check each one against
+    // what ComfyUI actually reports as available, so we can tell the user exactly what's
+    // missing instead of a generic "0 checkpoints" message.
+    let required_models = [
+        ("anima-base-v1.0.safetensors", &checkpoints, "diffusion_models"),
+        ("qwen_image_vae.safetensors", &vaes, "vae"),
+        ("qwen_3_06b_base.safetensors", &clips, "text_encoders"),
+    ];
+    let missing_models: Vec<String> = required_models
+        .iter()
+        .filter(|(name, avail, _)| !avail.iter().any(|a| a == name))
+        .map(|(name, _, dir)| format!("{} (models/{}/)", name, dir))
+        .collect();
 
     // 3. Check custom nodes — we can't directly list custom_nodes via the API (no standard endpoint),
     //    but we can infer which critical nodes are available by checking object_info for their class_type.
@@ -198,6 +220,7 @@ pub async fn check_environment(url: Option<String>) -> Result<serde_json::Value,
         "lora_count": lora_count,
         "missing_nodes": missing_nodes,
         "installed_nodes": installed_nodes,
+        "missing_models": missing_models,
     }))
 }
 
@@ -210,9 +233,11 @@ pub async fn fetch_comfy_models(url: Option<String>) -> Result<serde_json::Value
         .timeout(std::time::Duration::from_secs(15))
         .build().map_err(|e| format!("{}", e))?;
 
-    let nodes = ["UNETLoader","CheckpointLoaderSimple","CheckpointLoader","LoraLoader","Power Lora Loader (rgthree)"];
+    let nodes = ["UNETLoader","CheckpointLoaderSimple","CheckpointLoader","LoraLoader","Power Lora Loader (rgthree)","VAELoader","CLIPLoader"];
     let mut checkpoints = Vec::new();
     let mut loras = Vec::new();
+    let mut vaes = Vec::new();
+    let mut clips = Vec::new();
 
     for node in &nodes {
         let u = format!("{}/object_info/{}", base, node.replace(" ", "%20").replace("(", "%28").replace(")", "%29"));
@@ -231,6 +256,10 @@ pub async fn fetch_comfy_models(url: Option<String>) -> Result<serde_json::Value
                                         loras.extend(strs);
                                     } else if kl.contains("unet") || kl.contains("ckpt") || kl.contains("model") {
                                         checkpoints.extend(strs);
+                                    } else if kl.contains("vae") {
+                                        vaes.extend(strs);
+                                    } else if kl.contains("clip") {
+                                        clips.extend(strs);
                                     }
                                 }
                             }
@@ -244,7 +273,9 @@ pub async fn fetch_comfy_models(url: Option<String>) -> Result<serde_json::Value
     }
     checkpoints.sort(); checkpoints.dedup();
     loras.sort(); loras.dedup();
-    Ok(serde_json::json!({ "checkpoints": checkpoints, "loras": loras }))
+    vaes.sort(); vaes.dedup();
+    clips.sort(); clips.dedup();
+    Ok(serde_json::json!({ "checkpoints": checkpoints, "loras": loras, "vaes": vaes, "clips": clips }))
 }
 
 // ========== interrupt_comfy ==========

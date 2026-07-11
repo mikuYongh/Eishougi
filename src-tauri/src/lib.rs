@@ -328,7 +328,7 @@ pub fn run() {
             commands::auto_deploy::check_file_exists,
             commands::logging::write_log,
             commands::auto_deploy::call_llm_proxy,
-            commands::fetch_ollama_models,
+            commands::fetch_llm_models,
             commands::prompts::create_prompt,
             commands::prompts::get_prompt,
             commands::prompts::update_prompt,

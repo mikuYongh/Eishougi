@@ -72,7 +72,7 @@ fn seed_default_workflows(conn: &Connection) {
         let inserted = conn.execute(
             "INSERT OR IGNORE INTO workflows (id, name, description, json_content, type, is_default, is_builtin, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, 'text2img', 1, 1, ?5, ?5)",
-            rusqlite::params!["seed_text2img_default", "默认文生图工作流", "SDXL 文本生图基础工作流", json, now],
+            rusqlite::params!["seed_text2img_default", "默认文生图工作流", "Anima Preview3 文本生图工作流", json, now],
         );
         match inserted {
             Ok(_) => log::info!("Seeded default text2img workflow"),

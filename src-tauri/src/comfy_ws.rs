@@ -305,7 +305,40 @@ pub async fn queue_prompt_and_track(
         .map_err(|e| e.to_string())?;
 
     if !res.status().is_success() {
-        return Err(format!("Failed to queue prompt: {}", res.status()));
+        let status = res.status();
+        // ComfyUI returns detailed validation errors in the body (e.g. which node's
+        // sampler/scheduler/model value is invalid). Surface that instead of a bare
+        // "400 Bad Request" so the user actually knows what to fix.
+        let body = res.text().await.unwrap_or_default();
+        let detail = match serde_json::from_str::<Value>(&body) {
+            Ok(j) => {
+                // Try to extract the most useful message from ComfyUI's error shape.
+                let mut parts: Vec<String> = Vec::new();
+                if let Some(node_errors) = j.get("node_errors").and_then(|v| v.as_object()) {
+                    for (_node_id, ne) in node_errors {
+                        if let Some(errs) = ne.get("errors").and_then(|v| v.as_array()) {
+                            for err in errs {
+                                let msg = err.get("message").and_then(|v| v.as_str()).unwrap_or("");
+                                let det = err.get("details").and_then(|v| v.as_str()).unwrap_or("");
+                                if !det.is_empty() {
+                                    parts.push(format!("{}: {}", msg, det));
+                                } else if !msg.is_empty() {
+                                    parts.push(msg.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+                if parts.is_empty() {
+                    if let Some(top_msg) = j.get("error").and_then(|e| e.get("message")).and_then(|v| v.as_str()) {
+                        parts.push(top_msg.to_string());
+                    }
+                }
+                if parts.is_empty() { body.chars().take(500).collect() } else { parts.join("; ") }
+            }
+            Err(_) => body.chars().take(500).collect(),
+        };
+        return Err(format!("Failed to queue prompt ({}): {}", status, detail));
     }
 
     let res_json: Value = res.json().await.map_err(|e| e.to_string())?;
