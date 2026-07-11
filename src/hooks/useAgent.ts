@@ -519,45 +519,6 @@ export function useAgent() {
     {
       type: "function",
       function: {
-        name: "deploy_comfyui",
-        description: "One-click deploy ComfyUI: clones repo, creates venv, installs PyTorch and requirements. Emits progress events to UI. Use this when user wants to install ComfyUI from scratch.",
-        parameters: {
-          type: "object",
-          properties: {
-            target_dir: { type: "string", description: "Installation directory. Default: C:\\ComfyUI (Windows) or ~/ComfyUI" },
-            use_mirror: { type: "boolean", description: "Use mirror URLs for faster downloads in China. Default: true" }
-          }
-        }
-      }
-    },
-    {
-      type: "function",
-      function: {
-        name: "start_comfyui",
-        description: "Start the local ComfyUI server. Waits up to 60 seconds for it to become ready. Returns the URL.",
-        parameters: {
-          type: "object",
-          properties: {
-            comfy_dir: { type: "string", description: "ComfyUI installation directory. Default: C:\\ComfyUI" },
-            port: { type: "number", description: "Port to listen on. Default: 8188" }
-          }
-        }
-      }
-    },
-    {
-      type: "function",
-      function: {
-        name: "stop_comfyui",
-        description: "Stop the local ComfyUI server if it's running.",
-        parameters: {
-          type: "object",
-          properties: {}
-        }
-      }
-    },
-    {
-      type: "function",
-      function: {
         name: "install_custom_node",
         description: "Install a ComfyUI custom node by git cloning it into custom_nodes/.",
         parameters: {
@@ -1816,30 +1777,6 @@ User input: ${userText}`;
                   usePromptStore.getState().fetchPrompts();
                 }
                 res = { status: "success", message: `Image added to prompt ${parsedArgs.prompt_id} instance images.` };
-              } else if (fnName === 'deploy_comfyui') {
-                const settings = useSettingsStore.getState().settings;
-                const targetDir = parsedArgs.target_dir || settings.comfyDir || null;
-                resultStr = JSON.stringify({ status: "running", message: "Starting ComfyUI deployment..." });
-                invoke<any>('deploy_comfyui', {
-                  targetDir,
-                  useMirror: parsedArgs.use_mirror !== false
-                }).then((result: any) => {
-                  useSettingsStore.getState().updateSettings({
-                    comfyUrl: 'http://127.0.0.1:8188',
-                    comfyDir: targetDir || result?.comfy_dir || settings.comfyDir
-                  });
-                }).catch((e: any) => {
-                  console.error('[Agent] deploy_comfyui failed:', e);
-                });
-              } else if (fnName === 'start_comfyui') {
-                const { url } = await invoke<any>('start_comfyui', {
-                  comfyDir: parsedArgs.comfy_dir || useSettingsStore.getState().settings.comfyDir || null,
-                  port: parsedArgs.port || null
-                });
-                res = { status: "success", url, message: `ComfyUI started at ${url}` };
-              } else if (fnName === 'stop_comfyui') {
-                await invoke('stop_comfyui');
-                res = { status: "success", message: "ComfyUI stopped" };
               } else if (fnName === 'install_custom_node') {
                 // 安全：custom node 是 Python 代码，clone 后会被 ComfyUI 自动加载执行。
                 // 限制只允许主流代码托管域名，防止 LLM 被 prompt injection 诱导 clone 恶意仓库。
