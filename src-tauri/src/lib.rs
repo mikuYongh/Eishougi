@@ -319,12 +319,9 @@ pub fn run() {
         .manage(comfy_ws::ComfyState::new())
         .invoke_handler(tauri::generate_handler![
             commands::greet,
-            commands::auto_deploy::run_auto_deploy,
-            commands::auto_deploy::deploy_comfyui,
-            commands::auto_deploy::start_comfyui,
-            commands::auto_deploy::stop_comfyui,
             commands::auto_deploy::install_custom_node,
             commands::auto_deploy::check_comfyui_status,
+            commands::auto_deploy::check_environment,
             commands::auto_deploy::fetch_comfy_models,
             commands::auto_deploy::interrupt_comfy,
             commands::auto_deploy::download_model_file,

@@ -1,11 +1,11 @@
 use tauri::{AppHandle, Emitter};
 use tokio::process::Command;
-use std::sync::Mutex;
-use once_cell::sync::Lazy;
-use futures_util::StreamExt;
 use std::io::Write;
+use futures_util::StreamExt;
 
-static COMFY_CHILD: Lazy<Mutex<Option<tokio::process::Child>>> = Lazy::new(|| Mutex::new(None));
+// NOTE: The one-click deploy (clone ComfyUI + venv + PyTorch) was removed because it was unreliable.
+// Users now install ComfyUI themselves (e.g. via ComfyUI-aki). This file retains the component
+// download / custom-node install / status check utilities that the new onboarding wizard uses.
 
 fn emit_progress(app: &AppHandle, step: usize, total: usize, status: &str, message: &str) {
     let _ = app.emit("deploy-progress", serde_json::json!({
@@ -20,13 +20,6 @@ fn get_default_comfy_dir() -> String {
     { format!("{}/ComfyUI", std::env::var("HOME").unwrap_or_else(|_| ".".to_string())) }
 }
 
-fn venv_python_path(comfy_dir: &str) -> String {
-    #[cfg(target_os = "windows")]
-    { format!("{}\\venv\\Scripts\\python.exe", comfy_dir) }
-    #[cfg(not(target_os = "windows"))]
-    { format!("{}/venv/bin/python", comfy_dir) }
-}
-
 async fn run_cmd(program: &str, args: &[&str], cwd: Option<&str>) -> Result<String, String> {
     let mut cmd = Command::new(program);
     cmd.args(args);
@@ -39,53 +32,6 @@ async fn run_cmd(program: &str, args: &[&str], cwd: Option<&str>) -> Result<Stri
         return Err(if stderr.is_empty() { stdout } else { stderr });
     }
     Ok(if stdout.is_empty() { stderr } else { stdout })
-}
-
-async fn detect_nvidia() -> bool {
-    matches!(run_cmd("nvidia-smi", &["--query-gpu=name", "--format=csv,noheader"], None).await,
-        Ok(o) if !o.trim().is_empty())
-}
-
-async fn detect_cuda_version() -> Option<String> {
-    // Get GPU compute capability to determine right CUDA version
-    let caps = run_cmd("nvidia-smi", &["--query-gpu=compute_cap", "--format=csv,noheader"], None).await.ok()?;
-    let cap: f64 = caps.trim().parse().ok()?;
-    // RTX 50 series (CC 10.0+) needs cu128
-    // RTX 30/40 series (CC 8.0+) needs cu124 or newer
-    // Older GPUs need cu121
-    // Fallback to cu124 for unknown
-    if cap >= 12.0 { Some("cu130".to_string()) }
-    else if cap >= 10.0 { Some("cu128".to_string()) }
-    else if cap >= 8.0 { Some("cu124".to_string()) }
-    else { Some("cu121".to_string()) }
-}
-
-fn create_run_script(comfy_dir: &str, venv_python: &str) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    {
-        let bat = format!("@echo off\r\ncd /d \"{}\"\r\n\"{}\" main.py --listen 0.0.0.0 --port 8188 --enable-cors-header\r\npause\r\n", comfy_dir, venv_python);
-        std::fs::write(format!("{}\\run_api.bat", comfy_dir), bat).map_err(|e| e.to_string())?;
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let sh = format!("#!/bin/bash\ncd '{}'\n'{}' main.py --listen 0.0.0.0 --port 8188 --enable-cors-header\n", comfy_dir, venv_python);
-        std::fs::write(format!("{}/run_api.sh", comfy_dir), sh).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-fn load_default_workflow() -> String {
-    let paths = [
-        "docs/workflows/Anima+Preview3_Txt2Img_Example.json",
-        "../docs/workflows/Anima+Preview3_Txt2Img_Example.json",
-        "../../docs/workflows/Anima+Preview3_Txt2Img_Example.json",
-    ];
-    for p in &paths {
-        if let Ok(content) = std::fs::read_to_string(p) {
-            return content;
-        }
-    }
-    r#"{"last_node_id":1,"nodes":[]}"#.to_string()
 }
 
 fn known_custom_nodes() -> Vec<(&'static str, &'static str)> {
@@ -117,211 +63,6 @@ fn known_model_urls() -> Vec<(&'static str, &'static str, &'static str)> {
         ("gemma_3_12B_it_fpmixed.safetensors", "models/text_encoders",
          "https://cnb.cool/ai-models/Comfy-Org/ltx-2/-/lfs/82457a446f1636422689b15fe4762e71c5d1d11fdc02ac9cd2d8c4acec833e52"),
     ]
-}
-
-fn generate_download_script(comfy_dir: &str, wf_models: &[String]) -> Result<(), String> {
-    let known = known_model_urls();
-    #[cfg(target_os = "windows")]
-    {
-        let mut ps = format!("# ComfyUI Model Download Script\r\n# Run in PowerShell: .\\download_models.ps1\r\n$ComfyDir = \"{}\"\r\n$ProgressPreference = 'SilentlyContinue'\r\n\r\nWrite-Host \"=== Downloading known models ===\" -ForegroundColor Cyan\r\n\r\n", comfy_dir);
-        for (fname, subdir, url) in &known {
-            ps.push_str(&format!("$out = \"$ComfyDir\\{}\\{}\"\r\nif (Test-Path $out) {{\r\n  Write-Host \"  SKIP: {}\" -ForegroundColor Gray\r\n}}\r\nelse {{\r\n  Write-Host \"  DOWNLOAD: {}...\" -ForegroundColor Yellow\r\n  New-Item -ItemType Directory -Force -Path \"$ComfyDir\\{}\" | Out-Null\r\n  try {{ Invoke-WebRequest -Uri \"{}\" -OutFile $out; Write-Host \"    OK\" -ForegroundColor Green }} catch {{ Write-Host \"    FAILED: $_\" -ForegroundColor Red }}\r\n}}\r\n\r\n",
-                subdir, fname, fname, fname, subdir, url));
-        }
-        let missing: Vec<_> = wf_models.iter().filter(|m| !known.iter().any(|(n,_,_)| *n == m.as_str())).collect::<Vec<_>>();
-        if !missing.is_empty() {
-            ps.push_str("Write-Host \"=== Missing models (no URL) ===\" -ForegroundColor Magenta\r\n");
-            for m in &missing {
-                ps.push_str(&format!("Write-Host \"  NEED: {}\" -ForegroundColor Magenta\r\nWrite-Host \"    Place in: $ComfyDir\\models\\\" -ForegroundColor Gray -NoNewline\r\nWrite-Host \"{}\" -ForegroundColor Gray\r\n\r\n", m, m));
-            }
-        }
-        std::fs::write(format!("{}\\download_models.ps1", comfy_dir), ps).map_err(|e| e.to_string())?;
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let mut sh = format!("#!/bin/bash\nCOMFY_DIR=\"{}\"\necho \"=== Downloading known models ===\"\n", comfy_dir);
-        for (fname, subdir, url) in &known {
-            sh.push_str(&format!("if [ -f \"$COMFY_DIR/{}/{}\" ]; then\n  echo \"  SKIP: {}\"\nelse\n  echo \"  DOWNLOAD: {}...\"\n  mkdir -p \"$COMFY_DIR/{}\"\n  curl -L -o \"$COMFY_DIR/{}/{}\" \"{}\" && echo \"    OK\" || echo \"    FAILED\"\nfi\n\n",
-                subdir, fname, fname, fname, subdir, subdir, fname, url));
-        }
-        std::fs::write(format!("{}/download_models.sh", comfy_dir), sh).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
-
-// ========== deploy_comfyui ==========
-#[tauri::command]
-pub async fn deploy_comfyui(
-    app: AppHandle, target_dir: Option<String>, use_mirror: Option<bool>,
-) -> Result<serde_json::Value, String> {
-    let total = 10;
-    let mirror = use_mirror.unwrap_or(true);
-    let comfy_dir = target_dir.unwrap_or_else(get_default_comfy_dir);
-
-    emit_progress(&app, 1, total, "running", "检查环境 (git, python)...");
-    run_cmd("git", &["--version"], None).await?;
-    let python_cmd = if cfg!(target_os = "windows") { "python" } else { "python3" };
-    let py_ver = run_cmd(python_cmd, &["--version"], None).await?;
-    emit_progress(&app, 1, total, "success", &format!("Ready: {}", py_ver.trim()));
-
-    emit_progress(&app, 2, total, "running", "克隆 ComfyUI...");
-    if std::path::Path::new(&comfy_dir).join(".git").exists() {
-        let _ = run_cmd("git", &["pull"], Some(&comfy_dir)).await;
-        emit_progress(&app, 2, total, "success", "已存在，已拉取最新");
-    } else {
-        let parent = std::path::Path::new(&comfy_dir).parent().ok_or("无效的目标路径")?.display().to_string();
-        let name = std::path::Path::new(&comfy_dir).file_name().ok_or("无效的目录名")?.to_str().ok_or("UTF-8 错误")?;
-        let url = if mirror { "https://ghfast.top/https://github.com/comfyanonymous/ComfyUI.git" } else { "https://github.com/comfyanonymous/ComfyUI.git" };
-        std::fs::create_dir_all(&comfy_dir).map_err(|e| e.to_string())?;
-        run_cmd("git", &["clone", url, name], Some(&parent)).await?;
-        emit_progress(&app, 2, total, "success", "ComfyUI 克隆完成");
-    }
-
-    emit_progress(&app, 3, total, "running", "创建虚拟环境...");
-    let vp = venv_python_path(&comfy_dir);
-    if !std::path::Path::new(&vp).exists() {
-        run_cmd(python_cmd, &["-m", "venv", "venv"], Some(&comfy_dir)).await?;
-        emit_progress(&app, 3, total, "success", "虚拟环境创建完成");
-    } else {
-        emit_progress(&app, 3, total, "success", "虚拟环境已存在");
-    }
-
-    emit_progress(&app, 4, total, "running", "安装 PyTorch...");
-    let nvidia = detect_nvidia().await;
-    if nvidia {
-        let cuda_ver = detect_cuda_version().await.unwrap_or_else(|| "cu124".to_string());
-        emit_progress(&app, 4, total, "running", &format!("安装 CUDA PyTorch ({})...", cuda_ver));
-        let index_url = format!("https://download.pytorch.org/whl/{}", cuda_ver);
-        let cu_args = vec!["-m", "pip", "install", "--no-cache-dir", "torch", "torchvision", "torchaudio",
-            "--index-url", index_url.as_str()];
-        if run_cmd(&vp, &cu_args, Some(&comfy_dir)).await.is_err() {
-            emit_progress(&app, 4, total, "running", "CUDA 安装失败，降级到 CPU 版...");
-            let cpu_args = vec!["-m", "pip", "install", "--no-cache-dir", "torch", "torchvision", "torchaudio"];
-            if mirror {
-                run_cmd(&vp, &["-m", "pip", "install", "--no-cache-dir", "torch", "torchvision", "torchaudio",
-                    "-i", "https://pypi.tuna.tsinghua.edu.cn/simple"], Some(&comfy_dir)).await?;
-            } else {
-                run_cmd(&vp, &cpu_args, Some(&comfy_dir)).await?;
-            }
-            emit_progress(&app, 4, total, "success", "CPU PyTorch 已安装 (CUDA 不可用)");
-        } else {
-            emit_progress(&app, 4, total, "success", "CUDA PyTorch 安装完成");
-        }
-    } else {
-        emit_progress(&app, 4, total, "running", "Installing CPU PyTorch...");
-        if mirror {
-            run_cmd(&vp, &["-m", "pip", "install", "--no-cache-dir", "torch", "torchvision", "torchaudio",
-                "-i", "https://pypi.tuna.tsinghua.edu.cn/simple"], Some(&comfy_dir)).await?;
-        } else {
-            run_cmd(&vp, &["-m", "pip", "install", "--no-cache-dir", "torch", "torchvision", "torchaudio"], Some(&comfy_dir)).await?;
-        }
-        emit_progress(&app, 4, total, "success", "CPU PyTorch installed");
-    }
-
-    emit_progress(&app, 5, total, "running", "安装依赖包...");
-    if mirror {
-        run_cmd(&vp, &["-m", "pip", "install", "-r", "requirements.txt", "-i", "https://pypi.tuna.tsinghua.edu.cn/simple"], Some(&comfy_dir)).await?;
-    } else {
-        run_cmd(&vp, &["-m", "pip", "install", "-r", "requirements.txt"], Some(&comfy_dir)).await?;
-    }
-    emit_progress(&app, 5, total, "success", "依赖包安装完成");
-
-    emit_progress(&app, 6, total, "running", "安装自定义节点...");
-    let cn_dir = std::path::Path::new(&comfy_dir).join("custom_nodes");
-    std::fs::create_dir_all(&cn_dir).map_err(|e| e.to_string())?;
-    let cn_str = cn_dir.to_str().ok_or("Invalid path")?;
-    let nodes = known_custom_nodes();
-    let node_count = nodes.len();
-    for (idx, (name, url)) in nodes.iter().enumerate() {
-        let node_path = cn_dir.join(name);
-        emit_progress(&app, 6, total, "running", &format!("安装节点 [{}/{}]: {}...", idx + 1, node_count, name));
-        if node_path.exists() {
-            let _ = run_cmd("git", &["pull"], Some(node_path.to_str().unwrap())).await;
-        } else {
-            run_cmd("git", &["clone", url, name], Some(cn_str)).await?;
-        }
-        // Install node dependencies if requirements.txt exists
-        let req_file = node_path.join("requirements.txt");
-        if req_file.exists() {
-            emit_progress(&app, 6, total, "running", &format!("  ↳ 安装 {} 的依赖...", name));
-            let _ = run_cmd(&vp, &["-m", "pip", "install", "-r", "requirements.txt",
-                "-i", "https://pypi.tuna.tsinghua.edu.cn/simple"], Some(node_path.to_str().unwrap())).await;
-        }
-    }
-    emit_progress(&app, 6, total, "success", &format!("{} 个自定义节点安装完成", node_count));
-
-    emit_progress(&app, 7, total, "running", "创建启动脚本...");
-    create_run_script(&comfy_dir, &vp)?;
-    emit_progress(&app, 7, total, "success", "启动脚本创建完成");
-
-    emit_progress(&app, 8, total, "running", "创建模型目录...");
-    for sub in &["checkpoints", "vae", "clip", "loras", "text_encoders", "diffusion_models", "controlnet", "upscale_models", "latent_upscale_models", "unet"] {
-        let _ = std::fs::create_dir_all(std::path::Path::new(&comfy_dir).join("models").join(sub));
-    }
-    emit_progress(&app, 8, total, "success", "模型目录创建完成");
-
-    emit_progress(&app, 9, total, "running", "导入默认工作流...");
-    let wf_dir = std::path::Path::new(&comfy_dir).join("user").join("default").join("workflows");
-    std::fs::create_dir_all(&wf_dir).map_err(|e| e.to_string())?;
-    std::fs::write(wf_dir.join("Anima_Txt2Img_Example.json"), &load_default_workflow()).map_err(|e| e.to_string())?;
-    emit_progress(&app, 9, total, "success", "工作流导入完成");
-
-    emit_progress(&app, 10, total, "running", "生成模型下载指引...");
-    generate_download_script(&comfy_dir, &[])?;
-    let known = known_model_urls();
-    let models_with_urls: Vec<serde_json::Value> = known.iter().map(|(name, subdir, url)| {
-        serde_json::json!({ "name": name, "subdir": subdir, "url": url })
-    }).collect();
-    emit_progress(&app, 10, total, "success", "模型下载指引生成完毕");
-
-    Ok(serde_json::json!({
-        "comfy_dir": comfy_dir, "venv_python": vp, "nvidia_detected": nvidia,
-        "models_needed": models_with_urls, "models_count": known.len(),
-        "message": "部署完成！运行 download_models.ps1 下载模型，然后双击 run_api.bat 启动"
-    }))
-}
-
-// ========== start_comfyui ==========
-#[tauri::command]
-pub async fn start_comfyui(
-    app: AppHandle, comfy_dir: Option<String>, port: Option<u16>,
-) -> Result<String, String> {
-    let dir = comfy_dir.unwrap_or_else(get_default_comfy_dir);
-    let p = port.unwrap_or(8188);
-    {
-        let mut guard = COMFY_CHILD.lock().unwrap();
-        if let Some(ref mut child) = *guard {
-            if let Ok(None) = child.try_wait() { return Ok(format!("http://127.0.0.1:{}", p)); }
-        }
-    }
-    let vp = venv_python_path(&dir);
-    if !std::path::Path::new(&vp).exists() { return Err(format!("未找到虚拟环境: {}。请先部署", vp)); }
-    let port_s = p.to_string();
-    let mut cmd = Command::new(&vp);
-    cmd.args(&["main.py", "--listen", "0.0.0.0", "--port", &port_s, "--enable-cors-header"]).current_dir(&dir);
-    let child = cmd.spawn().map_err(|e| format!("启动失败: {}", e))?;
-    { let mut guard = COMFY_CHILD.lock().unwrap(); *guard = Some(child); }
-    let url = format!("http://127.0.0.1:{}", p);
-    let client = reqwest::Client::new();
-    for _ in 1..=30 {
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        if let Ok(resp) = client.get(format!("{}/system_stats", &url)).send().await {
-            if resp.status().is_success() { let _ = app.emit("comfy-status", "connected"); return Ok(url); }
-        }
-        let mut guard = COMFY_CHILD.lock().unwrap();
-        if let Some(ref mut child) = *guard { if let Ok(Some(_)) = child.try_wait() { return Err("ComfyUI 意外退出".to_string()); } }
-    }
-    Err(format!("ComfyUI 60秒内未响应: {}", url))
-}
-
-// ========== stop_comfyui ==========
-#[tauri::command]
-pub async fn stop_comfyui(app: AppHandle) -> Result<(), String> {
-    let child = { let mut guard = COMFY_CHILD.lock().unwrap(); guard.take() };
-    match child {
-        Some(mut c) => { let _ = c.kill(); let _ = c.wait().await; let _ = app.emit("comfy-status", "disconnected"); Ok(()) }
-        None => Err("ComfyUI 未运行".to_string()),
-    }
 }
 
 // ========== install_custom_node ==========
@@ -360,6 +101,104 @@ pub async fn check_comfyui_status(url: Option<String>) -> Result<serde_json::Val
         }
         Err(e) => Ok(serde_json::json!({ "online": false, "url": u, "error": e.to_string() }))
     }
+}
+
+// ========== check_environment ==========
+/// Unified environment check: is ComfyUI online? What models/nodes are available?
+/// Used by the onboarding wizard to determine what needs to be downloaded/installed.
+#[tauri::command]
+pub async fn check_environment(url: Option<String>) -> Result<serde_json::Value, String> {
+    let comfy_url = url.unwrap_or_else(|| "http://127.0.0.1:8188".to_string());
+    let base = comfy_url.trim_end_matches('/');
+
+    // 1. Check if ComfyUI is online
+    let status = check_comfyui_status(Some(comfy_url.clone())).await?;
+    let online = status["online"].as_bool().unwrap_or(false);
+    if !online {
+        return Ok(serde_json::json!({
+            "online": false,
+            "url": comfy_url,
+            "checkpoints": [],
+            "lora_count": 0,
+            "missing_nodes": [],
+            "installed_nodes": [],
+            "error": status.get("error").cloned().unwrap_or_default(),
+        }));
+    }
+
+    // 2. Fetch available models
+    let models = fetch_comfy_models(Some(comfy_url.clone())).await?;
+    let checkpoints: Vec<String> = models["checkpoints"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+    let lora_count = models["loras"]
+        .as_array()
+        .map(|a| a.len())
+        .unwrap_or(0);
+
+    // 3. Check custom nodes — we can't directly list custom_nodes via the API (no standard endpoint),
+    //    but we can infer which critical nodes are available by checking object_info for their class_type.
+    //    The Anima workflow needs: Power Lora Loader (rgthree), Simple String (pysssss), SDXLEmptyLatentSizePicker+ (inspire)
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build().map_err(|e| format!("{}", e))?;
+
+    let required_nodes = [
+        ("Power Lora Loader (rgthree)", "rgthree-comfy"),
+        ("SDXLEmptyLatentSizePicker+", "ComfyUI-Inspire-Pack"),
+    ];
+
+    let mut installed_nodes = Vec::new();
+    let mut missing_nodes = Vec::new();
+
+    for (class_type, node_name) in &required_nodes {
+        let check_url = format!("{}/object_info/{}", base,
+            class_type.replace(" ", "%20").replace("(", "%28").replace(")", "%29").replace("+", "%2B"));
+        let exists = match client.get(&check_url).send().await {
+            Ok(r) => {
+                if r.status().is_success() {
+                    // If the response contains the class_type as a key, the node is installed
+                    match r.json::<serde_json::Value>().await {
+                        Ok(j) => j.get(*class_type).is_some(),
+                        Err(_) => false,
+                    }
+                } else { false }
+            }
+            Err(_) => false,
+        };
+        if exists {
+            installed_nodes.push(*node_name);
+        } else {
+            missing_nodes.push(*node_name);
+        }
+    }
+
+    // Check for pysssss Simple String node
+    let ss_url = format!("{}/object_info/Simple%20String", base);
+    let has_simple_string = match client.get(&ss_url).send().await {
+        Ok(r) if r.status().is_success() => {
+            match r.json::<serde_json::Value>().await {
+                Ok(j) => j.get("Simple String").is_some() || j.get("SimpleString").is_some(),
+                Err(_) => false,
+            }
+        }
+        _ => false,
+    };
+    if has_simple_string {
+        installed_nodes.push("pysssss (Simple String)");
+    } else {
+        missing_nodes.push("pysssss (Simple String)");
+    }
+
+    Ok(serde_json::json!({
+        "online": true,
+        "url": comfy_url,
+        "checkpoints": checkpoints,
+        "lora_count": lora_count,
+        "missing_nodes": missing_nodes,
+        "installed_nodes": installed_nodes,
+    }))
 }
 
 // ========== fetch_comfy_models ==========
@@ -421,7 +260,7 @@ pub async fn interrupt_comfy(url: Option<String>) -> Result<bool, String> {
     }
 }
 
-// ========== 6. download_model_file (streaming with progress) ==========
+// ========== download_model_file (streaming with progress) ==========
 #[tauri::command]
 pub async fn download_model_file(
     app: AppHandle,
@@ -429,7 +268,6 @@ pub async fn download_model_file(
     dest_path: String,
     model_name: String,
 ) -> Result<String, String> {
-    // Create parent directory
     if let Some(parent) = std::path::Path::new(&dest_path).parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -477,25 +315,7 @@ pub async fn download_model_file(
     Ok(dest_path)
 }
 
-// ========== run_auto_deploy (legacy compat) ==========
-#[tauri::command]
-pub async fn run_auto_deploy(
-    app: AppHandle, _api_key: Option<String>, use_mirror: Option<bool>,
-) -> Result<String, String> {
-    let result = deploy_comfyui(app, None, use_mirror).await?;
-    Ok(result["message"].as_str().unwrap_or("部署完成").to_string())
-}
-
 // ========== call_llm_proxy (HTTP proxy for webview CORS bypass) ==========
-//
-// 瞬时错误重试策略：
-// - reqwest 的 connect/timeout 错误（"error sending request"）→ 重试
-// - HTTP 5xx（含 Agnes 的 do_request_failed）→ 重试
-// - HTTP 4xx（请求格式错误）→ 不重试，原样抛回
-// - 流式开始后的中断 → 不重试（已发出 chunk，重试会重复）
-//
-// Agnes AI 在连续多轮 agent 调用后经常出现网络抖动，单次重试能消化掉
-// 大部分失败。重试间隔指数退避（1s, 2s），最多 3 次尝试。
 #[tauri::command]
 pub async fn call_llm_proxy(
     api_url: String,
@@ -525,13 +345,11 @@ pub async fn call_llm_proxy(
             Ok(r) => {
                 let status = r.status().as_u16();
                 if status >= 500 {
-                    // 5xx：服务端瞬时错误（含 Agnes do_request_failed），可重试
                     let body_text = r.text().await.unwrap_or_default();
                     let snippet = if body_text.len() > 300 { &body_text[..300] } else { &body_text };
                     last_err = Some(format!("API {} HTTP {}: {}", api_url, status, snippet));
                     log::warn!("[LLM Proxy] attempt {}/{} got HTTP {}, will retry", attempt, MAX_ATTEMPTS, status);
                 } else if status >= 400 {
-                    // 4xx：请求格式错误，重试无用，直接抛
                     let body_text = r.text().await.unwrap_or_default();
                     let snippet = if body_text.len() > 300 { &body_text[..300] } else { &body_text };
                     return Err(format!("API {} HTTP {}: {}", api_url, status, snippet));
@@ -541,7 +359,6 @@ pub async fn call_llm_proxy(
                 }
             }
             Err(e) => {
-                // reqwest 错误：connect/timeout 可重试，其他不重试
                 let is_retryable = e.is_connect() || e.is_timeout();
                 let msg = format!("API {}: {}", api_url, e);
                 if !is_retryable || attempt == MAX_ATTEMPTS {
@@ -552,7 +369,6 @@ pub async fn call_llm_proxy(
             }
         }
 
-        // 指数退避：1s, 2s（最后一次失败后不睡）
         if attempt < MAX_ATTEMPTS {
             let backoff = std::time::Duration::from_secs(1u64 << (attempt - 1));
             log::info!("[LLM Proxy] retrying in {:?}", backoff);
@@ -563,10 +379,6 @@ pub async fn call_llm_proxy(
     let resp = resp.ok_or_else(|| last_err.unwrap_or_else(|| "LLM proxy: all attempts failed".to_string()))?;
 
     let mut stream = resp.bytes_stream();
-    // SSE 行边界缓冲：reqwest 的 bytes_stream() 可能从任意字节位置切断，
-    // 一行 data: {...} 可能被切成多个 chunk。按 \n 切分，只把完整行
-    // send 给前端，避免前端 JSON.parse 失败丢内容。
-    // 流式开始后不再重试——已发出的 chunk 不可撤回。
     let mut buffer = String::new();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
@@ -577,7 +389,6 @@ pub async fn call_llm_proxy(
             buffer = buffer[nl + 1..].to_string();
         }
     }
-    // flush 残留（最后一行可能没 \n 结尾）
     if !buffer.trim().is_empty() {
         let _ = on_chunk.send(buffer);
     }
