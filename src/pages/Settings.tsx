@@ -3,15 +3,21 @@ import { useSettingsStore, type McpServerConfig } from "../stores/settingsStore"
 import { useQueueStore } from "../stores/queueStore";
 import { useModelStore } from "../stores/modelStore";
 import { appLog } from "../utils/appLog";
-import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Download, Upload, Database, Wand2, RefreshCw } from "lucide-react";
+import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Check, Download, Upload, Database, Wand2, RefreshCw, Loader2, MessageCircle, ExternalLink } from "lucide-react";
 import { useAppVersion } from "../hooks/useAppVersion";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { save, open } from "@tauri-apps/plugin-dialog";
+import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { GlassDropdown } from "../components/ui/GlassDropdown";
 import { McpServerPanel } from "../components/settings/McpServerPanel";
 import { UpdatePanel } from "../components/settings/UpdatePanel";
 import { toast } from "sonner";
+import qqGroupQR from "../assets/qrcodes/qq_group.jpg";
+
+const QQ_GROUP_URL = "https://qm.qq.com/q/DOL54nJCSc";
+const QQ_GROUP_NUMBER = "389236073";
+const ANIMA_MODELS_URL = "https://huggingface.co/circlestone-labs/Anima/tree/main/split_files";
 
 const SETTINGS_TABS = [
   { id: "appearance", label: "外观设置", icon: <Palette size={18} /> },
@@ -22,6 +28,7 @@ const SETTINGS_TABS = [
 ];
 
 export function Settings() {
+  const isAndroid = /android/i.test(navigator.userAgent);
   // Allow other parts of the app (e.g. the startup update toast) to deep-link into a specific tab.
   const [activeTab, setActiveTab] = useState(() => {
     const requested = localStorage.getItem("settings_open_tab");
@@ -42,7 +49,9 @@ export function Settings() {
   const [localWallpaper, setLocalWallpaper] = useState(wallpaperPath);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
-  const [ollamaModels, setOllamaModels] = useState<{label: string, value: string}[]>([]);
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [isTestingComfy, setIsTestingComfy] = useState(false);
   // MCP server running indicator (null = unknown). Polled so the "模型与服务" tab dot stays live.
   const [mcpRunning, setMcpRunning] = useState<boolean | null>(null);
@@ -81,30 +90,23 @@ export function Settings() {
     }
   };
 
-  useEffect(() => {
-    if (settings.llm.provider === 'ollama') {
-      const fetchOllamaModels = async () => {
-        try {
-          let baseUrl = settings.llm.apiUrl;
-          if (baseUrl.endsWith('/v1')) baseUrl = baseUrl.slice(0, -3);
-          if (baseUrl.endsWith('/api')) baseUrl = baseUrl.slice(0, -4);
-          if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-          if (!baseUrl) baseUrl = 'http://127.0.0.1:11434';
-
-          const res = await invoke<string>('fetch_ollama_models', { url: `${baseUrl}/api/tags` });
-          if (res) {
-            const data = JSON.parse(res);
-            if (data.models) {
-              setOllamaModels(data.models.map((m: any) => ({ label: m.name, value: m.name })));
-            }
-          }
-        } catch (e) {
-          console.error("Failed to fetch Ollama models:", e);
-        }
-      };
-      fetchOllamaModels();
+  const handleFetchModels = async () => {
+    setIsFetchingModels(true);
+    try {
+      const models = await invoke<string[]>('fetch_llm_models', {
+        provider: settings.llm.provider,
+        baseUrl: settings.llm.apiUrl,
+        apiKey: settings.llm.apiKey || null,
+      });
+      setFetchedModels(models);
+      toast.success(`获取到 ${models.length} 个模型`);
+    } catch (e: any) {
+      toast.error(`获取模型列表失败: ${e?.message || e}`);
+      console.error("Failed to fetch LLM models:", e);
+    } finally {
+      setIsFetchingModels(false);
     }
-  }, [settings.llm.provider, settings.llm.apiUrl]);
+  };
 
   useEffect(() => {
     setLocalWallpaper(wallpaperPath);
@@ -596,7 +598,8 @@ export function Settings() {
                 </div>
               </div>
 
-              {/* Environment setup & onboarding */}
+              {/* Environment setup & onboarding — desktop only (Android has no onboarding) */}
+              {!isAndroid && (
               <div className="glass-panel p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -616,6 +619,7 @@ export function Settings() {
                   </button>
                 </div>
               </div>
+              )}
 
               {/* LLM Agent Settings */}
               <div className="glass-panel p-6">
@@ -667,26 +671,54 @@ export function Settings() {
 
                     <div>
                       <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">模型名称 (Model)</label>
-                      {settings.llm.provider === 'ollama' && ollamaModels.length > 0 ? (
-                        <GlassDropdown
-                          value={settings.llm.model}
-                          onChange={(val) => updateSettings({
-                            llm: { ...settings.llm, model: val }
-                          })}
-                          options={ollamaModels}
-                          accentColor="pink"
-                        />
-                      ) : (
-                        <input
-                          type="text"
-                          value={settings.llm.model}
-                          onChange={(e) => updateSettings({
-                            llm: { ...settings.llm, model: e.target.value }
-                          })}
-                          className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
-                          placeholder={settings.llm.provider === 'ollama' ? "e.g. qwen2.5:7b (Fetching local models...)" : "e.g. agnes-2.0-flash, gpt-4o, etc."}
-                        />
-                      )}
+                      <div className="relative">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={settings.llm.model}
+                            onChange={(e) => { setModelDropdownOpen(true); updateSettings({ llm: { ...settings.llm, model: e.target.value } }); }}
+                            onFocus={() => setModelDropdownOpen(true)}
+                            className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono pr-10"
+                            placeholder="e.g. gpt-4o, claude-3-5-sonnet, qwen2.5:7b..."
+                          />
+                          {fetchedModels.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg)] transition-all"
+                            >
+                              <ChevronDown size={16} className={`transition-transform duration-300 ${modelDropdownOpen ? "rotate-180" : ""}`} />
+                            </button>
+                          )}
+                        </div>
+                        {modelDropdownOpen && fetchedModels.length > 0 && (
+                          <div className="absolute left-0 right-0 top-[110%] bg-[var(--glass-bg)] backdrop-blur-3xl border border-[var(--glass-border)] rounded-xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.6)] z-[100] py-1 max-h-60 overflow-y-auto custom-scrollbar text-[13px]">
+                            {fetchedModels.map(m => (
+                              <div
+                                key={m}
+                                className={`px-4 py-2.5 font-bold cursor-pointer flex items-center justify-between transition-colors ${settings.llm.model === m ? "bg-[var(--accent-1)]/10 text-[var(--accent-1)]" : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]"}`}
+                                onClick={() => { updateSettings({ llm: { ...settings.llm, model: m } }); setModelDropdownOpen(false); }}
+                              >
+                                {m}
+                                {settings.llm.model === m && <Check size={14} className="flex-shrink-0" />}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={handleFetchModels}
+                          disabled={isFetchingModels}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold text-[var(--accent-1)] bg-[var(--accent-1)]/10 hover:bg-[var(--accent-1)]/20 border border-[var(--accent-1)]/20 transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          {isFetchingModels ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
+                          {isFetchingModels ? '获取中...' : '获取模型列表'}
+                        </button>
+                        {fetchedModels.length > 0 && (
+                          <span className="text-[10px] text-[var(--text-muted)]">{fetchedModels.length} 个模型可用，点击下拉选择</span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -864,7 +896,8 @@ export function Settings() {
                 <UpdatePanel />
               </div>
 
-              {/* Re-run onboarding */}
+              {/* Re-run onboarding — desktop only (Android has no onboarding) */}
+              {!isAndroid && (
               <div className="max-w-2xl mx-auto">
                 <button
                   onClick={() => { updateSettings({ hasCompletedOnboarding: false } as any); setTimeout(() => window.location.reload(), 100); }}
@@ -880,6 +913,40 @@ export function Settings() {
                     </div>
                   </div>
                 </button>
+              </div>
+              )}
+
+              {/* QQ群 + 模型下载 */}
+              <div className="max-w-2xl mx-auto">
+                <div className="p-5 rounded-2xl bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+                  <div className="flex items-center gap-2 mb-4">
+                    <MessageCircle size={18} className="text-[var(--accent-1)]" />
+                    <h4 className="text-[14px] font-bold text-[var(--text-primary)]">帮助与支持</h4>
+                  </div>
+                  <div className="flex items-start gap-4 mb-4">
+                    <img src={qqGroupQR} alt="QQ群二维码" className="w-24 h-24 rounded-xl object-cover border border-[var(--glass-border)] flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-bold text-[var(--text-primary)]">詠唱机 ComfyUI 交流群</p>
+                      <p className="text-[12px] text-[var(--text-secondary)] mt-1">群号：<span className="font-mono font-bold text-[var(--text-primary)]">{QQ_GROUP_NUMBER}</span></p>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-1.5">遇到安装/模型/节点问题，群里有人帮你。群内有完整模型包和图文教程。</p>
+                      <button
+                        onClick={() => openUrl(QQ_GROUP_URL)}
+                        className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-1)]/15 border border-[var(--accent-1)]/40 text-[12px] font-bold text-[var(--accent-1)] hover:bg-[var(--accent-1)]/25 transition-colors cursor-pointer"
+                      >
+                        <ExternalLink size={13} /> 点此加群
+                      </button>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-[var(--glass-border)]">
+                    <button
+                      onClick={() => openUrl(ANIMA_MODELS_URL)}
+                      className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)] hover:text-[var(--accent-2)] transition-colors cursor-pointer"
+                    >
+                      <Download size={14} />
+                      自行下载 Anima 模型（HuggingFace）
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
