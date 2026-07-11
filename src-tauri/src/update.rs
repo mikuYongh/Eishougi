@@ -60,9 +60,9 @@ pub struct UpdateInfo {
 /// Endpoints we try, in order. jsDelivr first (CDN-cached, fast in CN), raw.githubusercontent as
 /// a fallback when jsDelivr has a hiccup. Both point at the same committed `latest.json`.
 const MANIFEST_URLS: [&str; 3] = [
-    "https://cdn.jsdelivr.net/gh/mikuYongh/Eishougi@main/update/latest.json",
-    "https://raw.githubusercontent.com/mikuYongh/Eishougi/main/update/latest.json",
-    "https://ghfast.top/https://raw.githubusercontent.com/mikuYongh/Eishougi/main/update/latest.json",
+    "https://cdn.jsdelivr.net/gh/mikuYongh/Eishougi@master/update/latest.json",
+    "https://raw.githubusercontent.com/mikuYongh/Eishougi/master/update/latest.json",
+    "https://ghfast.top/https://raw.githubusercontent.com/mikuYongh/Eishougi/master/update/latest.json",
 ];
 
 /// Detect the platform key used in `latest.json.platforms`.
