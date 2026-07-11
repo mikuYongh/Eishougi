@@ -76,7 +76,7 @@ export function Dashboard() {
 
   // Active queue jobs
   const activeJobs = jobs.filter(j => j.status === 'pending' || j.status === 'generating');
-  const completedJobs = jobs.filter(j => j.status === 'completed');
+  const completedJobs = jobs.filter(j => j.status === 'completed').reverse();
 
   const handleImportWorkflow = () => {
     const input = document.createElement('input');
@@ -246,7 +246,7 @@ export function Dashboard() {
                     </div>
                   </div>
                 ))}
-                {completedJobs.slice(0, 3).map(job => {
+                {completedJobs.map(job => {
                   const jobImg = job.images?.[0] ? getImgSrc(job.images[0]) : '';
                   return (
                   <PhotoView key={job.id} src={jobImg}>
