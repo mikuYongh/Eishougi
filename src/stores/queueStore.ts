@@ -45,7 +45,7 @@ interface QueueStore {
 }
 
 // Module-level state — must survive Vite HMR. Cleaned up via import.meta.hot.dispose.
-const _jobResolvers = new Map<string, (images: string[]) => void>();
+const _jobResolvers = new Map<string, { resolve: (images: string[]) => void; reject: (err: Error) => void }>();
 let _isSetup = false;
 let _unlisteners: UnlistenFn[] = [];
 
@@ -91,9 +91,9 @@ export const useQueueStore = create<QueueStore>((set, get) => {
       const imgCount = Array.isArray(images) ? images.length : 0;
       console.info(`[ComfyWS] comfy-completed event: job_id=${job_id} images=${imgCount}`);
 
-      const resolve = _jobResolvers.get(job_id);
-      if (resolve) {
-        resolve(images);
+      const resolver = _jobResolvers.get(job_id);
+      if (resolver) {
+        resolver.resolve(images);
         _jobResolvers.delete(job_id);
       } else {
         console.warn(`[ComfyWS] comfy-completed for job_id=${job_id} but no resolver found (already cleaned up or unknown job)`);
@@ -134,19 +134,37 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     const u4 = await listen<any>('comfy-error', (event) => {
       const msg = event.payload;
       const promptId = msg.data?.prompt_id;
+      const rawError = msg.data?.exception_message || "Error";
       console.error(
-        `[ComfyWS] comfy-error event: prompt_id=${promptId} exception=${msg.data?.exception_message || '(none)'}`
+        `[ComfyWS] comfy-error event: prompt_id=${promptId} exception=${rawError}`
       );
-      appLog.error('ComfyWS', `comfy-error: prompt_id=${promptId} ${msg.data?.exception_message || ''}`);
+      appLog.error('ComfyWS', `comfy-error: prompt_id=${promptId} ${rawError}`);
+      // Detect OOM / allocation errors and give a actionable hint to upgrade ComfyUI.
+      // Older ComfyUI kernels mis-load the Anima CLIP as a full hidream/llama stack,
+      // blowing up VRAM. Upgrading to v0.16.0+ fixes this.
+      const isOOM = /OutOfMemory|Allocation on device|CUDA out of memory/i.test(rawError);
+      const friendlyError = isOOM
+        ? '显存不足（OOM）。请升级 ComfyUI 内核：进入绘世启动器 → 版本管理 → 内核，升级到 v0.16.0 以上后重启 ComfyUI 再试。'
+        : rawError;
       set(state => {
         let activeIndex = promptId ? state.jobs.findIndex(j => j.comfyPromptId === promptId) : -1;
         if (activeIndex === -1) return state;
-        
+
+        // Reject the addJob promise so callers (onboarding test, agent, etc.) don't hang.
+        const jobId = activeIndex !== -1 ? state.jobs[activeIndex].id : null;
+        if (jobId) {
+          const resolver = _jobResolvers.get(jobId);
+          if (resolver) {
+            resolver.reject(new Error(friendlyError));
+            _jobResolvers.delete(jobId);
+          }
+        }
+
         const newJobs = [...state.jobs];
         newJobs[activeIndex] = {
           ...newJobs[activeIndex],
           status: 'failed',
-          error: msg.data?.exception_message || "Error"
+          error: friendlyError
         };
         return { jobs: newJobs };
       });
@@ -189,8 +207,8 @@ export const useQueueStore = create<QueueStore>((set, get) => {
       for (let i = 0; i < batchCount; i++) {
         const jobId = "job_" + Date.now() + "_" + i;
         jobIds.push(jobId);
-        const promise = new Promise<string[]>((resolve) => {
-          _jobResolvers.set(jobId, resolve);
+        const promise = new Promise<string[]>((resolve, reject) => {
+          _jobResolvers.set(jobId, { resolve, reject });
         });
         jobPromises.push(promise);
         jobs.push({
@@ -294,8 +312,8 @@ export const useQueueStore = create<QueueStore>((set, get) => {
       await get().connect();
 
       const jobId = tempProject.id; // use tempProject id directly to match
-      const promise = new Promise<string[]>((resolve) => {
-        _jobResolvers.set(jobId, resolve);
+      const promise = new Promise<string[]>((resolve, reject) => {
+        _jobResolvers.set(jobId, { resolve, reject });
       });
 
       const job: QueueJob = {
