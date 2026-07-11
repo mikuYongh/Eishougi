@@ -1,7 +1,7 @@
 {
   "name": "eishougi",
   "private": true,
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "用文字咒语召唤画面的 AI 创作工作台",
   "type": "module",
   "scripts": {

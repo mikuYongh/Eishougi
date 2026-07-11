@@ -62,6 +62,7 @@ scripts/
 
 # Tool session files
 .omo/
+.zcode/
 
 # Data-processing output documents (translation/QA artifacts)
 *.docx
