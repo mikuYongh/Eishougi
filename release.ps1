@@ -1,4 +1,4 @@
-# release.ps1
+﻿# release.ps1
 # ====================================================================
 # EISHOUGI 一体化发布脚本
 # 构建（Windows NSIS + Android APK）→ 签名 → 更新 latest.json → git 推送 → GitHub Release
@@ -187,7 +187,7 @@ Write-Host "`n=== [5/7] 上传构建产物 ===" -ForegroundColor Cyan
 
 $uploadFiles = @()
 if ($winExe) {
-    # 重命名为规范文件名
+    # 重命名为规范文件名（避免中文文件名在 URL 里编码问题）
     $winDest = "$PSScriptRoot\Eishougi_${Version}_x64-setup.exe"
     Copy-Item $winExe.FullName $winDest -Force
     $uploadFiles += $winDest
