@@ -61,17 +61,17 @@ Write-Host "✅ 签名密钥已加载" -ForegroundColor Green
 # ====================================================================
 Write-Host "`n=== [1/7] 更新版本号 → $Version ===" -ForegroundColor Cyan
 
-$tauriConf = Get-Content "src-tauri\tauri.conf.json" -Raw
+$tauriConf = Get-Content "src-tauri\tauri.conf.json" -Raw -Encoding UTF8
 $tauriConf = $tauriConf -replace '"version": "[^"]*"', "`"version`": `"$Version`""
-Set-Content "src-tauri\tauri.conf.json" $tauriConf -NoNewline
+Set-Content "src-tauri\tauri.conf.json" $tauriConf -NoNewline -Encoding UTF8
 
-$cargoToml = Get-Content "src-tauri\Cargo.toml" -Raw
+$cargoToml = Get-Content "src-tauri\Cargo.toml" -Raw -Encoding UTF8
 $cargoToml = $cargoToml -replace '^version = "[^"]*"', "version = `"$Version`""
-Set-Content "src-tauri\Cargo.toml" $cargoToml -NoNewline
+Set-Content "src-tauri\Cargo.toml" $cargoToml -NoNewline -Encoding UTF8
 
-$pkgJson = Get-Content "package.json" -Raw
+$pkgJson = Get-Content "package.json" -Raw -Encoding UTF8
 $pkgJson = $pkgJson -replace '"version": "[^"]*"', "`"version`": `"$Version`""
-Set-Content "package.json" $pkgJson -NoNewline
+Set-Content "package.json" $pkgJson -NoNewline -Encoding UTF8
 
 Write-Host "  ✅ tauri.conf.json / Cargo.toml / package.json → $Version" -ForegroundColor Green
 
