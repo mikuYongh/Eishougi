@@ -113,7 +113,7 @@ export function SearchableDropdown({
       </button>
 
       {isOpen && (
-        <div className={`absolute z-50 mt-2 bg-[var(--glass-bg)] backdrop-blur-3xl border border-[var(--glass-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in slide-in-from-top-2 duration-200 ${dropdownClassName || 'w-full left-0'}`}>
+        <div className={`absolute z-[100] mt-2 bg-[var(--bg-layer-1)] backdrop-blur-3xl border border-[var(--glass-border-active)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in slide-in-from-top-2 duration-200 ${dropdownClassName || 'w-full left-0'}`}>
           
           <div className="p-2 border-b border-[var(--glass-border)] flex-shrink-0">
             <div className="relative flex items-center">

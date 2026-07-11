@@ -71,7 +71,7 @@ export function GlassDropdown({
       </div>
 
       {isOpen && (
-        <div className={`absolute left-0 right-0 top-[110%] bg-[var(--glass-bg)] backdrop-blur-3xl border border-[var(--glass-border)] rounded-xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.6)] z-[100] py-1 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent ${small ? 'text-xs' : 'text-[13px]'}`}>
+        <div className={`absolute left-0 right-0 top-[110%] bg-[var(--bg-layer-1)] backdrop-blur-3xl border border-[var(--glass-border-active)] rounded-xl overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.6)] z-[100] py-1 max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent ${small ? 'text-xs' : 'text-[13px]'}`}>
           {options.map((opt) => (
             <div 
               key={opt.value}
