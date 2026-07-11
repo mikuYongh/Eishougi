@@ -11,11 +11,39 @@ import { comfyService } from "../../services/comfyService";
 import { getImgSrc } from "../../utils/imageUtils";
 import {
   Loader2, CheckCircle2, XCircle, Download, Play, ArrowRight, ArrowLeft,
-  ExternalLink, RefreshCw, Sparkles, Cpu, Package, Zap, X,
+  ExternalLink, RefreshCw, Sparkles, Cpu, Package, Zap, X, MessageCircle,
 } from "lucide-react";
+import qqGroupQR from "../../assets/qrcodes/qq_group.jpg";
 
 // ComfyUI-aki download URL (placeholder — replace with actual network drive URL)
 const AKI_DOWNLOAD_URL = "https://pan.quark.cn/s/df057d5baeab";
+
+// QQ群 + 模型下载源（用户遇到问题时的主要求助渠道）
+const QQ_GROUP_URL = "https://qm.qq.com/q/DOL54nJCSc";
+const QQ_GROUP_NUMBER = "389236073";
+const ANIMA_MODELS_URL = "https://huggingface.co/circlestone-labs/Anima/tree/main/split_files";
+
+// 共享：遇到问题时显示的 QQ群求助卡片（扫码 + 加群按钮）
+function HelpCard() {
+  return (
+    <div className="rounded-xl bg-[var(--accent-1)]/8 border border-[var(--accent-1)]/25 p-4 flex items-center gap-4">
+      <img src={qqGroupQR} alt="QQ群二维码" className="w-20 h-20 rounded-lg object-cover flex-shrink-0 border border-[var(--glass-border)]" />
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+          <MessageCircle size={14} className="text-[var(--accent-1)]" />
+          遇到问题？扫码加群
+        </p>
+        <p className="text-[11px] text-[var(--text-secondary)] mt-1">QQ群 {QQ_GROUP_NUMBER} · 群内有完整模型包和安装教程</p>
+        <button
+          onClick={() => open(QQ_GROUP_URL)}
+          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--accent-1)]/20 border border-[var(--accent-1)]/40 text-[11px] font-bold text-[var(--accent-1)] hover:bg-[var(--accent-1)]/30 transition-colors cursor-pointer"
+        >
+          <ExternalLink size={12} /> 点此加群
+        </button>
+      </div>
+    </div>
+  );
+}
 
 type StepId = 0 | 1 | 2 | 3;
 type CheckStatus = 'pending' | 'checking' | 'pass' | 'fail';
@@ -27,6 +55,7 @@ interface EnvCheck {
   lora_count: number;
   missing_nodes: string[];
   installed_nodes: string[];
+  missing_models?: string[];
   error?: string;
 }
 
@@ -358,7 +387,7 @@ function Step2_GetComfyUI({ onBack, onConnected }: { onBack: () => void; onConne
 
 function Step3_CheckAndTest({ onComplete, onBack }: { onComplete: () => void; onBack: () => void }) {
   const { settings } = useSettingsStore();
-  const [phase, setPhase] = useState<'checking' | 'testing' | 'done' | 'error'>('checking');
+  const [phase, setPhase] = useState<'checking' | 'missing_nodes' | 'missing_models' | 'testing' | 'done' | 'error'>('checking');
   const [envResult, setEnvResult] = useState<EnvCheck | null>(null);
   const [testImage, setTestImage] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -380,6 +409,20 @@ function Step3_CheckAndTest({ onComplete, onBack }: { onComplete: () => void; on
       if (!result.online) {
         setErrorMsg('ComfyUI 不可达，请返回上一步检查连接');
         setPhase('error');
+        return;
+      }
+      // If the default workflow needs custom nodes that aren't installed, stop here —
+      // queuing the prompt would just 400 because ComfyUI doesn't recognize the node types.
+      // Ask the user to install them in ComfyUI (via Manager) and re-check.
+      if (result.missing_nodes.length > 0) {
+        setPhase('missing_nodes');
+        return;
+      }
+      // The default Anima workflow references specific model files (unet / vae / clip).
+      // If any are missing from disk, ComfyUI will reject the prompt with 400 "model not
+      // found". Stop here and tell the user exactly what to download + where to put it.
+      if (result.missing_models && result.missing_models.length > 0) {
+        setPhase('missing_models');
         return;
       }
       setPhase('testing');
@@ -474,12 +517,111 @@ function Step3_CheckAndTest({ onComplete, onBack }: { onComplete: () => void; on
         </div>
       )}
 
-      {envResult && (phase === 'testing' || phase === 'done' || phase === 'error') && (
+      {envResult && (phase === 'testing' || phase === 'done' || phase === 'error' || phase === 'missing_nodes' || phase === 'missing_models') && (
         <div className="space-y-2 mb-6">
           <CheckRow label="ComfyUI 在线" status={envResult.online ? 'pass' : 'fail'} detail={envResult.online ? envResult.url : '不可达'} />
-          <CheckRow label="Checkpoint 模型" status={envResult.checkpoints.length > 0 ? 'pass' : 'fail'} detail={`${envResult.checkpoints.length} 个可用`} />
+          <CheckRow label="Checkpoint 模型" status={envResult.checkpoints.length > 0 ? 'pass' : (phase === 'missing_models' ? 'fail' : 'pending')} detail={`${envResult.checkpoints.length} 个可用`} />
           <CheckRow label="LoRA 模型" status={envResult.lora_count > 0 ? 'pass' : 'pending'} detail={`${envResult.lora_count} 个可用`} />
-          <CheckRow label="自定义节点" status={envResult.missing_nodes.length === 0 ? 'pass' : 'pending'} detail={envResult.missing_nodes.length === 0 ? `${envResult.installed_nodes.length} 个已安装` : `缺少: ${envResult.missing_nodes.join(', ')}`} />
+          <CheckRow label="自定义节点" status={envResult.missing_nodes.length === 0 ? 'pass' : (phase === 'missing_nodes' ? 'fail' : 'pending')} detail={envResult.missing_nodes.length === 0 ? `${envResult.installed_nodes.length} 个已安装` : `缺少: ${envResult.missing_nodes.join(', ')}`} />
+        </div>
+      )}
+
+      {phase === 'missing_nodes' && envResult && (
+        <div className="text-center py-4 animate-in zoom-in-95 duration-300">
+          <Package size={48} className="text-orange-400 mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">缺少自定义节点</h3>
+          <p className="text-sm text-[var(--text-secondary)] mb-2 max-w-md mx-auto">
+            默认工作流需要以下节点，请在 ComfyUI 的 <span className="font-bold text-[var(--text-primary)]">Manager → Install Custom Nodes</span> 中安装后重启 ComfyUI：
+          </p>
+          <div className="flex flex-col items-center justify-center gap-2 mb-4">
+            {envResult.missing_nodes.map((n) => (
+              <span key={n} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--bg-layer-1)] border border-red-500/50 text-[13px] font-bold text-[var(--text-primary)] shadow-[0_0_15px_rgba(239,68,68,0.15)]">
+                <XCircle size={14} className="text-red-400 flex-shrink-0" />
+                {n}
+              </span>
+            ))}
+          </div>
+          <div className="mb-5">
+            <HelpCard />
+          </div>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={runEnvCheck}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold text-white bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] hover:opacity-90 transition-all cursor-pointer"
+            >
+              <RefreshCw size={15} /> 我已安装，重新检测
+            </button>
+            <button
+              onClick={onComplete}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors cursor-pointer px-4 py-2.5"
+            >
+              跳过
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === 'missing_models' && envResult && (
+        <div className="py-4 animate-in zoom-in-95 duration-300">
+          <div className="text-center mb-5">
+            <Download size={48} className="text-[var(--accent-1)] mx-auto mb-3" />
+            <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">缺少模型文件</h3>
+            <p className="text-sm text-[var(--text-secondary)] max-w-md mx-auto">
+              默认工作流需要以下模型，放到 ComfyUI 对应目录后点「我已下载，重新检测」。
+            </p>
+          </div>
+          <div className="space-y-2 mb-5">
+            {(envResult.missing_models || []).map((raw) => {
+              // Backend format: "filename.safetensors (models/dir/)"
+              const name = raw.split(' (')[0];
+              const dir = (raw.match(/\(([^)]+)\)/)?.[1] || '').replace(/\/$/, '');
+              return (
+              <div key={name} className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)]">
+                <Download size={16} className="text-[var(--accent-1)] flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-bold text-[var(--text-primary)] truncate">{name}</p>
+                  <p className="text-[11px] text-[var(--text-secondary)] font-mono">→ {dir}/</p>
+                </div>
+              </div>
+              );
+            })}
+          </div>
+
+          {/* 方式一：QQ群（推荐，群内有完整模型包 + 安装教程）*/}
+          <div className="mb-3">
+            <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">方式一 · 加群获取（推荐）</p>
+            <HelpCard />
+          </div>
+
+          {/* 方式二：自行从 HuggingFace 下载 */}
+          <div className="mb-5">
+            <p className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">方式二 · 自行下载</p>
+            <button
+              onClick={() => open(ANIMA_MODELS_URL)}
+              className="w-full flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] hover:border-[var(--accent-1)]/40 transition-colors cursor-pointer text-left"
+            >
+              <ExternalLink size={16} className="text-[var(--accent-2)] flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-bold text-[var(--text-primary)]">从 HuggingFace 下载 Anima 模型</p>
+                <p className="text-[11px] text-[var(--text-secondary)] truncate">huggingface.co/circlestone-labs/Anima</p>
+              </div>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={runEnvCheck}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold text-white bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] hover:opacity-90 transition-all cursor-pointer"
+            >
+              <RefreshCw size={15} /> 我已下载，重新检测
+            </button>
+            <button
+              onClick={onComplete}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors cursor-pointer px-4 py-2.5"
+            >
+              跳过
+            </button>
+          </div>
         </div>
       )}
 
@@ -515,10 +657,15 @@ function Step3_CheckAndTest({ onComplete, onBack }: { onComplete: () => void; on
       )}
 
       {phase === 'error' && (
-        <div className="text-center py-4 animate-in zoom-in-95 duration-300">
-          <XCircle size={48} className="text-red-400 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">测试未通过</h3>
-          <p className="text-sm text-[var(--text-secondary)] mb-6 max-w-md mx-auto">{errorMsg}</p>
+        <div className="py-4 animate-in zoom-in-95 duration-300">
+          <div className="text-center mb-5">
+            <XCircle size={48} className="text-red-400 mx-auto mb-3" />
+            <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">测试未通过</h3>
+            <p className="text-sm text-[var(--text-secondary)] max-w-md mx-auto">{errorMsg}</p>
+          </div>
+          <div className="mb-5">
+            <HelpCard />
+          </div>
           <div className="flex items-center justify-center gap-3">
             <button
               onClick={runTestGeneration}
