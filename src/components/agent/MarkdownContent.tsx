@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PhotoView } from "react-photo-view";
@@ -11,7 +11,29 @@ import { getImgSrc } from "../../utils/imageUtils";
  * Why memo: streaming 时 messages 每秒更新 ~60 次，每个历史 assistant 消息都会
  * 重 render。ReactMarkdown 解析 + AST walk 开销大，memo 让未变的消息跳过解析。
  */
+
+// 图片/视频后缀，用于识别 markdown 链接里指向媒体文件的本地路径
+const MEDIA_VIDEO = new Set(['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v']);
+const MEDIA_IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
+
+/**
+ * Normalize local Windows file paths that the LLM embeds inside markdown image/link
+ * syntax. remark treats `\` as an escape character, so `C:\Users\...\file.png` gets
+ * mangled (`\U`/`\y` lose their backslash, `\t`/`\f` become tab/form-feed) and the
+ * whole `![](...)` collapses into plain text. We rewrite backslashes → forward slashes
+ * in URL positions BEFORE parsing so the image survives remark.
+ *
+ * Only touches `](` … `)` URL spans; leaves code blocks / inline text alone.
+ */
+function normalizeMarkdownPaths(content: string): string {
+  // Match `]( <url> )` — the URL portion of a markdown link/image — and replace
+  // backslashes with forward slashes only inside that URL span.
+  return content.replace(/\]\(([^)]*)\)/g, (_m, url: string) => `](${url.replace(/\\/g, '/')})`);
+}
+
 export const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
+  const processed = useMemo(() => normalizeMarkdownPaths(content), [content]);
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -22,8 +44,6 @@ export const MarkdownContent = memo(function MarkdownContent({ content }: { cont
         a: ({node, href, children, ...props}) => {
           // LLM 回复中的 [视频预览](path.mp4) 是 markdown 链接语法，
           // 对媒体文件直接渲染为 video/img 播放器，不显示为可点击超链接。
-          const MEDIA_VIDEO = new Set(['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v']);
-          const MEDIA_IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']);
           if (typeof href === 'string') {
             const ext = href.split('?')[0].split('.').pop()?.toLowerCase() || '';
             if (MEDIA_VIDEO.has(ext)) {
@@ -52,7 +72,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content }: { cont
         )
       }}
     >
-      {content}
+      {processed}
     </ReactMarkdown>
   );
 });

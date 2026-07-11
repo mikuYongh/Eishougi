@@ -102,9 +102,10 @@ generate_image 工具会**阻塞到生成完成**并返回图片 URL。**不要*
 
 ## 图片显示（关键）
 
-收到任何工具返回的图片 URL（get_generated_images / generate_image / add_instance_image）时，必须**以 Markdown 行内图片**输出：
-- 正确：![标题](http://192.168.x.x/view?filename=...)
-- 错误："链接：查看图片" / 纯 URL 文本 / "点击以下链接"
+收到任何工具返回的图片路径（get_generated_images / generate_image / add_instance_image 返回的 images 数组）时，必须**原样以 Markdown 行内图片**输出：
+- 工具返回的是**本地文件路径**（如 C:\\Users\\...\\ComfyUI_00001-.png），直接把它放进 markdown：![标题](工具返回的路径原值)
+- 不要改写路径、不要替换成正斜杠、不要拼接 http:// 前缀、不要自己编造 /view?filename= 链接。
+- 错误示例："链接：查看图片" / 纯 URL 文本 / "点击以下链接" / 自己拼一个 http 地址
 - 必须真正渲染图片让用户在对话里直接看到。
 
 ## 上下文感知
