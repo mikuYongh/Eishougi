@@ -1,7 +1,7 @@
 {
-  "version": "0.3.0",
-  "notes": "EISHOUGI v0.3.0: New onboarding wizard, environment check, portable build, English naming. See GitHub release for details.",
-  "pub_date": "2026-07-11T13:42:00Z",
-  "url": "https://github.com/mikuYongh/Eishougi/releases/download/v0.3.0/Eishougi_0.3.0_x64-setup.exe",
-  "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSc1Q2RTdzY25NclRkZnU4OWxRUXFUQjkwV1RYakJiaUtseDdjYnNKNHlFRk9iMFJiS3NPdEVES09NaGQwYmlneWxqT3FwR2NOY0l5eTZ1ODZzSEw0L1pmT21uRVZjS0FNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzNzc3Mjg5CWZpbGU6RWlzaG91Z2lfMC4zLjBfeDY0LXNldHVwLmV4ZQpaR1RXRW92OVRqQkNKbU5IYm5OSGNhUmEybk9zbFl0WjRBcUFpS2NKbkNzSmEzclNrY0NzNlJRZ1VmdC8rYWtWZGt2b1c2MUdqdUxkMlVTUHdYWENBdz09Cg=="
+  "version": "0.3.1",
+  "notes": "EISHOUGI v0.3.1 更新。详细变更请查看 commits。",
+  "pub_date": "2026-07-12T04:00:00Z",
+  "url": "https://github.com/mikuYongh/Eishougi/releases/download/v0.3.1/Eishougi_0.3.1_x64-setup.exe",
+  "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSc1Q2RTdzY25NcmFOWFBWOUNFRHZCTXlxMjY3MWZaSGphdDJaV05ZNDZuWkxQeEptOG9SR0NaOGJHcTFrNFV6RXVDUlE2RjkwcEpvMWtBaGwrMThJTDJTTkVUMFlrVVFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzODAxMTc2CWZpbGU6RWlzaG91Z2lfMC4zLjFfeDY0LXNldHVwLmV4ZQpDTG9SL0t2OVQ2NEx4Zk41b3h3aUtQc09OQXRBaW5lcXAydWRSUzNtM1Z6V1BHa3JZalU1OSswZGpFTlJOOU4rZ205cDhqQmlDdVlmN0tpbnY5Q2dBZz09Cg=="
 }
