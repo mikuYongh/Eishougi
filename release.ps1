@@ -63,15 +63,15 @@ Write-Host "`n=== [1/7] 更新版本号 → $Version ===" -ForegroundColor Cyan
 
 $tauriConf = Get-Content "src-tauri\tauri.conf.json" -Raw -Encoding UTF8
 $tauriConf = $tauriConf -replace '"version": "[^"]*"', "`"version`": `"$Version`""
-Set-Content "src-tauri\tauri.conf.json" $tauriConf -NoNewline -Encoding UTF8
+[System.IO.File]::WriteAllText("src-tauri\tauri.conf.json", $tauriConf, [System.Text.UTF8Encoding]::new($false))
 
 $cargoToml = Get-Content "src-tauri\Cargo.toml" -Raw -Encoding UTF8
 $cargoToml = $cargoToml -replace '^version = "[^"]*"', "version = `"$Version`""
-Set-Content "src-tauri\Cargo.toml" $cargoToml -NoNewline -Encoding UTF8
+[System.IO.File]::WriteAllText("src-tauri\Cargo.toml", $cargoToml, [System.Text.UTF8Encoding]::new($false))
 
 $pkgJson = Get-Content "package.json" -Raw -Encoding UTF8
 $pkgJson = $pkgJson -replace '"version": "[^"]*"', "`"version`": `"$Version`""
-Set-Content "package.json" $pkgJson -NoNewline -Encoding UTF8
+[System.IO.File]::WriteAllText("package.json", $pkgJson, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host "  ✅ tauri.conf.json / Cargo.toml / package.json → $Version" -ForegroundColor Green
 

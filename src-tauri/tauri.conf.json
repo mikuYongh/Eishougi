@@ -1,66 +1,66 @@
-﻿{
-  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Eishougi",
-  "version": "0.3.0",
-  "identifier": "com.promptmuse.app",
-  "build": {
-    "frontendDist": "../dist",
-    "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
-  },
-  "app": {
-    "windows": [
-      {
-        "title": "詠唱机 EISHOUGI",
-        "label": "main",
-        "width": 1440,
-        "height": 900,
-        "minWidth": 1024,
-        "minHeight": 680,
-        "resizable": true,
-        "decorations": false,
-        "transparent": true,
-        "center": true
-      }
-    ],
-    "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost http://asset.localhost http://127.0.0.1:* http://localhost:* http://* https://* data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost tauri: http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:* http://*:* https://*:* ws://*:* wss://*:*",
-      "assetProtocol": {
-        "enable": true,
-        "scope": [
-          "**/*",
-          "/**",
-          "/**",
-          "/**",
-          "C:/**"
-        ]
-      }
-    }
-  },
-  "bundle": {
-    "active": true,
-    "targets": [
-      "nsis"
-    ],
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFEQ0NDOUIxM0JBMTRGNkMKUldSc1Q2RTdzY25NclR3TGZFWnQ1SkpCMzhoYUc3THQzWkdJTFFZRkQrZ3VFcTFCbVRnRFl0cjgK",
-      "endpoints": [
-        "https://cdn.jsdelivr.net/gh/mikuYongh/Eishougi@main/update/latest.json",
-        "https://raw.githubusercontent.com/mikuYongh/Eishougi/main/update/latest.json"
-      ],
-      "windows": {
-        "installMode": "passive"
-      }
-    }
-  }
-}
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Eishougi",
+  "version": "0.3.0",
+  "identifier": "com.promptmuse.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "詠唱机 EISHOUGI",
+        "label": "main",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 680,
+        "resizable": true,
+        "decorations": false,
+        "transparent": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost http://asset.localhost http://127.0.0.1:* http://localhost:* http://* https://* data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost tauri: http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:* http://*:* https://*:* ws://*:* wss://*:*",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**/*",
+          "/**",
+          "/**",
+          "/**",
+          "C:/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFEQ0NDOUIxM0JBMTRGNkMKUldSc1Q2RTdzY25NclR3TGZFWnQ1SkpCMzhoYUc3THQzWkdJTFFZRkQrZ3VFcTFCbVRnRFl0cjgK",
+      "endpoints": [
+        "https://cdn.jsdelivr.net/gh/mikuYongh/Eishougi@main/update/latest.json",
+        "https://raw.githubusercontent.com/mikuYongh/Eishougi/main/update/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}
