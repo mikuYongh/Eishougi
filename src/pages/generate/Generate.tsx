@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders, Zap, BookmarkPlus } from "lucide-react";
+import { Play, Image as ImageIcon, Loader2, ArrowLeft, Download, Maximize2, RefreshCw, Cpu, Layers, Plus, Trash2, Sliders, Zap, BookmarkPlus, Tags } from "lucide-react";
 import { PhotoView } from 'react-photo-view';
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
@@ -16,6 +16,7 @@ import { LoraSelectorUI } from "../../components/prompt/LoraSelectorUI";
 import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
 import { ArtistSelector } from "../../components/prompt/ArtistSelector";
 import { comfyService } from "../../services/comfyService";
+import { aiService } from "../../services/aiService";
 import { getImgSrc } from "../../utils/imageUtils";
 import { toast } from "sonner";
 
@@ -120,6 +121,36 @@ export function Generate() {
 
   // Workflow structure flag
   const [hasSizePicker, setHasSizePicker] = useState<boolean>(false);
+
+  // Currently selected image from the session strip (drives main preview + 设为示范图 target).
+  // Empty string = no manual selection → falls back to results[0].
+  const [selectedImage, setSelectedImage] = useState<string>("");
+
+  // Single-project AI tagging state
+  const [isTagging, setIsTagging] = useState<boolean>(false);
+
+  const handleAutoTagSingle = async () => {
+    if (!project || isTagging) return;
+    const textToAnalyze = [project.title, positivePrompt].filter(Boolean).join("\n").trim();
+    if (!textToAnalyze) {
+      toast.error("项目没有可分析的提示词文本");
+      return;
+    }
+    setIsTagging(true);
+    try {
+      const newTags = await aiService.generateTags(textToAnalyze);
+      if (newTags.length > 0) {
+        await updatePrompt(project.id, { tags: newTags });
+        toast.success(`已生成 ${newTags.length} 个标签：${newTags.join("、")}`);
+      } else {
+        toast.info("未能提取到标签");
+      }
+    } catch (err: any) {
+      toast.error(`打标失败：${err?.message || err}`);
+    } finally {
+      setIsTagging(false);
+    }
+  };
 
   useEffect(() => {
     if (project) {
@@ -239,20 +270,31 @@ export function Generate() {
   // Combine all images from completed jobs for this session (newest first)
   const results = useMemo(() => completedJobs.flatMap(j => j.images || []).reverse(), [completedJobs]);
 
+  // Reset the manual selection whenever a new batch arrives.
+  useEffect(() => { setSelectedImage(""); }, [results]);
+
+  // The image shown in the main preview + target of 设为示范图:
+  // honor an explicit click on the strip, otherwise the newest result.
+  const currentImage = selectedImage || results[0] || "";
+
   const handleSetAsExample = async (imageUrl: string) => {
     if (!project) return;
     const existing = project.instanceImages || [];
-    if (!existing.includes(imageUrl)) {
-      const updatedImages = [...existing, imageUrl];
-      // Ensure prompt store triggers a state update
-      await usePromptStore.getState().updatePrompt(project.id, { instanceImages: updatedImages });
-      if (!project.coverImage) {
-        await usePromptStore.getState().updatePrompt(project.id, { coverImage: imageUrl });
-      }
-      toast.success('已设置为项目示范图！');
+    // Prepend (newest first) so instanceImages[0] is always the most recently chosen demo
+    // image. PromptList / Dashboard fall back to instanceImages[0] when coverImage is absent,
+    // so this is what actually shows up as the project cover across the app.
+    let updatedImages: string[];
+    if (existing.includes(imageUrl)) {
+      // Already a demo image — move it to the front so it becomes the cover.
+      updatedImages = [imageUrl, ...existing.filter(u => u !== imageUrl)];
     } else {
-      toast.info('该图已是示范图');
+      updatedImages = [imageUrl, ...existing];
     }
+    await usePromptStore.getState().updatePrompt(project.id, {
+      instanceImages: updatedImages,
+      coverImage: imageUrl,
+    });
+    toast.success('已设置为项目示范图！');
   };
 
   useEffect(() => {
@@ -329,8 +371,18 @@ export function Generate() {
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full md:w-auto justify-end">
           {/* Removed Reconnect Engine button since Rust handles it on demand */}
-          
-          <button 
+
+          <button
+            onClick={handleAutoTagSingle}
+            disabled={isTagging}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            title="用 AI 分析当前提示词并生成分类标签"
+          >
+            {isTagging ? <Loader2 size={16} className="animate-spin" /> : <Tags size={16} />}
+            {isTagging ? '打标中...' : 'AI 打标'}
+          </button>
+
+          <button
             onClick={handleGenerate}
             disabled={isGenerating}
             className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-[14px] font-bold shadow-[0_4px_15px_rgba(100,181,246,0.3)] transition-all ${isGenerating ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:scale-[1.02] cursor-pointer text-[var(--text-primary)]'}`}
@@ -378,15 +430,15 @@ export function Generate() {
             
             {results.length > 0 && !isGenerating ? (
               <div className="relative w-full h-full flex items-center justify-center group">
-                <PhotoView src={getImgSrc(results[0])}>
-                  <img src={getImgSrc(results[0])} alt="Generated" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-zoom-in transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} />
+                <PhotoView src={getImgSrc(currentImage)}>
+                  <img src={getImgSrc(currentImage)} alt="Generated" className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-zoom-in transition-all duration-300 ${privacyMode ? 'blur-2xl hover:blur-none' : ''}`} />
                 </PhotoView>
-                
+
                 <div className="flex flex-wrap items-center justify-center gap-3 w-full max-w-2xl px-4 absolute bottom-6 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => downloadImage(results[0], `generated_${Date.now()}.png`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-[var(--accent-1)]/50 cursor-pointer">
+                    <button onClick={() => downloadImage(currentImage, `generated_${Date.now()}.png`)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-2)]/80 backdrop-blur-md text-[var(--text-primary)] text-[13px] font-bold hover:bg-[var(--accent-2)] transition-colors shadow-lg border border-[var(--accent-1)]/50 cursor-pointer">
                       <Download size={16} /> 下载原图
                     </button>
-                    <button onClick={() => handleSetAsExample(results[0])} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-1)]/80 backdrop-blur-md text-white text-[13px] font-bold hover:bg-[var(--accent-1)] transition-colors shadow-lg border border-[var(--accent-2)]/50 cursor-pointer">
+                    <button onClick={() => handleSetAsExample(currentImage)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--accent-1)]/80 backdrop-blur-md text-white text-[13px] font-bold hover:bg-[var(--accent-1)] transition-colors shadow-lg border border-[var(--accent-2)]/50 cursor-pointer">
                       <BookmarkPlus size={16} /> 设为示范图
                     </button>
                   </div>
@@ -608,13 +660,20 @@ export function Generate() {
       {/* Session History Strip */}
       {results.length > 0 && (
         <div className="flex-shrink-0 glass-panel p-3 rounded-2xl border border-[var(--glass-border)] flex gap-3 overflow-x-auto no-scrollbar">
-          {results.map((res, i) => (
-            <div key={res} className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-[var(--glass-border)] hover:border-[var(--accent-1)]/50 cursor-pointer transition-colors relative group">
+          {results.map((res, i) => {
+            const isActive = res === currentImage;
+            return (
+            <div
+              key={res}
+              onClick={() => setSelectedImage(res)}
+              className={`w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border cursor-pointer transition-all relative group ${isActive ? 'border-[var(--accent-1)] ring-2 ring-[var(--accent-1)]/50' : 'border-[var(--glass-border)] hover:border-[var(--accent-1)]/50'}`}
+            >
               <PhotoView src={getImgSrc(res)}>
-                <img src={getImgSrc(res)} alt={`History ${i}`} className={`w-full h-full object-cover opacity-60 group-hover:opacity-100 cursor-zoom-in transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                <img src={getImgSrc(res)} alt={`History ${i}`} className={`w-full h-full object-cover transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'} cursor-zoom-in ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
               </PhotoView>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

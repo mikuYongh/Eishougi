@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Play, Plus, Image as ImageIcon, UploadCloud, Cpu, Layers, X, Trash2, History, FileText, RefreshCw } from "lucide-react";
+import { ArrowLeft, Save, Play, Plus, Image as ImageIcon, UploadCloud, Cpu, Layers, X, Trash2, History, FileText, RefreshCw, Tags, Loader2 } from "lucide-react";
 import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
 import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -18,6 +18,7 @@ import { ArtistSelector } from "../../components/prompt/ArtistSelector";
 import { LoraSelectorUI } from "../../components/prompt/LoraSelectorUI";
 import { getImgSrc } from "../../utils/imageUtils";
 import { comfyService } from "../../services/comfyService";
+import { aiService } from "../../services/aiService";
 import { toast } from "sonner";
 
 export function PromptEdit() {
@@ -45,6 +46,34 @@ export function PromptEdit() {
   const tagContainerRef = useRef<HTMLDivElement>(null);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Single-project AI tagging state
+  const [isTagging, setIsTagging] = useState<boolean>(false);
+
+  const handleAutoTagSingle = async () => {
+    if (isTagging) return;
+    const textToAnalyze = [project.title, project.positivePrompt].filter(Boolean).join("\n").trim();
+    if (!textToAnalyze) {
+      toast.error("项目没有可分析的提示词文本");
+      return;
+    }
+    setIsTagging(true);
+    try {
+      const newTags = await aiService.generateTags(textToAnalyze);
+      if (newTags.length > 0) {
+        // Merge with existing tags (dedupe), keep the new ones.
+        const existing = project.tags || [];
+        const merged = Array.from(new Set([...existing, ...newTags]));
+        setProject(prev => ({ ...prev, tags: merged }));
+        toast.success(`已生成 ${newTags.length} 个标签：${newTags.join("、")}`);
+      } else {
+        toast.info("未能提取到标签");
+      }
+    } catch (err: any) {
+      toast.error(`打标失败：${err?.message || err}`);
+    } finally {
+      setIsTagging(false);
+    }
+  };
   // Guard so the new-prompt default-workflow init only runs ONCE. Previously this effect re-ran
   // whenever `prompts` changed (e.g. Generate auto-saving another project, an agent creating a
   // prompt, a favorite toggle), and the new-prompt branch would clobber the user's in-progress
@@ -221,7 +250,16 @@ export function PromptEdit() {
         </div>
         
         <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto justify-end">
-          <button 
+          <button
+            onClick={handleAutoTagSingle}
+            disabled={isTagging}
+            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)] w-full sm:w-auto disabled:opacity-60 disabled:cursor-not-allowed"
+            title="用 AI 分析当前提示词并生成分类标签"
+          >
+            {isTagging ? <Loader2 size={16} className="animate-spin" /> : <Tags size={16} />}
+            {isTagging ? '打标中...' : 'AI 打标'}
+          </button>
+          <button
             onClick={handleSave}
             className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-[var(--glass-bg-hover)] hover:bg-[var(--glass-border-active)] text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)] w-full sm:w-auto"
           >
