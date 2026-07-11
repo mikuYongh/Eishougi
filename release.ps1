@@ -82,17 +82,21 @@ $winExe = $null
 $winSig = $null
 
 if (-not $SkipWindows) {
-    Write-Host "`n=== [2/7] 构建 Windows NSIS 安装包（带签名）===" -ForegroundColor Cyan
-    npx tauri build 2>&1 | Out-Default
+    Write-Host "`n=== [2/7] 构建 Windows 安装包（NSIS + 免安装便携版，带签名）===" -ForegroundColor Cyan
+    npx tauri build --bundles nsis,portable 2>&1 | Out-Default
 
-    # 查找产物
+    # 查找产物 — NSIS 安装包
     $nsisDir = "src-tauri\target\release\bundle\nsis"
     $winExe = Get-ChildItem "$nsisDir\*.exe" | Where-Object { $_.Name -notmatch "uninstall" } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     $winSig = Get-ChildItem "$nsisDir\*.sig" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
+    # 查找产物 — 免安装便携版
+    $portableDir = "src-tauri\target\release\bundle\portable"
+    $portableExe = Get-ChildItem "$portableDir\*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
     if ($winExe) {
         $sizeMB = [math]::Round($winExe.Length / 1MB, 1)
-        Write-Host "  ✅ 安装包: $($winExe.Name) ($sizeMB MB)" -ForegroundColor Green
+        Write-Host "  ✅ NSIS 安装包: $($winExe.Name) ($sizeMB MB)" -ForegroundColor Green
     } else {
         Write-Host "  ❌ NSIS 安装包未找到" -ForegroundColor Red
         exit 1
@@ -101,6 +105,12 @@ if (-not $SkipWindows) {
         Write-Host "  ✅ 签名文件: $($winSig.Name)" -ForegroundColor Green
     } else {
         Write-Host "  ⚠️ 未找到 .sig 签名文件（签名环境变量可能未生效）" -ForegroundColor Yellow
+    }
+    if ($portableExe) {
+        $sizeMB = [math]::Round($portableExe.Length / 1MB, 1)
+        Write-Host "  ✅ 免安装便携版: $($portableExe.Name) ($sizeMB MB)" -ForegroundColor Green
+    } else {
+        Write-Host "  ⚠️ 免安装便携版未找到" -ForegroundColor Yellow
     }
 } else {
     Write-Host "`n=== [2/7] 跳过 Windows 构建 ===" -ForegroundColor DarkGray
@@ -177,7 +187,7 @@ Write-Host "`n=== [5/7] 上传构建产物 ===" -ForegroundColor Cyan
 
 $uploadFiles = @()
 if ($winExe) {
-    # 重命名为规范文件名（避免中文文件名在 URL 里编码问题）
+    # 重命名为规范文件名
     $winDest = "$PSScriptRoot\Eishougi_${Version}_x64-setup.exe"
     Copy-Item $winExe.FullName $winDest -Force
     $uploadFiles += $winDest
@@ -186,6 +196,11 @@ if ($winExe) {
         Copy-Item $winSig.FullName $sigDest -Force
         $uploadFiles += $sigDest
     }
+}
+if ($portableExe) {
+    $portableDest = "$PSScriptRoot\Eishougi_${Version}_x64-portable.exe"
+    Copy-Item $portableExe.FullName $portableDest -Force
+    $uploadFiles += $portableDest
 }
 if ($apkFile -and (Test-Path $apkFile)) {
     $uploadFiles += $apkFile
@@ -253,7 +268,7 @@ git push origin (git branch --show-current) 2>&1 | Out-Default
 Write-Host "  ✅ 代码已推送" -ForegroundColor Green
 
 # 清理临时文件
-foreach ($f in @("$PSScriptRoot\Eishougi_${Version}_x64-setup.exe", "$PSScriptRoot\Eishougi_${Version}_x64-setup.exe.sig")) {
+foreach ($f in @("$PSScriptRoot\Eishougi_${Version}_x64-setup.exe", "$PSScriptRoot\Eishougi_${Version}_x64-setup.exe.sig", "$PSScriptRoot\Eishougi_${Version}_x64-portable.exe")) {
     if (Test-Path $f) { Remove-Item $f -Force }
 }
 

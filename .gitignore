@@ -71,6 +71,7 @@ scripts/
 *.sig
 *.key.pub
 Eishougi_*_x64-setup.exe
+Eishougi_*_x64-portable.exe
 
 # Tauri signing key (generated locally, NEVER commit)
 ~/.tauri/
