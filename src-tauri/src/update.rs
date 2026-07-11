@@ -16,6 +16,10 @@ use tauri::AppHandle;
 
 /// CDN-hosted manifest describing the newest release. Committed to the repo at `update/latest.json`
 /// and served via jsDelivr (+ raw.githubusercontent fallback).
+///
+/// Format matches what `tauri-plugin-updater` expects on the wire: `url` + `signature` at
+/// top level (NOT nested under `platforms.<target>`), so the same file works for both the
+/// plugin's own check and our custom `check_for_updates` command.
 #[derive(Debug, serde::Deserialize)]
 struct LatestManifest {
     version: String,
@@ -23,18 +27,12 @@ struct LatestManifest {
     notes: Option<String>,
     #[serde(default)]
     pub_date: Option<String>,
-    #[serde(default)]
-    platforms: std::collections::HashMap<String, PlatformAsset>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct PlatformAsset {
-    /// Windows: the minisign/ed25519 signature the updater verifies. Android: unused.
-    #[serde(default)]
-    signature: Option<String>,
-    /// Direct download URL for the installer/APK.
+    /// Download URL for this platform's installer.
     #[serde(default)]
     url: Option<String>,
+    /// Minisign/ed25519 signature for verifying the installer.
+    #[serde(default)]
+    signature: Option<String>,
 }
 
 /// Result returned to the frontend.
@@ -65,25 +63,7 @@ const MANIFEST_URLS: [&str; 3] = [
     "https://ghfast.top/https://raw.githubusercontent.com/mikuYongh/Eishougi/master/update/latest.json",
 ];
 
-/// Detect the platform key used in `latest.json.platforms`.
-fn platform_key() -> &'static str {
-    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-    { "windows-x86_64" }
-    #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
-    { "windows-aarch64" }
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    { "darwin-aarch64" }
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    { "darwin-x86_64" }
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    { "linux-x86_64" }
-    #[cfg(target_os = "android")]
-    { "android-universal" }
-    #[cfg(not(any(
-        target_os = "windows", target_os = "macos", target_os = "linux", target_os = "android"
-    )))]
-    { "unknown" }
-}
+
 
 /// Fetch the manifest, trying each CDN URL until one works.
 async fn fetch_manifest() -> Result<LatestManifest, String> {
@@ -142,9 +122,10 @@ pub async fn check_for_updates(app: AppHandle) -> Result<UpdateInfo, String> {
     };
 
     // Pick this platform's asset (download URL + signature).
-    let asset = manifest.platforms.get(platform_key());
-    let download_url = asset.and_then(|a| a.url.clone());
-    let signature = asset.and_then(|a| a.signature.clone());
+    // Since latest.json now uses the flat tauri-plugin-updater format,
+    // url / signature are at the top level (not nested under platforms.<target>).
+    let download_url = manifest.url;
+    let signature = manifest.signature;
 
     Ok(UpdateInfo {
         has_update,

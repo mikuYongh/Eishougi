@@ -243,15 +243,8 @@ $latest = @{
     version = $Version
     notes = $Notes
     pub_date = $pubDate
-    platforms = @{
-        "windows-x86_64" = @{
-            signature = $sigContent
-            url = $winUrl
-        }
-        "android-universal" = @{
-            url = $apkUrl
-        }
-    }
+    url = $winUrl
+    signature = $sigContent
 } | ConvertTo-Json -Depth 5
 
 Set-Content "update\latest.json" $latest -Encoding UTF8
