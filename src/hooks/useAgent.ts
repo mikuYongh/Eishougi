@@ -36,6 +36,8 @@ export interface ChatMessage {
   tool_calls?: any[];
   tool_call_id?: string;
   name?: string;
+  // Reasoning models (deepseek-v4-flash etc.) require this to be passed back on multi-turn calls.
+  reasoning_content?: string;
 }
 
 export interface ChatAttachment {
@@ -586,7 +588,7 @@ export function useAgent() {
       type: "function",
       function: {
         name: "list_character_series",
-        description: "List character series/copyrights (e.g. 原神/Genshin, 明日方舟/Arknights) with character counts, paginated. Use this FIRST to discover which series exist, then call search_characters_in_series with the series name. Returns both `series` (English tag) and `seriesZh` (Chinese name). Always page (default 30, max 100).",
+        description: "List character series/copyrights (e.g. Genshin Impact/原神, Arknights/明日方舟) with character counts, paginated. Use this FIRST to discover which series exist, then call search_characters_in_series with the series name. Each result returns BOTH `series` (English tag) and `seriesZh` (Chinese name). Always page (default 30, max 100).",
         parameters: {
           type: "object",
           properties: {
@@ -649,8 +651,8 @@ export function useAgent() {
     {
       type: "function",
       function: {
-        name: "list_favorite_characters",
-        description: "List favorite characters. Supports tag filter (OR by default, AND via tag_match='and') and free-text search. Returns each character with resolved_image (gallery img_url → example_image → null) and tags.",
+        name: "view_bookmarks",
+        description: "⚠️ ONLY use when user explicitly says \"收藏\"/\"bookmark\"/\"favorite\". Shows the user's BOOKMARKED characters (not the full library). For browsing ALL characters use browse_characters instead. Supports tag filter and search.",
         parameters: {
           type: "object",
           properties: {
@@ -785,8 +787,8 @@ export function useAgent() {
     {
       type: "function",
       function: {
-        name: "list_favorite_artists",
-        description: "List favorite artists. Supports free-text search. Returns each artist with resolved_image.",
+        name: "view_bookmarked_artists",
+        description: "⚠️ ONLY use when user explicitly says \"收藏画师\"/\"bookmark artist\". Shows the user's BOOKMARKED artists (not the full library). For searching ALL artists use search_artists instead.",
         parameters: {
           type: "object",
           properties: {
@@ -1014,6 +1016,9 @@ User input: ${userText}`;
         if (msg.tool_calls && msg.tool_calls.length > 0) m.tool_calls = msg.tool_calls;
         if (msg.tool_call_id) m.tool_call_id = msg.tool_call_id;
         if (msg.name) m.name = msg.name;
+        // Preserve reasoning_content for thinking-mode models (deepseek-v4-flash etc.) — the API
+        // requires it to be passed back on subsequent turns or it rejects with 400.
+        if (msg.reasoning_content) m.reasoning_content = msg.reasoning_content;
         return m;
       }));
 
@@ -1151,13 +1156,14 @@ User input: ${userText}`;
 
         const systemMessage = {
           role: "system",
-          content: agentSettings.systemPrompt + mcpToolsPrompt + systemContext + precheckContext + budgetContext + "\n\nCRITICAL RULE FOR WORKFLOWS: You HAVE the `create_workflow`, `update_workflow`, and `delete_workflow` tools. If the user provides a JSON for a workflow or asks to create/manage a workflow, you MUST use these tools! DO NOT tell the user they need to import it manually."
-            + "\n\n## 角色与画师库查询（关键 — 防止误用收藏工具）"
-            + "\n当用户问\"有什么角色\"/\"有哪些角色\"/\"角色列表\" → 用 `list_character_series`（列系列）+ `search_characters_in_series`（系列内搜角色），这是查全库 36000+ 角色。"
-            + "\n当用户问\"有什么画师\"/\"有哪些风格\"/\"画师列表\" → 用 `search_artists`，这是查全库 15000+ 画师。"
-            + "\n当用户说\"随便来一张\"/\"给我个惊喜\" → 用 `random_character_and_artist`。"
-            + "\n⚠️ `list_favorite_characters` / `list_favorite_artists` 只返回**用户收藏**的（可能只有几个），不是全库。用户问\"有什么角色\"时不要用收藏工具，除非用户明确说\"我收藏的角色\"。"
-            + "\n⚠️ `get_custom_styles` 工具不存在。用户问\"有什么风格\"时用 `search_artists`。"
+          content: agentSettings.systemPrompt + mcpToolsPrompt + systemContext + precheckContext + budgetContext
+            + "\n\n## 工具路由规则（必须遵守）"
+            + "\n用户问\"有什么角色\"/\"有哪些角色\" → `list_character_series`（全库36000+角色）。`view_bookmarks` 只返回收藏夹（仅用户明确说\"收藏\"时用）"
+            + "\n用户问\"有什么画师\"/\"有什么风格\" → `search_artists`（不是 get_custom_styles！那工具不存在）"
+            + "\n用户说\"随便来一张\"/\"给我个惊喜\" → `random_character_and_artist`"
+            + "\n用户要创建角色图片 → 直接用你的 Danbooru 知识构建 tag 调 create_prompt，不需要先搜索"
+            + "\n搜索返回空 → 继续用你的知识创建，不要卡住或重复搜索"
+            + "\n⚠️ search_tags/get_related_tags/get_artist_recommendations/get_custom_styles 这些工具不存在，不要尝试调用"
         };
         
         const payload: any = {
@@ -1243,6 +1249,12 @@ User input: ${userText}`;
               const delta = data.choices?.[0]?.delta;
               if (!delta) continue;
               if (delta.content) assistantMessage.content += delta.content;
+              // Reasoning models (e.g. deepseek-v4-flash) return reasoning_content in the delta.
+              // We must preserve it and pass it back on subsequent multi-turn calls, or the API
+              // will reject with 400 "reasoning_content in thinking mode must be passed back".
+              if (delta.reasoning_content) {
+                assistantMessage.reasoning_content = (assistantMessage.reasoning_content || '') + delta.reasoning_content;
+              }
               if (delta.tool_calls) {
                 for (const tc of delta.tool_calls) {
                   if (tc.id) {
@@ -1487,7 +1499,9 @@ User input: ${userText}`;
                 await invoke('delete_prompt', { id: parsedArgs.prompt_id });
                 usePromptStore.getState().fetchPrompts();
                 res = { status: "success", message: `Prompt ${parsedArgs.prompt_id} deleted.` };
-              } else if (fnName === 'search_prompts') {
+               } else if (fnName === 'search_prompts') {
+                // Refresh from DB so newly created/deleted prompts are reflected immediately.
+                await usePromptStore.getState().fetchPrompts();
                 const prompts = usePromptStore.getState().prompts;
                 res = prompts.filter(p => {
                   if (!parsedArgs.tags || parsedArgs.tags.length === 0) return true;
@@ -1621,10 +1635,8 @@ User input: ${userText}`;
             aiService.batchAutoTagPrompts();
             resultStr = JSON.stringify({ status: "success", message: "后台批量打标已启动，将自动为所有提示词生成标签" });
           } else if (fnName === 'list_local_models') {
-            const store = useModelStore.getState();
-            if (store.checkpoints.length === 0 && store.loras.length === 0) {
-              await store.fetchModels();
-            }
+            // Always fetch fresh — the user may have added/removed LoRAs since the last call.
+            await useModelStore.getState().fetchModels(true);
             const { checkpoints, loras } = useModelStore.getState();
             res = { checkpoints, loras };
           } else if (fnName === 'list_character_series') {
@@ -1685,7 +1697,9 @@ User input: ${userText}`;
                   total_jobs_in_history: state.jobs.length,
                   recent_completed: recentCompleted
                 };
-              } else if (fnName === 'search_workflows') {
+               } else if (fnName === 'search_workflows') {
+                // Refresh from DB so newly created/deleted workflows are reflected immediately.
+                await useWorkflowStore.getState().fetchWorkflows();
                 const workflows = useWorkflowStore.getState().workflows;
                 res = workflows.filter(w => {
                   if (!parsedArgs.tags || parsedArgs.tags.length === 0) return true;
@@ -1847,7 +1861,7 @@ User input: ${userText}`;
                 res = await invoke<any>('check_comfyui_status', {
                   url: parsedArgs.url || null
                 });
-              } else if (fnName === 'list_favorite_characters') {
+              } else if (fnName === 'view_bookmarks') {
                 res = await invoke<any[]>('list_favorite_characters', {
                   tags: parsedArgs.tags || null,
                   tagMatch: parsedArgs.tag_match || null,
@@ -1903,7 +1917,7 @@ User input: ${userText}`;
                 res = { status: "success", count };
               } else if (fnName === 'list_favorite_character_tags') {
                 res = await invoke<any[]>('list_favorite_character_tags', {});
-              } else if (fnName === 'list_favorite_artists') {
+              } else if (fnName === 'view_bookmarked_artists') {
                 res = await invoke<any[]>('list_favorite_artists', {
                   search: parsedArgs.search || null,
                   limit: parsedArgs.limit ?? null,
