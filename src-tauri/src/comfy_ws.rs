@@ -22,9 +22,10 @@ use std::time::Duration;
 /// the user gets a downloaded file that never appears in history.
 ///
 /// Current producers:
-///   - `video_`     → `Img2VideoModal.tsx`, `VideoGenerate.tsx`, `useAgent.ts` (temp video jobs)
-///   - `mcp_temp_`  → `useMcpServer.ts` (MCP direct-generation mode, no prompt created)
-const SYNTHETIC_PROJECT_ID_PREFIXES: &[&str] = &["video_", "mcp_temp_"];
+///   - `video_`         → `Img2VideoModal.tsx`, `VideoGenerate.tsx`, `useAgent.ts` (temp video jobs)
+///   - `mcp_temp_`      → `useMcpServer.ts` (MCP direct-generation mode, no prompt created)
+///   - `onboard_test_`  → `OnboardingWizard.tsx` (onboarding test generation, no prompt row)
+const SYNTHETIC_PROJECT_ID_PREFIXES: &[&str] = &["video_", "mcp_temp_", "onboard_test_"];
 
 /// True if `id` refers to a throwaway job rather than a persisted prompt. Such ids must NOT be
 /// written into FK columns that reference `prompts(id)`.
@@ -571,6 +572,7 @@ mod tests {
     fn synthetic_ids_are_detected() {
         assert!(is_synthetic_project_id("video_1234567890"));
         assert!(is_synthetic_project_id("mcp_temp_1234567890"));
+        assert!(is_synthetic_project_id("onboard_test_1234567890"));
     }
 
     #[test]
