@@ -1,11 +1,11 @@
 {
-  "version": "0.2.3",
-  "notes": "当前版本，无可用更新。",
-  "pub_date": "2026-07-07T00:00:00Z",
+  "version": "0.3.0",
+  "notes": "EISHOUGI v0.3.0: New onboarding wizard, environment check, portable build, English naming. See GitHub release for details.",
+  "pub_date": "2026-07-11T13:42:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "",
-      "url": ""
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSc1Q2RTdzY25NclRkZnU4OWxRUXFUQjkwV1RYakJiaUtseDdjYnNKNHlFRk9iMFJiS3NPdEVES09NaGQwYmlneWxqT3FwR2NOY0l5eTZ1ODZzSEw0L1pmT21uRVZjS0FNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzNzc3Mjg5CWZpbGU6RWlzaG91Z2lfMC4zLjBfeDY0LXNldHVwLmV4ZQpaR1RXRW92OVRqQkNKbU5IYm5OSGNhUmEybk9zbFl0WjRBcUFpS2NKbkNzSmEzclNrY0NzNlJRZ1VmdC8rYWtWZGt2b1c2MUdqdUxkMlVTUHdYWENBdz09Cg==",
+      "url": "https://github.com/mikuYongh/Eishougi/releases/download/v0.3.0/Eishougi_0.3.0_x64-setup.exe"
     },
     "android-universal": {
       "url": ""

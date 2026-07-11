@@ -175,9 +175,9 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# 如果 release 已存在则先删除
-gh release delete "v$Version" --yes --repo $REPO 2>&1 | Out-Null
-git push origin ":refs/tags/v$Version" 2>&1 | Out-Null
+# 如果 release 已存在则先删除（忽略错误，首次发布不存在）
+gh release delete "v$Version" --yes --repo $REPO 2>$null | Out-Null
+git push origin ":refs/tags/v$Version" 2>$null | Out-Null
 
 # 创建 release（先不上传文件，拿到 URL 后更新 latest.json 再上传）
 gh release create "v$Version" --repo $REPO --title "v$Version" --notes $Notes --latest 2>&1 | Out-Null
