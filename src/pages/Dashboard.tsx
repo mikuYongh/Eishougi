@@ -8,6 +8,7 @@ import { useQueueStore } from "../stores/queueStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { getImgSrc, isVideoFile } from "../utils/imageUtils";
 import { toast } from "sonner";
+import { PhotoView } from "react-photo-view";
 
 
 
@@ -17,18 +18,33 @@ export function Dashboard() {
   const fetchPrompts = usePromptStore(state => state.fetchPrompts);
   const workflows = useWorkflowStore(state => state.workflows);
   const fetchWorkflows = useWorkflowStore(state => state.fetchWorkflows);
-  const { jobs, isConnected, connect } = useQueueStore();
+  const { jobs, connect } = useQueueStore();
   const historyUpdateTick = useQueueStore(state => state.historyUpdateTick);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
   const [totalGenerated, setTotalGenerated] = useState(0);
   const [todayGenerated, setTodayGenerated] = useState(0);
   const [recentImages, setRecentImages] = useState<any[]>([]);
+  // Real ComfyUI reachability (HTTP ping /system_stats). The queue store's `isConnected`
+  // only reflects the WebSocket status, which is opened lazily on the first queued job —
+  // so it's almost always false on the dashboard when nothing is generating, even when
+  // ComfyUI is perfectly online. We probe the HTTP endpoint instead for the status label.
+  const [comfyOnline, setComfyOnline] = useState(false);
+
+  const checkComfy = async () => {
+    try {
+      const r = await invoke<any>('check_comfyui_status', { url: null });
+      setComfyOnline(!!r?.online);
+    } catch {
+      setComfyOnline(false);
+    }
+  };
 
   useEffect(() => {
     fetchPrompts();
     fetchWorkflows();
     connect();
+    checkComfy();
     fetchHistory();
   }, []);
 
@@ -205,14 +221,14 @@ export function Dashboard() {
               当前生成队列
             </div>
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${activeJobs.length > 0 ? 'bg-orange-500/20 text-orange-400 border-orange-500/20' : 'bg-white/5 text-[var(--text-secondary)] border-[var(--glass-border)]'}`}>
-              {activeJobs.length > 0 ? `${activeJobs.length} 个任务进行中` : (isConnected ? '队列空闲' : '未连接引擎')}
+              {activeJobs.length > 0 ? `${activeJobs.length} 个任务进行中` : (comfyOnline ? '队列空闲' : '未连接引擎')}
             </span>
           </div>
           <div className="flex-1 overflow-y-auto space-y-3 pr-1">
             {activeJobs.length === 0 && completedJobs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-[var(--text-secondary)]">
                 <ImageIcon size={32} className="mb-2 opacity-50" />
-                <p className="text-[12px]">{isConnected ? '队列为空，去生成一张图吧' : '请先在设置中配置 ComfyUI 地址'}</p>
+                <p className="text-[12px]">{comfyOnline ? '队列为空，去生成一张图吧' : '请先在设置中配置 ComfyUI 地址'}</p>
               </div>
             ) : (
               <>
@@ -230,27 +246,24 @@ export function Dashboard() {
                     </div>
                   </div>
                 ))}
-                {completedJobs.slice(0, 3).map(job => (
-                  <div key={job.id} className="p-3 rounded-lg bg-green-500/5 border border-green-500/20 flex items-center justify-between group relative cursor-pointer hover:bg-green-500/10 transition-colors">
+                {completedJobs.slice(0, 3).map(job => {
+                  const jobImg = job.images?.[0] ? getImgSrc(job.images[0]) : '';
+                  return (
+                  <PhotoView key={job.id} src={jobImg}>
+                  <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20 flex items-center justify-between gap-2 group relative cursor-zoom-in hover:bg-green-500/10 transition-colors">
                     <div className="flex items-center gap-2 min-w-0">
-                      <ImageIcon size={14} className="text-green-400 flex-shrink-0" />
+                      {jobImg ? (
+                        <img src={jobImg} className={`w-8 h-8 rounded-md object-cover border border-green-500/30 flex-shrink-0 ${privacyMode ? 'blur-md hover:blur-none' : ''}`} alt="" />
+                      ) : (
+                        <ImageIcon size={16} className="text-green-400 flex-shrink-0 ml-1" />
+                      )}
                       <span className="text-[12px] font-bold text-[var(--text-primary)] truncate">{job.projectTitle}</span>
                     </div>
-                    <span className="text-[10px] font-bold text-green-400 flex-shrink-0 ml-2">✓ 完成</span>
-
-                    {/* Hover Bubble Image Preview */}
-                    {job.images?.[0] && (
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-40 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 pointer-events-none translate-y-2 group-hover:translate-y-0">
-                        <div className="bg-[var(--bg-layer-1)] backdrop-blur-2xl border border-green-500/40 p-2 rounded-2xl shadow-[0_8px_30px_rgba(34,197,94,0.3)]">
-                          <img src={getImgSrc(job.images[0])} className={`w-full aspect-square rounded-xl object-cover ${privacyMode ? 'blur-md' : ''}`} alt="preview" />
-                          <div className="text-[10px] text-center mt-2 text-green-400 font-bold mb-1">点击查看大图</div>
-                        </div>
-                        {/* Tooltip Arrow */}
-                        <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[var(--bg-layer-1)] border-b border-r border-green-500/40 rotate-45 backdrop-blur-2xl" />
-                      </div>
-                    )}
+                    <span className="text-[10px] font-bold text-green-400 flex-shrink-0">✓ 完成</span>
                   </div>
-                ))}
+                  </PhotoView>
+                  );
+                })}
               </>
             )}
           </div>
