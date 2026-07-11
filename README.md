@@ -22,12 +22,28 @@
 </p>
 
 <p align="center">
-  <a href="#-核心特性">核心特性</a> ·
   <a href="#-界面预览">界面预览</a> ·
+  <a href="#-核心特性">核心特性</a> ·
   <a href="#-快速开始">快速开始</a> ·
   <a href="#-mcp-对外服务">MCP 服务</a> ·
   <a href="#-本地开发">本地开发</a>
 </p>
+
+---
+
+## 🖼️ 界面预览
+
+| 仪表盘 | 提示词编辑 |
+|:---:|:---:|
+| <img src="docs/screenshots/dashboard.png" width="400" /> | <img src="docs/screenshots/prompt-edit.png" width="400" /> |
+
+| AI 助手对话 | 角色图鉴 |
+|:---:|:---:|
+| <img src="docs/screenshots/agent.png" width="400" /> | <img src="docs/screenshots/vault.png" width="400" /> |
+
+| 提示词项目界面 |
+|:---:|
+| <img src="docs/screenshots/projects.png" width="812" /> |
 
 ---
 
@@ -112,23 +128,6 @@
 - **赛博朋克 + 毛玻璃美学**：5 套配色主题（樱花 / 经典 / 翠绿 / 暗夜 / 赛博）
 - **全平台自适应**：桌面端侧边栏布局，移动端底部导航，沉浸式全屏
 - **壁纸自定义**：支持本地图片 / 网络图片 / 模糊度调节
-- **流畅动效**：进度条、状态指示器、过渡动画
-
----
-
-## 🖼️ 界面预览
-
-| 仪表盘 | 提示词编辑 |
-|:---:|:---:|
-| <img src="docs/screenshots/dashboard.png" width="400" /> | <img src="docs/screenshots/prompt-edit.png" width="400" /> |
-
-| AI 助手对话 | 典藏库画廊 |
-|:---:|:---:|
-| <img src="docs/screenshots/agent.png" width="400" /> | <img src="docs/screenshots/vault.png" width="400" /> |
-
-> 📸 截图后续补充
-
----
 
 ## 🚀 快速开始
 
