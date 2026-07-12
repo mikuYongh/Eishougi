@@ -19,6 +19,8 @@ export interface AppSettings {
     model: string;
     temperature: number;
     maxTokens: number;
+    // 思考模型开关 — 开启后 LLM 返回 reasoning_content（深度推理），消耗更多 token。默认开启。
+    reasoningEnabled: boolean;
   };
   mcpServers: McpServerConfig[];
   // MCP server (exposing this app's tools to external AI clients like Claude Desktop / Cursor).
@@ -76,7 +78,8 @@ const defaultSettings: AppSettings = {
     apiUrl: import.meta.env.VITE_LLM_API_URL || 'https://apihub.agnes-ai.com/v1',
     model: import.meta.env.VITE_LLM_MODEL || 'agnes-2.0-flash',
     temperature: 0.7,
-    maxTokens: 8192
+    maxTokens: 8192,
+    reasoningEnabled: true,
   },
   slimToolsMode: false,
   saveFolder: 'Eishougi',
@@ -125,17 +128,23 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'eishougi-settings',
-      merge(persisted: unknown, current: SettingsState) {
-        const p = persisted as Partial<SettingsState> | null;
-        return {
-          ...current,
-          ...(p || {}),
-          settings: {
-            ...current.settings,
-            ...(p?.settings || {}),
-          },
-        };
-      },
+    merge(persisted: unknown, current: SettingsState) {
+      const p = persisted as Partial<SettingsState> | null;
+      const merged = {
+        ...current,
+        ...(p || {}),
+        settings: {
+          ...current.settings,
+          ...(p?.settings || {}),
+        },
+      };
+      // 确保 llm 子对象的字段完整性（旧版本持久化数据可能缺少新字段如 reasoningEnabled）
+      merged.settings.llm = {
+        ...current.settings.llm,
+        ...(p?.settings?.llm || {}),
+      };
+      return merged;
+    },
     }
   )
 );

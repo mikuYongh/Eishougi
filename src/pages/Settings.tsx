@@ -807,6 +807,22 @@ export function Settings() {
                       />
                     </div>
                   </div>
+
+                  {/* Reasoning / Thinking Model Toggle */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-[var(--text-primary)]">思考模型 (Reasoning)</h4>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1">开启后 AI 会进行深度推理再回答，质量更高但消耗更多 Token。关闭可大幅节省用量</p>
+                      </div>
+                      <button
+                        onClick={() => updateSettings({ llm: { ...settings.llm, reasoningEnabled: !settings.llm.reasoningEnabled } })}
+                        className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${settings.llm.reasoningEnabled ? 'bg-[var(--accent-1)]' : 'bg-[var(--bg-layer-2)] border border-[var(--glass-border)]'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all ${settings.llm.reasoningEnabled ? 'left-7' : 'left-1'}`} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
