@@ -457,14 +457,14 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
     // ---- image cipher (anti-censorship obfuscation) ----
     ToolDef {
         name: "encrypt_image",
-        description: "Scramble an image's pixels using the 小番茄 (Tomato) or row-shuffle algorithm so the visual content is unrecognisable to automated moderation, while remaining perfectly recoverable with decrypt_image + the same key. Output is a lossless PNG served over HTTP.",
+        description: "Scramble an image's pixels so the visual content is unrecognisable to automated moderation, while remaining perfectly recoverable. Compatible with the PicEncrypt APK — encrypted output can be decrypted by the standalone PicEncrypt app using the matching algorithm and key. Output is a lossless PNG served over HTTP.",
         group: ToolGroup::Core,
         input_schema: json!({
             "type": "object",
             "properties": {
                 "image": { "type": "string", "description": "Image to encrypt: a local filename in uploads/, a local path, or an http(s) URL." },
-                "algorithm": { "type": "string", "enum": ["tomato", "row"], "description": "Scramble algorithm. 'tomato' (小番茄, Gilbert curve, default) or 'row' (logistic-map row shuffle)." },
-                "key": { "type": "number", "description": "Cipher key. Tomato: (0, 1.618], default 1. Row: (0, 1), default 0.666. REMEMBER this exactly — the same key is required to decrypt." }
+                "algorithm": { "type": "string", "enum": ["tomato", "row"], "description": "Scramble algorithm. 'tomato' (小番茄, Gilbert curve, DEFAULT — matches the PicEncrypt APK's default) or 'row' (PicEncrypt行模式, logistic-map column permutation)." },
+                "key": { "type": "number", "description": "Cipher key. Tomato: range (0, 1.618], default 1. Row: range (0, 1), default 0.666. REMEMBER this exactly — the same key + algorithm is required to decrypt (either via decrypt_image or the PicEncrypt APK)." }
             },
             "required": ["image"]
         }),
@@ -477,8 +477,8 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
             "type": "object",
             "properties": {
                 "image": { "type": "string", "description": "Encrypted image: a local filename in uploads/, a local path, or an http(s) URL." },
-                "algorithm": { "type": "string", "enum": ["tomato", "row"], "description": "Must match the algorithm used to encrypt. 'tomato' (default) or 'row'." },
-                "key": { "type": "number", "description": "Must match the key used to encrypt. Tomato: (0, 1.618], default 1. Row: (0, 1), default 0.666." }
+                "algorithm": { "type": "string", "enum": ["tomato", "row"], "description": "Must match the algorithm used to encrypt. 'tomato' (小番茄, DEFAULT) or 'row' (PicEncrypt行模式)." },
+                "key": { "type": "number", "description": "Must match the key used to encrypt. Tomato: range (0, 1.618], default 1. Row: range (0, 1), default 0.666." }
             },
             "required": ["image"]
         }),
