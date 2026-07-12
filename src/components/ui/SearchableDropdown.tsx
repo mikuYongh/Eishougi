@@ -63,9 +63,18 @@ export function SearchableDropdown({
   };
 
   const theme = colors[accentColor];
-  const selectedOption = options.find(o => o.value === value);
 
-  const filteredOptions = options.filter(o => 
+  // If the current value isn't in the options list (e.g. the model file was deleted,
+  // or the workflow references a model that hasn't been scanned yet), we still need to
+  // display it. Inject it as a synthetic option so the user can see what's set and the
+  // dropdown doesn't misleadingly show the placeholder.
+  const valueExists = options.some(o => o.value === value);
+  const allOptions = value && !valueExists
+    ? [{ label: `${value} (不在本地)`, value }, ...options]
+    : options;
+  const selectedOption = allOptions.find(o => o.value === value);
+
+  const filteredOptions = allOptions.filter(o => 
     o.label.toLowerCase().includes(search.toLowerCase()) || 
     o.value.toLowerCase().includes(search.toLowerCase())
   );

@@ -68,7 +68,13 @@ pub fn process_file(
 ) -> Result<(u32, u32), String> {
     validate_key(algorithm, key)?;
 
-    let img = image::open(input).map_err(|e| format!("Failed to decode image: {}", e))?;
+    // Read raw bytes and use load_from_memory, which infers format from magic bytes (PNG header,
+    // JPEG SOI marker, etc.) rather than the file extension. This is critical because temp files
+    // downloaded from URLs may have unusual extensions, and image::open() refuses unknown exts.
+    let file_bytes = std::fs::read(input)
+        .map_err(|e| format!("Failed to read input image: {}", e))?;
+    let img = image::load_from_memory(&file_bytes)
+        .map_err(|e| format!("Failed to decode image: {}", e))?;
     let (w, h) = img.dimensions();
 
     // Work in RGBA8 for a uniform pixel layout regardless of input format (RGB, RGBA, palette…).
@@ -269,9 +275,14 @@ fn gilbert2d(
 
 // ============================ Row scramble (logistic map) ============================
 
-/// Per-row column shuffle driven by a logistic-map pseudo-random sequence.
-/// Generates a deterministic permutation of column indices from x_{n+1} = r * x_n * (1 - x_n)
-/// with r = 3.9999999, then shuffles each row's pixels by that permutation (or its inverse).
+/// Column permutation driven by a logistic-map pseudo-random sequence.
+///
+/// This is a faithful port of PicEncryptRowScramble.java from the reference app. The key
+/// difference from a naive "shuffle within each row" is that this permutes **entire columns**:
+/// it generates `width` logistic-map values, sorts them to get a column permutation `positions[]`,
+/// then for each column `i` it moves ALL pixels in column `positions[i]` to column `i`
+/// (encrypt) or vice versa (decrypt). This must match the Java exactly so that images
+/// encrypted here can be decrypted by the standalone PicEncrypt APK.
 fn row_scramble_process(
     pixels: &[u32],
     width: u32,
@@ -286,20 +297,35 @@ fn row_scramble_process(
         return Vec::new();
     }
 
-    let perm = logistic_permutation(key, w);
+    let positions = logistic_permutation(key, w);
 
     let mut new_pixels = vec![0u32; pixel_count];
-    for row in 0..h {
-        let base = row * w;
-        match process_type {
-            ProcessType::Encrypt => {
-                for i in 0..w {
-                    new_pixels[base + perm[i]] = pixels[base + i];
+    // offset = (height-1) * width — the last row's start index. We iterate j from offset down
+    // to 0 by width steps, which visits row (height-1), (height-2), ..., 0 at column base.
+    let offset = (h - 1) * w;
+
+    match process_type {
+        ProcessType::Encrypt => {
+            // For each column i: copy column positions[i] → column i (all rows)
+            for i in 0..w {
+                let m = positions[i];
+                let mut j = offset;
+                loop {
+                    new_pixels[i + j] = pixels[m + j];
+                    if j == 0 { break; }
+                    j -= w;
                 }
             }
-            ProcessType::Decrypt => {
-                for i in 0..w {
-                    new_pixels[base + i] = pixels[base + perm[i]];
+        }
+        ProcessType::Decrypt => {
+            // Inverse: for each column i: copy column i → column positions[i] (all rows)
+            for i in 0..w {
+                let m = positions[i];
+                let mut j = offset;
+                loop {
+                    new_pixels[m + j] = pixels[i + j];
+                    if j == 0 { break; }
+                    j -= w;
                 }
             }
         }
