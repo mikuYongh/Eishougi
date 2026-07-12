@@ -53,8 +53,35 @@ pub async fn download_comfyui_image(app_data_dir: PathBuf, url: String) -> Resul
     Ok(file_path.to_string_lossy().to_string())
 }
 
+/// Sanitize a user-supplied subfolder name into a single safe path component.
+/// Strips path separators, drive letters, and other characters that are illegal in Windows/Mac/Linux
+/// directory names, so it can never escape the parent Pictures/Downloads root.
+fn sanitize_folder(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_matches('.');
+    if trimmed.is_empty() {
+        "Eishougi".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 #[tauri::command]
-pub async fn export_image_to_downloads(app: AppHandle, state: State<'_, crate::AppState>, url: String) -> Result<String, String> {
+pub async fn export_image_to_downloads(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+    url: String,
+    save_folder: Option<String>,
+) -> Result<String, String> {
+    let folder = sanitize_folder(save_folder.as_deref().unwrap_or("Eishougi"));
+
     #[cfg(target_os = "android")]
     {
         use std::time::{SystemTime, UNIX_EPOCH};
@@ -71,7 +98,13 @@ pub async fn export_image_to_downloads(app: AppHandle, state: State<'_, crate::A
 
         write_image_bytes(&url, &dest_path).await?;
 
-        let res = crate::jvm_plugin::save_image_to_gallery(&dest_path.to_string_lossy(), &file_name);
+        // Pass the sanitized subfolder so the Kotlin side writes to Pictures/<folder>/ instead of
+        // the hardcoded "Eishougi".
+        let res = crate::jvm_plugin::save_image_to_gallery(
+            &dest_path.to_string_lossy(),
+            &file_name,
+            &folder,
+        );
         let _ = std::fs::remove_file(&dest_path);
 
         return match res {
@@ -90,7 +123,7 @@ pub async fn export_image_to_downloads(app: AppHandle, state: State<'_, crate::A
             .download_dir()
             .map_err(|e| format!("Failed to get download dir: {}", e))?;
 
-        let target_dir = download_dir.join("Eishougi").join("photo");
+        let target_dir = download_dir.join(&folder).join("photo");
         if !target_dir.exists() {
             fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
         }

@@ -518,6 +518,23 @@ export function Settings() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Save Folder */}
+                  <div>
+                    <div>
+                      <h4 className="text-sm font-bold text-[var(--text-primary)]">保存目录 (Save Folder)</h4>
+                      <p className="text-xs text-[var(--text-secondary)] mt-1">
+                        保存到相册/下载时使用的子目录名。桌面端：下载/{isAndroid ? '' : '<'}文件夹{isAndroid ? '' : '>'}/photo/，移动端：图库/Pictures/{isAndroid ? '' : '<'}文件夹{isAndroid ? '' : '>'}/
+                      </p>
+                    </div>
+                    <input
+                      type="text"
+                      value={settings.saveFolder}
+                      onChange={(e) => updateSettings({ saveFolder: e.target.value })}
+                      placeholder="Eishougi"
+                      className="mt-2 w-full bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-1)] transition-colors"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

@@ -32,21 +32,23 @@ pub mod jvm_plugin {
     pub static mut MAIN_ACTIVITY_CLASS: Option<jni::objects::GlobalRef> = None;
     pub static mut MAIN_CONTEXT: Option<jni::objects::GlobalRef> = None;
 
-    pub fn save_image_to_gallery(source_path: &str, file_name: &str) -> Result<String, String> {
+    pub fn save_image_to_gallery(source_path: &str, file_name: &str, folder: &str) -> Result<String, String> {
         unsafe {
             if let Some(vm) = &JVM {
                 let mut env = vm.attach_current_thread().map_err(|e| e.to_string())?;
                 if let Some(class) = &MAIN_ACTIVITY_CLASS {
                     let source_path_j = env.new_string(source_path).map_err(|e| e.to_string())?;
                     let file_name_j = env.new_string(file_name).map_err(|e| e.to_string())?;
+                    let folder_j = env.new_string(folder).map_err(|e| e.to_string())?;
                     let result = env
                         .call_static_method(
                             class,
                             "saveImageToGallery",
-                            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+                            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
                             &[
                                 jni::objects::JValue::from(&source_path_j),
                                 jni::objects::JValue::from(&file_name_j),
+                                jni::objects::JValue::from(&folder_j),
                             ],
                         )
                         .map_err(|e| e.to_string())?;

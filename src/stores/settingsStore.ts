@@ -31,6 +31,9 @@ export interface AppSettings {
     write: boolean;
   };
   slimToolsMode: boolean;
+  /// Subfolder name (relative to OS Pictures/Downloads) where saved images go.
+  /// Empty = use default ("Eishougi"). On Android: Pictures/<folder>/, on desktop: Downloads/<folder>/photo/.
+  saveFolder: string;
   wallpaperPath: string;
   appTheme: 'dark' | 'light' | 'system';
   colorTheme: 'sakura' | 'classic' | 'green' | 'night' | 'cyber';
@@ -76,6 +79,7 @@ const defaultSettings: AppSettings = {
     maxTokens: 8192
   },
   slimToolsMode: false,
+  saveFolder: 'Eishougi',
   mcpServers: [
     {
       name: "Danbooru 标签搜索",
