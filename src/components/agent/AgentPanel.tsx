@@ -65,8 +65,11 @@ export function AgentPanel() {
   }, []);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   
-  const { messages, isGenerating, sendMessage, stopGenerating } = useAgent();
+  const { messages, isGenerating, sendMessage, stopGenerating, getTokenUsage, resetTokenUsage } = useAgent();
   const { sessions, activeSessionId, createSession, switchSession, deleteSession, settings, updateSettings } = useAgentStore();
+
+  // Reset token counter when switching sessions
+  useEffect(() => { resetTokenUsage(); }, [activeSessionId]);
   
   const [tempSystemPrompt, setTempSystemPrompt] = useState(settings.systemPrompt);
   const [tempReasoningEffort, setTempReasoningEffort] = useState(settings.reasoningEffort || 'medium');
@@ -749,9 +752,33 @@ export function AgentPanel() {
                 >
                   <History size={18} />
                 </button>
-                <span className="text-[10px] font-mono text-[var(--accent-1)]/40 uppercase tracking-widest group-focus-within:text-[var(--accent-1)]/80 transition-colors ml-2">
-                  Nexus Terminal v2.0
-                </span>
+                {(() => {
+                  const usage = getTokenUsage();
+                  if (!usage || usage.totalTokens === 0) return null;
+                  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+                  const pct = Math.min(100, usage.totalTokens / 128000 * 100);
+                  const isHot = pct > 60;
+                  const isWarn = pct > 80;
+                  return (
+                    <div className="flex items-center gap-2 ml-1" title={`输入 ${fmt(usage.promptTokens)} · 输出 ${fmt(usage.completionTokens)} · 共 ${fmt(usage.totalTokens)} tokens`}>
+                      <div className="relative w-8 h-8 flex items-center justify-center">
+                        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 36 36">
+                          <circle cx="18" cy="18" r="15" fill="none" stroke="var(--glass-border)" strokeWidth="3" />
+                          <circle
+                            cx="18" cy="18" r="15" fill="none"
+                            stroke={isWarn ? '#ef4444' : isHot ? '#f59e0b' : 'var(--accent-1)'}
+                            strokeWidth="3" strokeLinecap="round"
+                            strokeDasharray={`${pct * 0.94} 100`}
+                            style={{ transition: 'stroke-dasharray 0.5s ease, stroke 0.3s ease' }}
+                          />
+                        </svg>
+                        <span className={`text-[9px] font-bold font-mono ${isWarn ? 'text-red-400' : isHot ? 'text-amber-400' : 'text-[var(--accent-1)]'}`}>
+                          {fmt(usage.totalTokens)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               {isGenerating ? (
                 <button
