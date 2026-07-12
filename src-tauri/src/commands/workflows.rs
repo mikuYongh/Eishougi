@@ -76,9 +76,11 @@ pub async fn update_workflow(
 
     // 不允许通过 update 改 is_default：避免绕过 set_default_workflow 造成多默认。
     // type 字段也保持不变（改 type 应走新建+删旧，避免默认索引错位）。
+    // 注意：不加 is_builtin = 0 过滤——内置默认工作流也需要允许用户修改 json_content
+    // （比如换基础模型），否则 UPDATE 会静默匹配 0 行，用户改了重启后又被还原。
     db.conn.execute(
         "UPDATE workflows SET name = ?1, description = ?2, json_content = ?3, updated_at = ?4
-         WHERE id = ?5 AND is_builtin = 0",
+         WHERE id = ?5",
         params![
             workflow.name, workflow.description, workflow.json_content,
             workflow.updated_at, workflow.id
