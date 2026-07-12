@@ -451,10 +451,11 @@ export class ComfyService {
 
         // 1. KSampler / KSamplerAdvanced
         if (node.class_type.includes("KSampler")) {
-          if (project.steps !== undefined && node.inputs.steps !== undefined) node.inputs.steps = project.steps;
-          if (project.cfgScale !== undefined && node.inputs.cfg !== undefined) node.inputs.cfg = project.cfgScale;
-          if (project.sampler !== undefined && project.sampler !== null && node.inputs.sampler_name !== undefined) node.inputs.sampler_name = project.sampler;
-          if (project.scheduler !== undefined && project.scheduler !== null && node.inputs.scheduler !== undefined) node.inputs.scheduler = project.scheduler;
+          // Guard against empty strings too — they would clobber the workflow's good values.
+          if (project.steps !== undefined && project.steps !== null && Number(project.steps) > 0 && node.inputs.steps !== undefined) node.inputs.steps = project.steps;
+          if (project.cfgScale !== undefined && project.cfgScale !== null && Number(project.cfgScale) > 0 && node.inputs.cfg !== undefined) node.inputs.cfg = project.cfgScale;
+          if (project.sampler && project.sampler.trim() !== '' && node.inputs.sampler_name !== undefined) node.inputs.sampler_name = project.sampler;
+          if (project.scheduler && project.scheduler.trim() !== '' && node.inputs.scheduler !== undefined) node.inputs.scheduler = project.scheduler;
           if (project.seed !== undefined && node.inputs.noise_seed !== undefined) node.inputs.noise_seed = finalSeed;
           if (project.seed !== undefined && node.inputs.seed !== undefined) node.inputs.seed = finalSeed;
         }
@@ -487,7 +488,7 @@ export class ComfyService {
 
         // 4. UNet / Base Model
         if (node.class_type === "UNETLoader" || node.class_type === "CheckpointLoaderSimple") {
-          if (project.baseModel && project.baseModel.trim() !== '' && project.baseModel !== 'sd_xl_base_1.0.safetensors') {
+          if (project.baseModel && project.baseModel.trim() !== '') {
             if (node.inputs.unet_name !== undefined) node.inputs.unet_name = project.baseModel;
             if (node.inputs.ckpt_name !== undefined) node.inputs.ckpt_name = project.baseModel;
           }

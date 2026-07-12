@@ -24,13 +24,25 @@ const DEFAULT_NEGATIVE = "lowres, bad anatomy, bad hands, text, error, missing f
 function buildTempProject(params: any): PromptProject {
   const now = Date.now();
   const workflows = useWorkflowStore.getState().workflows;
+
+  // Validate caller-supplied workflow_id: only accept text2img workflows.
+  // An img2video/tagger/upscale workflow would produce garbage for image generation.
+  let validatedWorkflowId: string | undefined;
+  if (params.workflow_id) {
+    const wf = workflows.find((w) => w.id === params.workflow_id);
+    if (wf && wf.type === "text2img") {
+      validatedWorkflowId = wf.id;
+    } else {
+      console.warn(`[MCP direct-gen] workflow_id '${params.workflow_id}' is not a text2img workflow, ignoring`);
+    }
+  }
   const defaultWorkflowId =
-    params.workflow_id ||
+    validatedWorkflowId ||
     workflows.find((w) => w.type === "text2img" && w.isDefault)?.id;
   const defaultWorkflow = workflows.find((w) => w.id === defaultWorkflowId);
 
   // Parse the default workflow so unset generation fields inherit the workflow's real values
-  // (sampler, scheduler, baseModel, vae, size). This mirrors what PromptEdit does on new-project.
+  // (sampler, scheduler, baseModel, vae, size, steps, cfg). This mirrors what PromptEdit does.
   let wfSampler = "";
   let wfScheduler = "";
   let wfBaseModel = "";
@@ -38,6 +50,8 @@ function buildTempProject(params: any): PromptProject {
   let wfLoras: any[] = [];
   let wfWidth: number | null = null;
   let wfHeight: number | null = null;
+  let wfSteps: number | null = null;
+  let wfCfg: number | null = null;
   if (defaultWorkflow?.jsonContent) {
     try {
       const a = comfyService.analyzeWorkflow(defaultWorkflow.jsonContent);
@@ -48,14 +62,13 @@ function buildTempProject(params: any): PromptProject {
       wfLoras = a.loras || [];
       wfWidth = a.width;
       wfHeight = a.height;
+      wfSteps = a.steps;
+      wfCfg = a.cfgScale;
     } catch (e) {
       console.warn("[MCP direct-gen] failed to analyze default workflow:", e);
     }
   }
 
-  // Default size: prefer the workflow's native latent size; otherwise fall back to a portrait
-  // 832×1216 (the most common SDXL/illustration aspect — taller than wide), NOT a square. The
-  // MCP schema's resolution rule keeps both edges ≤ ~1024 by default.
   const defaultWidth = wfWidth ?? 832;
   const defaultHeight = wfHeight ?? 1216;
 
@@ -70,8 +83,8 @@ function buildTempProject(params: any): PromptProject {
     width: Number(params.width) || defaultWidth,
     height: Number(params.height) || defaultHeight,
     resolution: params.resolution,
-    steps: Number(params.steps) || 25,
-    cfgScale: Number(params.cfg_scale) || 5.0,
+    steps: Number(params.steps) || wfSteps || 25,
+    cfgScale: Number(params.cfg_scale) || wfCfg || 5.0,
     seed: params.seed != null ? String(params.seed) : "-1",
     sampler: params.sampler_name || wfSampler,
     scheduler: params.scheduler || wfScheduler,
@@ -181,7 +194,11 @@ export function useMcpServer() {
               ...(params.seed != null ? { seed: String(params.seed) } : {}),
               ...(params.sampler_name != null ? { sampler: params.sampler_name } : {}),
               ...(params.scheduler != null ? { scheduler: params.scheduler } : {}),
-              ...(params.workflow_id != null ? { workflowId: params.workflow_id } : {}),
+              ...(params.workflow_id != null ? (() => {
+                // Validate: only accept text2img workflow overrides
+                const wf = useWorkflowStore.getState().workflows.find((w) => w.id === params.workflow_id);
+                return wf && wf.type === "text2img" ? { workflowId: params.workflow_id } : {};
+              })() : {}),
             };
           }
         } else {

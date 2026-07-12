@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 interface ModelStore {
   checkpoints: string[];
   loras: string[];
+  vaes: string[];
+  clips: string[];
   isLoading: boolean;
   isError: boolean;
   errorMsg: string;
@@ -16,6 +18,8 @@ interface ModelStore {
 export const useModelStore = create<ModelStore>((set, get) => ({
   checkpoints: [],
   loras: [],
+  vaes: [],
+  clips: [],
   isLoading: false,
   isError: false,
   errorMsg: "",
@@ -34,23 +38,25 @@ export const useModelStore = create<ModelStore>((set, get) => ({
     try {
       const t0 = performance.now();
       const comfyUrl = useSettingsStore.getState().settings.comfyUrl;
-      const result: { checkpoints: string[]; loras: string[] } = await invoke('fetch_comfy_models', { url: comfyUrl || null });
+      const result: { checkpoints: string[]; loras: string[]; vaes?: string[]; clips?: string[] } = await invoke('fetch_comfy_models', { url: comfyUrl || null });
       const elapsed = Math.round(performance.now() - t0);
 
       set({
         checkpoints: result.checkpoints || [],
         loras: result.loras || [],
+        vaes: result.vaes || [],
+        clips: result.clips || [],
         isLoading: false,
         isError: false,
         lastFetched: Date.now(),
       });
 
       if (force) {
-        toast.success(`模型列表刷新成功（${result.checkpoints.length} 模型 / ${result.loras.length} LoRA）`);
+        toast.success(`模型列表刷新成功（${result.checkpoints.length} 模型 / ${result.loras.length} LoRA / ${result.vaes?.length || 0} VAE）`);
       } else if (result.checkpoints.length === 0 && result.loras.length === 0) {
         toast.info("未发现模型，请确认 ComfyUI 已安装相应节点");
       }
-      console.info(`[ComfyModel] fetchModels done ${elapsed}ms: ${result.checkpoints.length} checkpoints, ${result.loras.length} loras`);
+      console.info(`[ComfyModel] fetchModels done ${elapsed}ms: ${result.checkpoints.length} checkpoints, ${result.loras.length} loras, ${result.vaes?.length || 0} vaes`);
     } catch (e: any) {
       set({ isLoading: false, isError: true, errorMsg: String(e) });
       toast.error(`模型列表加载失败: ${e}`);
