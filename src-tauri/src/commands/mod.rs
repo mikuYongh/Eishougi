@@ -8,6 +8,7 @@ pub mod library;
 pub mod library_favorites;
 pub mod logging;
 pub mod mcp;
+pub mod picencrypt;
 pub mod prompts;
 pub mod styles;
 pub mod workflows;

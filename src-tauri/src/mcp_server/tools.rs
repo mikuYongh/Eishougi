@@ -454,6 +454,35 @@ static TOOLS: Lazy<Vec<ToolDef>> = Lazy::new(|| vec![
             "required": ["artist_id"]
         }),
     },
+    // ---- image cipher (anti-censorship obfuscation) ----
+    ToolDef {
+        name: "encrypt_image",
+        description: "Scramble an image's pixels using the 小番茄 (Tomato) or row-shuffle algorithm so the visual content is unrecognisable to automated moderation, while remaining perfectly recoverable with decrypt_image + the same key. Output is a lossless PNG served over HTTP.",
+        group: ToolGroup::Core,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "image": { "type": "string", "description": "Image to encrypt: a local filename in uploads/, a local path, or an http(s) URL." },
+                "algorithm": { "type": "string", "enum": ["tomato", "row"], "description": "Scramble algorithm. 'tomato' (小番茄, Gilbert curve, default) or 'row' (logistic-map row shuffle)." },
+                "key": { "type": "number", "description": "Cipher key. Tomato: (0, 1.618], default 1. Row: (0, 1), default 0.666. REMEMBER this exactly — the same key is required to decrypt." }
+            },
+            "required": ["image"]
+        }),
+    },
+    ToolDef {
+        name: "decrypt_image",
+        description: "Reverse an encrypt_image operation, restoring the original image. The algorithm and key MUST match what was used to encrypt.",
+        group: ToolGroup::Core,
+        input_schema: json!({
+            "type": "object",
+            "properties": {
+                "image": { "type": "string", "description": "Encrypted image: a local filename in uploads/, a local path, or an http(s) URL." },
+                "algorithm": { "type": "string", "enum": ["tomato", "row"], "description": "Must match the algorithm used to encrypt. 'tomato' (default) or 'row'." },
+                "key": { "type": "number", "description": "Must match the key used to encrypt. Tomato: (0, 1.618], default 1. Row: (0, 1), default 0.666." }
+            },
+            "required": ["image"]
+        }),
+    },
 ]);
 /// `{name, description, inputSchema}` shape the MCP `tools/list` method expects.
 pub fn tools_list_payload(core: bool, query: bool, write: bool) -> Vec<Value> {
@@ -507,6 +536,12 @@ pub async fn execute_tool(
     // All other tools run fully in the backend.
     if name == "generate_image" {
         return handle_generate_image(app, arguments).await;
+    }
+
+    // Image cipher tools — they need AppState (for the uploads dir) but not the DB, so handle them
+    // before the `state` guard below to keep the main match block clean.
+    if name == "encrypt_image" || name == "decrypt_image" {
+        return handle_image_cipher(app, name, arguments).await;
     }
 
     let Some(state) = app.try_state::<AppState>() else {
@@ -935,6 +970,184 @@ async fn handle_generate_image(app: &AppHandle, arguments: &Value) -> (Vec<Value
 
     let is_error = payload.get("status").and_then(|s| s.as_str()) != Some("completed");
     (vec![json!({ "type": "text", "text": payload.to_string() })], is_error)
+}
+
+/// encrypt_image / decrypt_image MCP tool handler.
+///
+/// Accepts an image as: (a) a bare filename in uploads/, (b) a full local path, or (c) an
+/// http(s) URL. Decodes → scrambles/unscrambles pixels → writes a lossless PNG into uploads/ →
+/// returns an HTTP URL served by the MCP /image/<filename> endpoint so external clients can fetch it.
+async fn handle_image_cipher(app: &AppHandle, name: &str, arguments: &Value) -> (Vec<Value>, bool) {
+    use commands::picencrypt::{Algorithm, ProcessType};
+
+    let image_arg = arg_str(arguments, "image");
+    if image_arg.is_empty() {
+        return text_err("'image' is required (filename, local path, or URL).".to_string());
+    }
+
+    let algorithm_str = arg_opt_string(arguments, "algorithm").unwrap_or_else(|| "tomato".to_string());
+    let algorithm = match Algorithm::from_str(&algorithm_str) {
+        Some(a) => a,
+        None => {
+            return text_err(format!(
+                "Unknown algorithm '{}'. Use 'tomato' or 'row'.",
+                algorithm_str
+            ));
+        }
+    };
+
+    let key = arguments
+        .get("key")
+        .and_then(|v| v.as_f64())
+        .unwrap_or_else(|| match algorithm {
+            Algorithm::Tomato => 1.0,
+            Algorithm::RowScramble => 0.666,
+        });
+
+    let process_type = if name == "encrypt_image" {
+        ProcessType::Encrypt
+    } else {
+        ProcessType::Decrypt
+    };
+
+    let Some(state) = app.try_state::<AppState>() else {
+        return text_err("Internal error: AppState unavailable.".to_string());
+    };
+
+    let uploads_dir = state.app_data_dir.join("uploads");
+    if !uploads_dir.exists() {
+        let _ = std::fs::create_dir_all(&uploads_dir);
+    }
+
+    // Resolve the input to a local temp file path that the image crate can open.
+    let (tmp_file, source_label) = match resolve_image_input(&image_arg, &uploads_dir).await {
+        Ok(v) => v,
+        Err(e) => return text_err(e),
+    };
+
+    // Output filename: cipher_<op>_<timestamp>_<sanitised_input_name>.png
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let stem = std::path::Path::new(&source_label)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("img")
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '_' { c } else { '_' })
+        .collect::<String>();
+    let op = if process_type == ProcessType::Encrypt { "enc" } else { "dec" };
+    let out_name = format!("cipher_{}_{}_{}.png", op, timestamp, stem);
+    let out_path = uploads_dir.join(&out_name);
+
+    // Pixel scrambling is CPU-bound — run on a blocking thread to avoid stalling the async runtime.
+    let tmp_path = tmp_file.clone();
+    let out_path_clone = out_path.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        commands::picencrypt::process_file(&tmp_path, &out_path_clone, algorithm, process_type, key)
+    })
+    .await;
+
+    // Clean up the temp file if one was created for URL download (named tmp_cipher_*.dat).
+    if tmp_file
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.starts_with("tmp_cipher_"))
+        .unwrap_or(false)
+    {
+        let _ = std::fs::remove_file(&tmp_file);
+    }
+
+    match result {
+        Ok(Ok((w, h))) => {
+            let port = crate::mcp_server::current_port().await;
+            let token = crate::mcp_server::current_token().await;
+            let url = crate::mcp_server::handler::image_url(&out_name, port, token.as_deref());
+            text_ok(
+                json!({
+                    "status": "ok",
+                    "operation": op,
+                    "algorithm": algorithm_str,
+                    "key": key,
+                    "width": w,
+                    "height": h,
+                    "image_url": url,
+                })
+                .to_string(),
+            )
+        }
+        Ok(Err(e)) => text_err(e),
+        Err(e) => text_err(format!("Internal error: {}", e)),
+    }
+}
+
+/// Resolve an image argument (uploads filename | local path | URL) to a local file path.
+/// Downloads remote URLs to a temp file. Returns (path, source_label_for_filename).
+async fn resolve_image_input(
+    image_arg: &str,
+    uploads_dir: &std::path::Path,
+) -> Result<(std::path::PathBuf, String), String> {
+    // (c) http(s) URL → download to temp file
+    if image_arg.starts_with("http://") || image_arg.starts_with("https://") {
+        let resp = reqwest::get(image_arg)
+            .await
+            .map_err(|e| format!("Failed to fetch image: {}", e))?;
+        let bytes = resp
+            .bytes()
+            .await
+            .map_err(|e| format!("Failed to read image bytes: {}", e))?;
+        let label = image_arg.rsplit('/').next().unwrap_or("remote").to_string();
+        let tmp = uploads_dir.join(format!(
+            "tmp_cipher_{}.dat",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        ));
+        std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
+        return Ok((tmp, label));
+    }
+
+    // (a) bare filename → uploads/<filename>
+    let candidate = uploads_dir.join(image_arg);
+    if !image_arg.contains(std::path::MAIN_SEPARATOR)
+        && !image_arg.contains('/')
+        && !image_arg.contains('\\')
+        && candidate.exists()
+    {
+        return Ok((candidate, image_arg.to_string()));
+    }
+
+    // (b) local path → use directly
+    let path = std::path::PathBuf::from(image_arg);
+    if path.exists() {
+        let label = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("local")
+            .to_string();
+        return Ok((path, label));
+    }
+
+    // Also try stripping asset:// protocol variants
+    let cleaned = image_arg
+        .strip_prefix("asset://localhost/")
+        .or_else(|| image_arg.strip_prefix("asset://"))
+        .unwrap_or(image_arg);
+    #[cfg(target_os = "windows")]
+    let cleaned = cleaned.strip_prefix('/').unwrap_or(cleaned);
+    let path2 = std::path::PathBuf::from(cleaned);
+    if path2.exists() {
+        let label = path2
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("local")
+            .to_string();
+        return Ok((path2, label));
+    }
+
+    Err(format!("Image not found: {}", image_arg))
 }
 
 #[cfg(test)]
