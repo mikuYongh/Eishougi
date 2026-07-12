@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { ArrowLeft, Save, UploadCloud, FileJson, Layers, Sliders, Cpu, Plus, Trash2, Maximize2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Save, UploadCloud, FileJson, Layers, Sliders, Cpu, Plus, Trash2, Maximize2, RefreshCw, Download, Code2 } from "lucide-react";
 import { useWorkflowStore, type WorkflowProject, type WorkflowType } from "../../stores/workflowStore";
 import { useModelStore } from "../../stores/modelStore";
+import { SAMPLER_OPTIONS, SCHEDULER_OPTIONS } from "../../lib/workflowOptions";
 import { convertFileSrc } from "@tauri-apps/api/core";
 
 
@@ -37,7 +38,7 @@ export function WorkflowEdit() {
   const addWorkflow = useWorkflowStore((state) => state.addWorkflow);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   
-  const { checkpoints, loras, isLoading, isError, fetchModels } = useModelStore();
+  const { checkpoints, loras, vaes, isLoading, isError, fetchModels } = useModelStore();
 
   const [workflow, setWorkflow] = useState<Partial<WorkflowProject>>({
     name: "", description: "", type: "text2img", jsonContent: "", tags: []
@@ -49,10 +50,26 @@ export function WorkflowEdit() {
     height: null,
     steps: null,
     cfgScale: null,
+    sampler: null,
+    scheduler: null,
+    vaeModel: null,
+    seed: null,
     loraConfigs: []
   });
 
   const [isLoraPickerOpen, setIsLoraPickerOpen] = useState(false);
+  const [showJsonEditor, setShowJsonEditor] = useState(false);
+
+  const handleExportJson = () => {
+    if (!workflow.jsonContent) return;
+    const blob = new Blob([workflow.jsonContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${workflow.name || 'workflow'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     fetchModels();
@@ -85,6 +102,10 @@ export function WorkflowEdit() {
       height: parsed.height,
       steps: parsed.steps,
       cfgScale: parsed.cfgScale,
+      sampler: parsed.samplerName,
+      scheduler: parsed.scheduler,
+      vaeModel: parsed.vaeModel,
+      seed: null,
       loraConfigs: parsed.loras.map((l, i) => ({
         id: `lora_${Date.now()}_${i}`,
         name: l.name,
@@ -286,14 +307,28 @@ export function WorkflowEdit() {
               <Sliders size={18} className="text-yellow-400" /> 默认参数配置
             </h3>
             <div className="flex items-center gap-2">
-              <button 
+              <button
                 onClick={() => fetchModels(true)}
                 className="flex items-center justify-center w-8 h-8 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-lg text-[var(--text-primary)] transition-colors cursor-pointer"
                 title="刷新模型列表"
               >
                 <RefreshCw size={14} className="text-[var(--accent-1)]" />
               </button>
-              <button 
+              <button
+                onClick={() => setShowJsonEditor(!showJsonEditor)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors cursor-pointer border ${showJsonEditor ? 'bg-[var(--accent-1)]/20 border-[var(--accent-1)]/40 text-[var(--accent-1)]' : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                title="查看/编辑原始 JSON"
+              >
+                <Code2 size={14} /> JSON
+              </button>
+              <button
+                onClick={handleExportJson}
+                className="flex items-center justify-center w-8 h-8 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-lg text-[var(--text-primary)] transition-colors cursor-pointer"
+                title="导出 JSON 文件"
+              >
+                <Download size={14} className="text-[var(--accent-2)]" />
+              </button>
+              <button
                 onClick={handleImportJson}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 text-[12px] font-bold transition-colors cursor-pointer border border-yellow-500/20"
               >
@@ -340,9 +375,58 @@ export function WorkflowEdit() {
                   </div>
                   <div>
                     <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">采样步数 (Steps)</label>
-                    <input 
+                    <input
                       type="number" value={draftParams.steps || ""} onChange={e => updateDraft('steps', parseInt(e.target.value) || undefined)}
                       className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-sm outline-none text-[var(--text-primary)]"
+                    />
+                  </div>
+                </div>
+
+                {/* Sampler / Scheduler / CFG / VAE / Seed */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">采样器 (Sampler)</label>
+                    <GlassDropdown
+                      value={draftParams.sampler || ""}
+                      onChange={v => updateDraft('sampler', v)}
+                      options={SAMPLER_OPTIONS}
+                      small
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">调度器 (Scheduler)</label>
+                    <GlassDropdown
+                      value={draftParams.scheduler || ""}
+                      onChange={v => updateDraft('scheduler', v)}
+                      options={SCHEDULER_OPTIONS}
+                      small
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">CFG Scale</label>
+                    <input
+                      type="number" step="0.1" value={draftParams.cfgScale ?? ""} onChange={e => updateDraft('cfgScale', parseFloat(e.target.value) || undefined)}
+                      className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2 text-sm outline-none text-[var(--text-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">VAE 模型</label>
+                    <GlassDropdown
+                      value={draftParams.vaeModel || "auto"}
+                      onChange={v => updateDraft('vaeModel', v)}
+                      options={[
+                        { label: "Automatic (自动)", value: "auto" },
+                        ...(vaes || []).map((v: string) => ({ label: v, value: v })),
+                      ]}
+                      small
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">默认种子 (Seed)</label>
+                    <input
+                      type="text" value={draftParams.seed ?? ""} onChange={e => updateDraft('seed', e.target.value || undefined)}
+                      placeholder="-1 为随机"
+                      className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2 text-sm outline-none text-[var(--text-primary)] font-mono"
                     />
                   </div>
                 </div>
@@ -488,6 +572,24 @@ export function WorkflowEdit() {
                   )}
                 </div>
               </div>
+
+              {/* Raw JSON Editor */}
+              {showJsonEditor && (
+                <div className="space-y-3">
+                  <h4 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
+                    <Code2 size={14} /> 原始 JSON 编辑
+                  </h4>
+                  <textarea
+                    value={workflow.jsonContent || ""}
+                    onChange={e => { updateField('jsonContent', e.target.value); }}
+                    onBlur={() => { if (workflow.jsonContent) try { parseAndSetParams(workflow.jsonContent); } catch {} }}
+                    className="w-full h-96 bg-[var(--bg-layer-0)] border border-[var(--glass-border)] rounded-xl px-4 py-3 text-xs font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-colors resize-y custom-scrollbar"
+                    placeholder='{"nodes": {...}}'
+                    spellCheck={false}
+                  />
+                  <p className="text-[10px] text-[var(--text-secondary)]">直接编辑工作流 JSON。离开输入框时会自动重新解析参数。注意：高级字段(weight_dtype, CLIPLoader 等)只能在此处修改。</p>
+                </div>
+              )}
 
             </div>
           )}
