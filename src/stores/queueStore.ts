@@ -148,17 +148,31 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         : rawError;
       set(state => {
         let activeIndex = promptId ? state.jobs.findIndex(j => j.comfyPromptId === promptId) : -1;
-        if (activeIndex === -1) return state;
 
         // Reject the addJob promise so callers (onboarding test, agent, etc.) don't hang.
-        const jobId = activeIndex !== -1 ? state.jobs[activeIndex].id : null;
-        if (jobId) {
+        if (activeIndex !== -1) {
+          const jobId = state.jobs[activeIndex].id;
           const resolver = _jobResolvers.get(jobId);
           if (resolver) {
             resolver.reject(new Error(friendlyError));
             _jobResolvers.delete(jobId);
           }
+        } else if (promptId) {
+          // Race condition: comfyPromptId wasn't set on the job yet (HTTP response
+          // hadn't arrived when the error fired). Try matching by pending/generating status
+          // as a fallback, or reject all pending resolvers if only one job is in flight.
+          const pending = state.jobs.filter(j => j.status === 'pending' || j.status === 'generating');
+          if (pending.length === 1) {
+            const resolver = _jobResolvers.get(pending[0].id);
+            if (resolver) {
+              resolver.reject(new Error(friendlyError));
+              _jobResolvers.delete(pending[0].id);
+            }
+            activeIndex = state.jobs.findIndex(j => j.id === pending[0].id);
+          }
         }
+
+        if (activeIndex === -1) return state;
 
         const newJobs = [...state.jobs];
         newJobs[activeIndex] = {
@@ -189,6 +203,11 @@ export const useQueueStore = create<QueueStore>((set, get) => {
       _unlisteners.forEach(unlisten => unlisten());
       _unlisteners = [];
       _isSetup = false;
+      // Reject all pending resolvers so callers don't hang forever after disconnect.
+      for (const [id, resolver] of _jobResolvers) {
+        resolver.reject(new Error('ComfyUI 连接已断开'));
+        _jobResolvers.delete(id);
+      }
       set({ isConnected: false });
     },
 
@@ -284,7 +303,21 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           }
         }
 
-        const results = await Promise.all(jobPromises);
+        // Timeout safety net: if neither comfy-completed nor comfy-error fires
+        // (WS dropped, poll cap exceeded, etc.), reject after 10 minutes so the
+        // caller doesn't hang forever.
+        const timeoutMs = 10 * 60 * 1000;
+        const results = await Promise.all(jobPromises.map((p, i) =>
+          Promise.race([
+            p,
+            new Promise<string[]>((_, reject) =>
+              setTimeout(() => {
+                const r = _jobResolvers.get(jobIds[i]);
+                if (r) { r.reject(new Error('生成超时（10 分钟无响应）')); _jobResolvers.delete(jobIds[i]); }
+              }, timeoutMs)
+            )
+          ])
+        ));
         const elapsed = Math.round(performance.now() - t0);
         console.info(`[ComfyQueue] addJob done in ${elapsed}ms, ${results.length} image set(s)`);
         return results;

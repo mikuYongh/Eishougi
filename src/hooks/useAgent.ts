@@ -58,40 +58,94 @@ function parseEmbeddedToolCalls(content: string): {
   const calls: { id: string; type: 'function'; function: { name: string; arguments: string } }[] = [];
   let remaining = content;
 
+  // ── 标准 <tool_call> 格式 ──
   const blockRe = /<tool_call>([\s\S]*?)<\/tool_call>/g;
   const blocks = [...content.matchAll(blockRe)];
-  if (blocks.length === 0) return { calls, remaining };
+  if (blocks.length > 0) {
+    for (let i = 0; i < blocks.length; i++) {
+      const raw = blocks[i][1].trim();
+      let name = '';
+      let argsObj: any = {};
 
-  for (let i = 0; i < blocks.length; i++) {
-    const raw = blocks[i][1].trim();
-    let name = '';
-    let argsObj: any = {};
-
-    // 优先尝试 JSON 解析（标准 Hermes 格式）
-    try {
-      const json = JSON.parse(raw);
-      if (json && typeof json === 'object') {
-        name = String(json.name || json.function || '');
-        if (json.arguments && typeof json.arguments === 'object') {
-          argsObj = json.arguments;
-        } else if (typeof json.arguments === 'string') {
-          try { argsObj = JSON.parse(json.arguments); } catch { argsObj = {}; }
-        } else if (json.parameters) {
-          argsObj = json.parameters;
+      try {
+        const json = JSON.parse(raw);
+        if (json && typeof json === 'object') {
+          name = String(json.name || json.function || '');
+          if (json.arguments && typeof json.arguments === 'object') {
+            argsObj = json.arguments;
+          } else if (typeof json.arguments === 'string') {
+            try { argsObj = JSON.parse(json.arguments); } catch { argsObj = {}; }
+          } else if (json.parameters) {
+            argsObj = json.parameters;
+          }
+        }
+      } catch {
+        const fnMatch = raw.match(/<function=([^>\s]+)>([\s\S]*?)<\/function>/);
+        if (fnMatch) {
+          name = fnMatch[1].trim();
+          const inner = fnMatch[2] || '';
+          const paramRe = /<parameter=([^>\s]+)>([\s\S]*?)<\/parameter>/g;
+          const params = [...inner.matchAll(paramRe)];
+          for (let p of params) {
+            const key = p[1].trim();
+            let val: any = p[2].trim();
+            if (val === 'true') val = true;
+            else if (val === 'false') val = false;
+            else if (val === 'null') val = null;
+            else {
+              try {
+                const parsed = JSON.parse(val);
+                val = typeof parsed === 'number' || typeof parsed === 'object' ? parsed : val;
+              } catch { /* 保持字符串 */ }
+            }
+            argsObj[key] = val;
+          }
         }
       }
-    } catch {
-      // 不是 JSON，尝试 XML 风格：<function=NAME>...</function> + <parameter=K>V</parameter>
-      const fnMatch = raw.match(/<function=([^>\s]+)>([\s\S]*?)<\/function>/);
-      if (fnMatch) {
-        name = fnMatch[1].trim();
-        const inner = fnMatch[2] || '';
-        const paramRe = /<parameter=([^>\s]+)>([\s\S]*?)<\/parameter>/g;
-        const params = [...inner.matchAll(paramRe)];
-        for (const p of params) {
-          const key = p[1].trim();
-          let val: any = p[2].trim();
-          // 尝试转 JSON（数组/对象/数字/布尔/null）
+
+      if (name) {
+        calls.push({
+          id: `recovered_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'function',
+          function: { name, arguments: JSON.stringify(argsObj) },
+        });
+      }
+    }
+    remaining = remaining.replace(blockRe, '');
+  }
+
+  // ── DeepSeek DSML 格式 ──
+  // DeepSeek 偶尔不走标准 tool_calls streaming，而是把工具调用以私有标记输出到 content：
+  //   <｜｜DSML｜｜tool_calls>
+  //   <｜｜DSML｜｜invoke name="generate_image">
+  //   <｜｜DSML｜｜parameter name="prompt_id" string="true">p_xxx</｜｜DSML｜｜parameter>
+  //   </｜｜DSML｜｜invoke>
+  //   </｜｜DSML｜｜tool_calls>
+  // 用 Unicode 转义避免编辑器/终端对全角竖线 ｜ 的处理差异。
+  const DSML = '\uFF5C\uFF5C'; // ｜｜
+  const dsmlBlockRe = new RegExp(
+    `<${DSML}DSML${DSML}tool_calls>([\\s\\S]*?)<\\/${DSML}DSML${DSML}tool_calls>`, 'g'
+  );
+  const dsmlBlocks = [...content.matchAll(dsmlBlockRe)];
+  if (dsmlBlocks.length > 0) {
+    for (let i = 0; i < dsmlBlocks.length; i++) {
+      const blockInner = dsmlBlocks[i][1];
+      const invokeRe = new RegExp(
+        `<${DSML}DSML${DSML}invoke\\s+name="([^"]+)">([\\s\\S]*?)<\\/${DSML}DSML${DSML}invoke>`, 'g'
+      );
+      let invokeMatch: RegExpExecArray | null;
+      let dsmlIdx = 0;
+      while ((invokeMatch = invokeRe.exec(blockInner)) !== null) {
+        const name = invokeMatch[1].trim();
+        const invokeInner = invokeMatch[2];
+        const paramRe = new RegExp(
+          `<${DSML}DSML${DSML}parameter\\s+name="([^"]+)"[^>]*>([\\s\\S]*?)<\\/${DSML}DSML${DSML}parameter>`, 'g'
+        );
+        const argsObj: any = {};
+        let paramMatch: RegExpExecArray | null;
+        while ((paramMatch = paramRe.exec(invokeInner)) !== null) {
+          const key = paramMatch[1].trim();
+          let val: any = paramMatch[2].trim();
           if (val === 'true') val = true;
           else if (val === 'false') val = false;
           else if (val === 'null') val = null;
@@ -103,19 +157,17 @@ function parseEmbeddedToolCalls(content: string): {
           }
           argsObj[key] = val;
         }
+        calls.push({
+          id: `dsml_${Date.now()}_${dsmlIdx}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'function',
+          function: { name, arguments: JSON.stringify(argsObj) },
+        });
+        dsmlIdx++;
       }
     }
-
-    if (name) {
-      calls.push({
-        id: `recovered_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 8)}`,
-        type: 'function',
-        function: { name, arguments: JSON.stringify(argsObj) },
-      });
-    }
+    remaining = remaining.replace(dsmlBlockRe, '');
   }
 
-  remaining = content.replace(blockRe, '');
   return { calls, remaining };
 }
 
@@ -246,7 +298,7 @@ export function useAgent() {
             prompt_syntax: { type: "string", enum: ["danbooru", "natural", "xml"], description: "The syntax mode of the prompt (danbooru, natural, xml)" },
             tags: { type: "array", items: { type: "string" }, description: "Tags for the prompt" },
             instance_images: { type: "array", items: { type: "string" }, description: "URLs or file paths to instance reference images" },
-            base_model: { type: "string", description: "The base checkpoint model filename, e.g. 'sd_xl_base_1.0.safetensors'" },
+            base_model: { type: "string", description: "Base model filename (unet or checkpoint), e.g. 'anima-base-v1.0.safetensors'" },
             vae_model: { type: "string", description: "VAE model, default 'auto'" },
             lora_configs: {
               type: "array",
@@ -267,7 +319,8 @@ export function useAgent() {
             cfg_scale: { type: "number", description: "CFG scale / guidance scale (default 5.0)" },
             seed: { type: "string", description: "Seed value, use '-1' for random" },
             sampler_name: { type: "string", description: "Sampler name (e.g. euler, euler_ancestral, dpmpp_2m)" },
-            scheduler: { type: "string", description: "Scheduler name (e.g. normal, karras, beta57)" }
+            scheduler: { type: "string", description: "Scheduler name (e.g. normal, karras, beta)" },
+            workflow_id: { type: "string", description: "The ID of the workflow to bind to this prompt" }
           },
           required: ["content"]
         }
@@ -302,7 +355,7 @@ export function useAgent() {
           type: "object",
           properties: {
             prompt_id: { type: "string", description: "The ID of the prompt to update" },
-            base_model: { type: "string", description: "Base checkpoint model filename" },
+            base_model: { type: "string", description: "Base model filename (unet or checkpoint)" },
             vae_model: { type: "string", description: "VAE model" },
             lora_configs: {
               type: "array",
@@ -348,12 +401,26 @@ export function useAgent() {
       type: "function",
       function: {
         name: "generate_image",
-        description: "Generate an image using a specific prompt project. It will automatically rely on the bound workflow. This function WAITS for generation to complete and returns the generated image URLs directly. You do NOT need to poll get_queue_status after calling this.",
+        description: "Generate an image using a specific prompt project. It will automatically rely on the bound workflow. This function WAITS for generation to complete and returns the generated image file paths directly. You do NOT need to poll get_queue_status after calling this. All override parameters are optional — when omitted, the project's saved values are used.",
         parameters: {
           type: "object",
           properties: {
             prompt_id: { type: "string", description: "The ID of the prompt to use" },
-            batch_count: { type: "number", description: "Number of images to generate (default 1)" }
+            batch_count: { type: "number", description: "Number of images to generate (default 1)" },
+            base_model: { type: "string", description: "Optional. Override the project's base model filename (unet or checkpoint)" },
+            vae_model: { type: "string", description: "Optional. Override the project's VAE model" },
+            lora_configs: { type: "array", description: "Optional. Override the project's LoRA configs", items: { type: "object", properties: { name: { type: "string" }, strength: { type: "number" }, enabled: { type: "boolean" } }, required: ["name", "strength", "enabled"] } },
+            width: { type: "number", description: "Optional. Override image width in pixels" },
+            height: { type: "number", description: "Optional. Override image height in pixels" },
+            steps: { type: "number", description: "Optional. Override sampling steps" },
+            cfg_scale: { type: "number", description: "Optional. Override CFG scale" },
+            seed: { type: "string", description: "Optional. Override seed (use '-1' for random)" },
+            sampler_name: { type: "string", description: "Optional. Override sampler name" },
+            scheduler: { type: "string", description: "Optional. Override scheduler name" },
+            positive_prompt: { type: "string", description: "Optional. Override the positive prompt" },
+            negative_prompt: { type: "string", description: "Optional. Override the negative prompt" },
+            artist_prompt: { type: "string", description: "Optional. Override the artist/style trigger words" },
+            workflow_id: { type: "string", description: "Optional. Override the workflow ID to use for this generation" }
           },
           required: ["prompt_id"]
         }
@@ -823,6 +890,8 @@ export function useAgent() {
   // 长 session 下 N² 的 IO；缓存后只有第一次 read，之后命中内存。
   // data: URL 不缓存（已内存）。session 切换不需要清——同张图路径不变。
   const imageBase64CacheRef = useRef<Map<string, string>>(new Map());
+  // Cumulative token usage for the current session, updated from stream usage data.
+  const tokenUsageRef = useRef<{ promptTokens: number; completionTokens: number; totalTokens: number } | null>(null);
 
   /**
    * Lightweight pre-check call before the main agent loop.
@@ -912,6 +981,41 @@ User input: ${userText}`;
     const effectiveMaxRounds = effort === 'low' ? 1 : (maxRounds || 8);
     const budgetExceeded = currentRound > effectiveMaxRounds;
 
+    // ── Context compression: if the message history is too large, summarize older messages ──
+    // Keep the last 6 messages intact, compress everything before them into a single
+    // compact "conversation summary" message. This prevents token costs from growing O(n²).
+    const CONTEXT_CHAR_THRESHOLD = 40000; // ~12-15k tokens worth of text content
+    let messagesToSend = currentMessages;
+    const totalChars = currentMessages.reduce((sum, m) => sum + (typeof m.content === 'string' ? m.content.length : 0), 0);
+    if (totalChars > CONTEXT_CHAR_THRESHOLD && currentMessages.length > 8) {
+      const KEEP_RECENT = 6;
+      const oldMessages = currentMessages.slice(0, -KEEP_RECENT);
+      const recentMessages = currentMessages.slice(-KEEP_RECENT);
+      // Build a compact summary of old messages: keep tool names + short results, strip verbose content
+      const summaryParts: string[] = [];
+      for (const m of oldMessages) {
+        if (m.role === 'system') { summaryParts.push(m.content as string); continue; }
+        if (m.role === 'user') { summaryParts.push(`[用户] ${(m.content as string).slice(0, 200)}`); continue; }
+        if (m.role === 'assistant') {
+          const text = (m.content as string).slice(0, 200);
+          const tools = m.tool_calls?.map(tc => tc.function?.name).filter(Boolean).join(', ') || '';
+          summaryParts.push(`[AI] ${text}${tools ? ` (调用工具: ${tools})` : ''}`);
+          continue;
+        }
+        if (m.role === 'tool') {
+          const content = m.content as string;
+          const truncated = content.length > 300 ? content.slice(0, 300) + '...' : content;
+          summaryParts.push(`[工具结果 ${m.name}] ${truncated}`);
+          continue;
+        }
+      }
+      messagesToSend = [
+        { id: 'ctx_summary', role: 'system' as const, content: `[以下是对话历史的压缩摘要]\n${summaryParts.join('\n')}` },
+        ...recentMessages,
+      ];
+      console.info(`[Agent] Context compressed: ${currentMessages.length} → ${messagesToSend.length} messages, ${totalChars} → ~${summaryParts.join('').length} chars`);
+    }
+
     let apiUrl = llm.apiUrl || 'https://apihub.agnes-ai.com/v1';
     if (!apiUrl.endsWith('/chat/completions')) {
       apiUrl = apiUrl.replace(/\/$/, '') + '/chat/completions';
@@ -925,60 +1029,93 @@ User input: ${userText}`;
     if (abortController.signal.aborted) return;
 
     try {
-      // Pre-process messages to fetch base64 for images.
+      // Pre-process messages: strip base64 from old images + truncate verbose tool results.
       // Skip video files — LLM Vision API can only consume static images.
       const VIDEO_EXTS = new Set(['mp4', 'webm', 'avi', 'mov', 'mkv', 'm4v']);
       const isVideoExt = (p: string) => VIDEO_EXTS.has((p.split('?')[0].split('.').pop() || '').toLowerCase());
-      const mappedMessages = await Promise.all(currentMessages.map(async (msg) => {
+
+      // Only send images for the last few messages — re-sending ALL historical images as base64
+      // every round is the #1 token waste source (1.7k-3.6k tokens per image per round).
+      // We keep images from the latest 3 messages only; older ones are stripped to text.
+      const totalMsgs = messagesToSend.length;
+      const IMAGE_CUTOFF = totalMsgs - 3;
+
+      // Tool results that are known to be huge get truncated to a summary after the first read.
+      // The LLM already saw the full result in the round it was called; subsequent rounds only
+      // need a compact reminder that the tool ran and what it roughly returned.
+      const VERBOSE_TOOL_NAMES = new Set([
+        'list_local_models', 'list_character_series', 'search_characters_in_series',
+        'search_artists', 'search_workflows', 'list_prompts', 'search_prompts',
+        'view_bookmarks', 'view_bookmarked_artists', 'get_generated_images',
+      ]);
+      const TOOL_RESULT_MAX_CHARS = 1500;
+
+      const mappedMessages = await Promise.all(messagesToSend.map(async (msg, idx) => {
         const m: any = { role: msg.role };
-        // Tool messages: don't send images back to LLM. The text content already
-        // contains the JSON result (status/images). Sending base64 images to a
-        // non-multimodal model causes "model does not support multimodal requests".
-        const imageOnly = msg.role === 'tool' ? [] : (msg.images || []).filter(p => !isVideoExt(p));
-        if (imageOnly.length > 0) {
-          const b64Images = await Promise.all(imageOnly.map(async (urlOrPath) => {
-            if (urlOrPath.startsWith('data:')) return urlOrPath;
-            // 命中缓存直接返回，避免每轮重复 IO / fetch
-            const cached = imageBase64CacheRef.current.get(urlOrPath);
-            if (cached) return cached;
-            let result: string;
-            if (urlOrPath.startsWith('http')) {
-              try {
-                const res = await fetch(urlOrPath);
-                const blob = await res.blob();
-                result = await new Promise<string>((resolve) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result as string);
-                  reader.readAsDataURL(blob);
-                });
-              } catch(e) { return urlOrPath; }
-            } else {
-              try {
-                result = await invoke('read_image_base64', { path: urlOrPath });
-              } catch(e) { return urlOrPath; }
+
+        // Truncate verbose tool results from older rounds
+        if (msg.role === 'tool' && msg.name && VERBOSE_TOOL_NAMES.has(msg.name) && idx < totalMsgs - 4) {
+          let summary = msg.content || "";
+          if (summary.length > TOOL_RESULT_MAX_CHARS) {
+            // Try to keep the JSON structure but truncate the arrays inside
+            try {
+              const parsed = JSON.parse(summary);
+              summary = JSON.stringify({
+                ...parsed,
+                _note: `(truncated, original ${summary.length} chars) results from ${msg.name}`,
+              }).slice(0, TOOL_RESULT_MAX_CHARS);
+            } catch {
+              summary = summary.slice(0, TOOL_RESULT_MAX_CHARS) + '\n... (truncated)';
             }
-            if (result && result.startsWith('data:')) {
-              imageBase64CacheRef.current.set(urlOrPath, result);
-            }
-            return result;
-          }));
-          
-          m.content = [
-            { type: "text", text: msg.content || "" },
-            ...b64Images.map(img => ({
-              type: "image_url",
-              image_url: { url: img }
-            }))
-          ];
+          }
+          m.content = summary;
         } else {
           m.content = msg.content || "";
         }
-        
+
+        // Only attach images for recent messages (IMAGE_CUTOFF onwards)
+        if (idx >= IMAGE_CUTOFF) {
+          const imageOnly = msg.role === 'tool' ? [] : (msg.images || []).filter(p => !isVideoExt(p));
+          if (imageOnly.length > 0) {
+            const b64Images = await Promise.all(imageOnly.map(async (urlOrPath) => {
+              if (urlOrPath.startsWith('data:')) return urlOrPath;
+              const cached = imageBase64CacheRef.current.get(urlOrPath);
+              if (cached) return cached;
+              let result: string;
+              if (urlOrPath.startsWith('http')) {
+                try {
+                  const res = await fetch(urlOrPath);
+                  const blob = await res.blob();
+                  result = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.readAsDataURL(blob);
+                  });
+                } catch(e) { return urlOrPath; }
+              } else {
+                try {
+                  result = await invoke('read_image_base64', { path: urlOrPath });
+                } catch(e) { return urlOrPath; }
+              }
+              if (result && result.startsWith('data:')) {
+                imageBase64CacheRef.current.set(urlOrPath, result);
+              }
+              return result;
+            }));
+
+            m.content = [
+              { type: "text", text: msg.content || "" },
+              ...b64Images.map(img => ({
+                type: "image_url",
+                image_url: { url: img }
+              }))
+            ];
+          }
+        }
+
         if (msg.tool_calls && msg.tool_calls.length > 0) m.tool_calls = msg.tool_calls;
         if (msg.tool_call_id) m.tool_call_id = msg.tool_call_id;
         if (msg.name) m.name = msg.name;
-        // Preserve reasoning_content for thinking-mode models (deepseek-v4-flash etc.) — the API
-        // requires it to be passed back on subsequent turns or it rejects with 400.
         if (msg.reasoning_content) m.reasoning_content = msg.reasoning_content;
         return m;
       }));
@@ -1134,6 +1271,7 @@ User input: ${userText}`;
             ...finalMessages
           ],
           stream: true,
+          stream_options: { include_usage: true },
           temperature: llm.temperature !== undefined ? llm.temperature : 0.7,
           max_tokens: llm.maxTokens !== undefined ? llm.maxTokens : 4096,
         };
@@ -1207,6 +1345,14 @@ User input: ${userText}`;
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
+              // Capture token usage from the final chunk (stream_options: include_usage)
+              if (data.usage) {
+                tokenUsageRef.current = {
+                  promptTokens: (tokenUsageRef.current?.promptTokens || 0) + (data.usage.prompt_tokens || 0),
+                  completionTokens: (tokenUsageRef.current?.completionTokens || 0) + (data.usage.completion_tokens || 0),
+                  totalTokens: (tokenUsageRef.current?.totalTokens || 0) + (data.usage.total_tokens || 0),
+                };
+              }
               const delta = data.choices?.[0]?.delta;
               if (!delta) continue;
               if (delta.content) assistantMessage.content += delta.content;
@@ -1258,7 +1404,8 @@ User input: ${userText}`;
       // 认为"我说完了"直接结束，工具永远不会被调用 (上一轮卡死的原因)。
       if ((!assistantMessage.tool_calls || assistantMessage.tool_calls.length === 0)
           && typeof assistantMessage.content === 'string'
-          && assistantMessage.content.includes('<tool_call>')) {
+          && (assistantMessage.content.includes('<tool_call>')
+              || assistantMessage.content.includes('\uFF5C\uFF5CDSML\uFF5C\uFF5Ctool_calls'))) {
         const parsed = parseEmbeddedToolCalls(assistantMessage.content);
         if (parsed.calls.length > 0) {
           assistantMessage.tool_calls = parsed.calls;
@@ -1342,15 +1489,18 @@ User input: ${userText}`;
                   }
                 }
 
-                // base_model 优先级（跟 PromptEdit 一致）：
+                // base_model 优先级（create_prompt 时 agent 不太可靠，优先用 workflow）：
                 // 1. workflow 解析出的 baseModel（即使不在本地列表也信——可能还没加载）
-                // 2. 本地第一个 checkpoint 兜底
-                // 3. 空串
-                // agent 传的 base_model 完全忽略——它只会抄 schema 示例里的 "sd_xl_base_1.0.safetensors"。
+                // 2. agent 传的 base_model（如果 workflow 没解析出来）
+                // 3. 本地第一个 checkpoint 兜底
+                // 4. 空串
+                // 注意：generate_image 的 override 路径会尊重 agent 显式指定的值，这里只是 create 时的默认值。
                 const localCheckpoints = useModelStore.getState().checkpoints || [];
                 let resolvedBaseModel: string;
                 if (workflowParsedBaseModel) {
                   resolvedBaseModel = workflowParsedBaseModel;
+                } else if (parsedArgs.base_model) {
+                  resolvedBaseModel = parsedArgs.base_model;
                 } else if (localCheckpoints.length > 0) {
                   resolvedBaseModel = localCheckpoints[0];
                 } else {
@@ -1363,15 +1513,15 @@ User input: ${userText}`;
                 const resolvedSteps = workflowParsedSteps ?? parsedArgs.steps ?? 25;
                 const resolvedCfg = workflowParsedCfg ?? parsedArgs.cfg_scale ?? 5.0;
                 const resolvedSampler = workflowParsedSampler ?? parsedArgs.sampler_name ?? "euler";
-                const resolvedScheduler = workflowParsedScheduler ?? parsedArgs.scheduler ?? "beta57";
+                const resolvedScheduler = workflowParsedScheduler ?? parsedArgs.scheduler ?? "normal";
                 const resolvedVae = workflowParsedVaeModel ?? parsedArgs.vae_model ?? "auto";
 
-                // LoRA 总是从绑定的 workflow JSON 解析，忽略 agent 传的 lora_configs。
-                // 原因：agent 不可能知道用户本地装了什么 LoRA，agent 编出来的 lora_configs 是错的，
-                // 保存到数据库后会污染 Generate 页面（Generate 的逻辑是项目有 loraConfigs 就用项目的）。
+                // LoRA 优先级：workflow 解析出的 LoRA > agent 传的 lora_configs > 无。
+                // 之前完全忽略 agent 传的 lora_configs，但 generate_image 的 override 路径
+                // 又接受它们，导致行为矛盾。现在统一：workflow 没有时回退到 agent 传的值。
                 const resolvedLoraConfigs: string | null = workflowParsedLoras.length > 0
                   ? JSON.stringify(workflowParsedLoras)
-                  : null;
+                  : (Array.isArray(parsedArgs.lora_configs) ? JSON.stringify(parsedArgs.lora_configs) : null);
 
                 const newPrompt = {
                   id: "p_" + Date.now().toString(),
@@ -1436,8 +1586,12 @@ User input: ${userText}`;
                 
                 if (parsedArgs.base_model !== undefined) {
                   const checkpoints = useModelStore.getState().checkpoints || [];
+                  // checkpoints now includes both UNetLoader (diffusion models) and CheckpointLoaderSimple entries.
+                  // Only validate if the model list is non-empty AND the value isn't found —
+                  // this catches lora filenames mistakenly used as base models without blocking
+                  // valid unet/checkpoint names the list might not have loaded yet.
                   if (checkpoints.length > 0 && !checkpoints.includes(parsedArgs.base_model)) {
-                    throw new Error(`Invalid base_model: '${parsedArgs.base_model}'. It is not a valid checkpoint (it might be a lora). Use list_local_models to check available checkpoints.`);
+                    throw new Error(`Invalid base_model: '${parsedArgs.base_model}'. It is not in the available model list (it might be a lora or misspelled). Use list_local_models to check available models.`);
                   }
                   updatedPrompt.baseModel = parsedArgs.base_model;
                 }
@@ -1449,7 +1603,7 @@ User input: ${userText}`;
                 if (parsedArgs.steps !== undefined) updatedPrompt.steps = parsedArgs.steps;
                 if (parsedArgs.cfg_scale !== undefined) updatedPrompt.cfgScale = parsedArgs.cfg_scale;
                 if (parsedArgs.seed !== undefined) updatedPrompt.seed = parsedArgs.seed;
-                if (parsedArgs.sampler_name !== undefined) updatedPrompt.samplerName = parsedArgs.sampler_name;
+                if (parsedArgs.sampler_name !== undefined) { updatedPrompt.samplerName = parsedArgs.sampler_name; updatedPrompt.sampler = parsedArgs.sampler_name; }
                 if (parsedArgs.scheduler !== undefined) updatedPrompt.scheduler = parsedArgs.scheduler;
                 if (parsedArgs.workflow_id !== undefined) updatedPrompt.workflowId = parsedArgs.workflow_id;
                 updatedPrompt.updatedAt = Date.now();
@@ -1478,22 +1632,50 @@ User input: ${userText}`;
               } else if (fnName === 'get_prompt') {
                 res = await invoke('get_prompt', { id: parsedArgs.prompt_id });
               } else if (fnName === 'generate_image') {
-                const project = await invoke('get_prompt', { id: parsedArgs.prompt_id }) as any;
-                if (!project) throw new Error(`Prompt ID ${parsedArgs.prompt_id} not found`);
-                
+                const rawProject = await invoke('get_prompt', { id: parsedArgs.prompt_id }) as any;
+                if (!rawProject) throw new Error(`Prompt ID ${parsedArgs.prompt_id} not found`);
+
+                // Normalize field names: Rust returns samplerName (camelCase wire format),
+                // but injectParameters reads project.sampler (TS format). Map it so
+                // overrides and the base project both use the same field.
+                const project = {
+                  ...rawProject,
+                  sampler: rawProject.sampler ?? rawProject.samplerName ?? '',
+                  };
+
+                // Apply per-field overrides on top of the loaded project (mirrors MCP generate_image).
+                // Only fields the agent explicitly passed (non-null) are applied.
+                Object.assign(project, {
+                  ...(parsedArgs.positive_prompt != null ? { positivePrompt: parsedArgs.positive_prompt } : {}),
+                  ...(parsedArgs.negative_prompt != null ? { negativePrompt: parsedArgs.negative_prompt } : {}),
+                  ...(parsedArgs.artist_prompt != null ? { artistPrompt: parsedArgs.artist_prompt } : {}),
+                  ...(parsedArgs.base_model != null ? { baseModel: parsedArgs.base_model } : {}),
+                  ...(parsedArgs.vae_model != null ? { vaeModel: parsedArgs.vae_model } : {}),
+                  ...(Array.isArray(parsedArgs.lora_configs) ? { loraConfigs: parsedArgs.lora_configs } : {}),
+                  ...(parsedArgs.width != null ? { width: Number(parsedArgs.width) } : {}),
+                  ...(parsedArgs.height != null ? { height: Number(parsedArgs.height) } : {}),
+                  ...(parsedArgs.steps != null ? { steps: Number(parsedArgs.steps) } : {}),
+                  ...(parsedArgs.cfg_scale != null ? { cfgScale: Number(parsedArgs.cfg_scale) } : {}),
+                  ...(parsedArgs.seed != null ? { seed: String(parsedArgs.seed) } : {}),
+                  ...(parsedArgs.sampler_name != null ? { sampler: parsedArgs.sampler_name } : {}),
+                  ...(parsedArgs.scheduler != null ? { scheduler: parsedArgs.scheduler } : {}),
+                  ...(parsedArgs.workflow_id != null ? { workflowId: parsedArgs.workflow_id } : {}),
+                });
+
+                // Resolve workflow: override > project's bound > default text2img
                 let wfId = project.workflowId;
                 if (!wfId) {
                   const workflows = useWorkflowStore.getState().workflows;
-                  // generate_image 走文本生图：优先 text2img 类型的默认
                   const defaultWf = workflows.find((w: any) => w.type === 'text2img' && w.isDefault)
                     || workflows.find((w: any) => w.type === 'text2img');
                   if (defaultWf) {
                     wfId = defaultWf.id;
-                  } else if (workflows.length > 0) {
-                    wfId = workflows[0].id;
                   }
                 }
-                
+                if (!wfId) {
+                  throw new Error('未找到 text2img 工作流，请先在工作流管理中导入');
+                }
+
                 const batchCount = parsedArgs.batch_count || 1;
                 const results = await useQueueStore.getState().addJob(project, wfId, batchCount);
                 const allImages = results ? results.flat() : [];
@@ -2091,6 +2273,8 @@ User input: ${userText}`;
     messages,
     isGenerating,
     sendMessage,
-    stopGenerating
+    stopGenerating,
+    getTokenUsage: () => tokenUsageRef.current,
+    resetTokenUsage: () => { tokenUsageRef.current = null; },
   };
 }

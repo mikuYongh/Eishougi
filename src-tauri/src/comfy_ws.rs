@@ -140,6 +140,21 @@ pub async fn process_executed(app_clone: AppHandle, ctx: JobContext, images: Vec
         }
     }
 
+    if local_paths.is_empty() && !images_urls.is_empty() {
+        // ComfyUI executed successfully but all image downloads failed.
+        // Emit an error instead of a fake "completed" with 0 images,
+        // otherwise the caller treats it as success-with-nothing.
+        error!("[ComfyWS] All {} image(s) failed to download for job {}", images_urls.len(), ctx.job_id);
+        emit_to_frontend(&app_clone, "comfy-error", serde_json::json!({
+            "data": {
+                "prompt_id": prompt_id,
+                "exception_message": "图片下载失败，可能是网络或磁盘空间问题，请重试"
+            }
+        }));
+        android_stop_service(&app_clone);
+        return;
+    }
+
     emit_to_frontend(&app_clone, "comfy-completed", serde_json::json!({
         "prompt_id": prompt_id,
         "job_id": ctx.job_id,
