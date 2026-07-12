@@ -1049,7 +1049,7 @@ async fn handle_image_cipher(app: &AppHandle, name: &str, arguments: &Value) -> 
     })
     .await;
 
-    // Clean up the temp file if one was created for URL download (named tmp_cipher_*.dat).
+    // Clean up the temp file if one was created for URL download (named tmp_cipher_*).
     if tmp_file
         .file_name()
         .and_then(|n| n.to_str())
@@ -1097,13 +1097,24 @@ async fn resolve_image_input(
             .bytes()
             .await
             .map_err(|e| format!("Failed to read image bytes: {}", e))?;
-        let label = image_arg.rsplit('/').next().unwrap_or("remote").to_string();
+        // Extract the original filename (strip query string like ?token=...) for the label
+        let path_part = image_arg.split('?').next().unwrap_or(image_arg);
+        let label = path_part.rsplit('/').next().unwrap_or("remote").to_string();
+        // Determine the file extension from the URL path so the `image` crate can infer
+        // the correct format. The image crate's open() uses the extension to pick a decoder,
+        // so .dat would fail with "extension not recognized". Strip query strings first.
+        let ext = path_part
+            .rsplit('.')
+            .next()
+            .filter(|e| !e.contains('/') && e.len() <= 5)
+            .unwrap_or("png");
         let tmp = uploads_dir.join(format!(
-            "tmp_cipher_{}.dat",
+            "tmp_cipher_{}.{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_millis()
+                .as_millis(),
+            ext
         ));
         std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
         return Ok((tmp, label));

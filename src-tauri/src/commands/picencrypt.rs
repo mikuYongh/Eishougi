@@ -68,7 +68,13 @@ pub fn process_file(
 ) -> Result<(u32, u32), String> {
     validate_key(algorithm, key)?;
 
-    let img = image::open(input).map_err(|e| format!("Failed to decode image: {}", e))?;
+    // Read raw bytes and use load_from_memory, which infers format from magic bytes (PNG header,
+    // JPEG SOI marker, etc.) rather than the file extension. This is critical because temp files
+    // downloaded from URLs may have unusual extensions, and image::open() refuses unknown exts.
+    let file_bytes = std::fs::read(input)
+        .map_err(|e| format!("Failed to read input image: {}", e))?;
+    let img = image::load_from_memory(&file_bytes)
+        .map_err(|e| format!("Failed to decode image: {}", e))?;
     let (w, h) = img.dimensions();
 
     // Work in RGBA8 for a uniform pixel layout regardless of input format (RGB, RGBA, palette…).
