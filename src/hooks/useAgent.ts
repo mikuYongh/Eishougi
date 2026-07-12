@@ -981,40 +981,11 @@ User input: ${userText}`;
     const effectiveMaxRounds = effort === 'low' ? 1 : (maxRounds || 8);
     const budgetExceeded = currentRound > effectiveMaxRounds;
 
-    // ── Context compression: if the message history is too large, summarize older messages ──
-    // Keep the last 6 messages intact, compress everything before them into a single
-    // compact "conversation summary" message. This prevents token costs from growing O(n²).
-    const CONTEXT_CHAR_THRESHOLD = 40000; // ~12-15k tokens worth of text content
-    let messagesToSend = currentMessages;
-    const totalChars = currentMessages.reduce((sum, m) => sum + (typeof m.content === 'string' ? m.content.length : 0), 0);
-    if (totalChars > CONTEXT_CHAR_THRESHOLD && currentMessages.length > 8) {
-      const KEEP_RECENT = 6;
-      const oldMessages = currentMessages.slice(0, -KEEP_RECENT);
-      const recentMessages = currentMessages.slice(-KEEP_RECENT);
-      // Build a compact summary of old messages: keep tool names + short results, strip verbose content
-      const summaryParts: string[] = [];
-      for (const m of oldMessages) {
-        if (m.role === 'system') { summaryParts.push(m.content as string); continue; }
-        if (m.role === 'user') { summaryParts.push(`[用户] ${(m.content as string).slice(0, 200)}`); continue; }
-        if (m.role === 'assistant') {
-          const text = (m.content as string).slice(0, 200);
-          const tools = m.tool_calls?.map(tc => tc.function?.name).filter(Boolean).join(', ') || '';
-          summaryParts.push(`[AI] ${text}${tools ? ` (调用工具: ${tools})` : ''}`);
-          continue;
-        }
-        if (m.role === 'tool') {
-          const content = m.content as string;
-          const truncated = content.length > 300 ? content.slice(0, 300) + '...' : content;
-          summaryParts.push(`[工具结果 ${m.name}] ${truncated}`);
-          continue;
-        }
-      }
-      messagesToSend = [
-        { id: 'ctx_summary', role: 'system' as const, content: `[以下是对话历史的压缩摘要]\n${summaryParts.join('\n')}` },
-        ...recentMessages,
-      ];
-      console.info(`[Agent] Context compressed: ${currentMessages.length} → ${messagesToSend.length} messages, ${totalChars} → ~${summaryParts.join('').length} chars`);
-    }
+    // NOTE: Context compression was removed — it inserted a system summary message that
+    // broke OpenAI's tool_call/tool_call_id pairing constraint, causing HTTP 400 errors.
+    // Token optimization is handled instead by: (1) stripping old reasoning_content,
+    // (2) not re-sending old image base64, and (3) the message sanitizer below.
+    const messagesToSend = currentMessages;
 
     let apiUrl = llm.apiUrl || 'https://apihub.agnes-ai.com/v1';
     if (!apiUrl.endsWith('/chat/completions')) {
@@ -1053,25 +1024,9 @@ User input: ${userText}`;
       const mappedMessages = await Promise.all(messagesToSend.map(async (msg, idx) => {
         const m: any = { role: msg.role };
 
-        // Truncate verbose tool results from older rounds
-        if (msg.role === 'tool' && msg.name && VERBOSE_TOOL_NAMES.has(msg.name) && idx < totalMsgs - 4) {
-          let summary = msg.content || "";
-          if (summary.length > TOOL_RESULT_MAX_CHARS) {
-            // Try to keep the JSON structure but truncate the arrays inside
-            try {
-              const parsed = JSON.parse(summary);
-              summary = JSON.stringify({
-                ...parsed,
-                _note: `(truncated, original ${summary.length} chars) results from ${msg.name}`,
-              }).slice(0, TOOL_RESULT_MAX_CHARS);
-            } catch {
-              summary = summary.slice(0, TOOL_RESULT_MAX_CHARS) + '\n... (truncated)';
-            }
-          }
-          m.content = summary;
-        } else {
-          m.content = msg.content || "";
-        }
+        // For tool messages, keep content as-is — truncating tool results would
+        // cause the AI to lose context it needs (e.g. character lists for selection).
+        m.content = msg.content || "";
 
         // Only attach images for recent messages (IMAGE_CUTOFF onwards)
         if (idx >= IMAGE_CUTOFF) {
@@ -1116,7 +1071,11 @@ User input: ${userText}`;
         if (msg.tool_calls && msg.tool_calls.length > 0) m.tool_calls = msg.tool_calls;
         if (msg.tool_call_id) m.tool_call_id = msg.tool_call_id;
         if (msg.name) m.name = msg.name;
-        if (msg.reasoning_content) m.reasoning_content = msg.reasoning_content;
+        // Preserve reasoning_content for thinking-mode models — but only for recent rounds.
+        // Old reasoning_content chains are pure token waste (often 1000+ chars each) and
+        // serve no purpose in subsequent turns; the API only requires the LATEST round's
+        // reasoning_content to be passed back.
+        if (msg.reasoning_content && idx >= IMAGE_CUTOFF) m.reasoning_content = msg.reasoning_content;
         return m;
       }));
 
@@ -1271,7 +1230,6 @@ User input: ${userText}`;
             ...finalMessages
           ],
           stream: true,
-          stream_options: { include_usage: true },
           temperature: llm.temperature !== undefined ? llm.temperature : 0.7,
           max_tokens: llm.maxTokens !== undefined ? llm.maxTokens : 4096,
         };
@@ -1394,6 +1352,19 @@ User input: ${userText}`;
       setMessages([...baseMessages, { ...assistantMessage }]);
 
       if (streamError) throw new Error(streamError);
+
+      // Fallback token estimation if the API didn't return usage data (no stream_options support).
+      // Rough heuristic: ~1.5 chars per CJK token, ~4 chars per English token. Blended average ~2.5.
+      if (!tokenUsageRef.current) {
+        const inputChars = JSON.stringify(mappedMessages).length;
+        const outputChars = (typeof assistantMessage.content === 'string' ? assistantMessage.content.length : 0)
+          + JSON.stringify(assistantMessage.tool_calls || []).length;
+        tokenUsageRef.current = {
+          promptTokens: Math.round(inputChars / 2.5),
+          completionTokens: Math.round(outputChars / 2.5),
+          totalTokens: Math.round((inputChars + outputChars) / 2.5),
+        };
+      }
 
       // === Hermes-style tool_call 文本化兜底解析 ===
       // 某些 LLM (尤其 agnes-2.0-flash 在长上下文+重复模式下) 会把 tool_call
@@ -2121,6 +2092,8 @@ User input: ${userText}`;
           setMessages([...newMessages]);
         }
 
+        // After tool execution, check if user stopped before recursing
+        if (abortController.signal.aborted) return;
         await callLLM(newMessages);
       }
 
