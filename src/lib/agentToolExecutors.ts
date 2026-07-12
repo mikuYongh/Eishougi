@@ -15,7 +15,7 @@ import { useWorkflowStore } from '../stores/workflowStore';
 import { useFavoriteLibraryStore } from '../stores/favoriteLibraryStore';
 import { useModelStore } from '../stores/modelStore';
 import { comfyService } from '../services/comfyService';
-import type { ChatMessage } from '../hooks/useAgent';
+import type { ChatMessage } from '../agent/types';
 
 export interface ToolResult {
   /** The serialised result string to feed back to the LLM. */

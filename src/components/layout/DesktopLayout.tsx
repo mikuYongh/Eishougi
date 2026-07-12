@@ -3,7 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { StatusBar } from "./StatusBar";
 import { BottomNav } from "./BottomNav";
-import { AgentPanel } from "../agent/AgentPanel";
+import { AgentPanel } from "../../agent/AgentPanel";
 import { CompletionToast } from "../ui/CompletionToast";
 import { useSettingsStore } from "../../stores/settingsStore";
 

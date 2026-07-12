@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ChatMessage } from '../hooks/useAgent';
+import type { ChatMessage } from '../agent/types';
 
 export interface AgentSession {
   id: string;
