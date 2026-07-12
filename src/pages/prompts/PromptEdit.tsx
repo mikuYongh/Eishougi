@@ -19,6 +19,7 @@ import { LoraSelectorUI } from "../../components/prompt/LoraSelectorUI";
 import { getImgSrc } from "../../utils/imageUtils";
 import { comfyService } from "../../services/comfyService";
 import { aiService } from "../../services/aiService";
+import { SAMPLER_OPTIONS, SCHEDULER_OPTIONS } from "../../lib/workflowOptions";
 import { toast } from "sonner";
 
 export function PromptEdit() {
@@ -27,7 +28,7 @@ export function PromptEdit() {
   const prompts = usePromptStore((state) => state.prompts);
   const updatePrompt = usePromptStore((state) => state.updatePrompt);
   const addPrompt = usePromptStore((state) => state.addPrompt);
-  const { checkpoints, loras, fetchModels } = useModelStore();
+  const { checkpoints, loras, vaes, fetchModels } = useModelStore();
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
   useEffect(() => {
@@ -64,9 +65,9 @@ export function PromptEdit() {
         const existing = project.tags || [];
         const merged = Array.from(new Set([...existing, ...newTags]));
         setProject(prev => ({ ...prev, tags: merged }));
-        toast.success(`已生成 ${newTags.length} 个标签：${newTags.join("、")}`);
+        toast.success("AI 打标完成");
       } else {
-        toast.info("未能提取到标签");
+        toast.error("未能提取到标签，请检查提示词内容");
       }
     } catch (err: any) {
       toast.error(`打标失败：${err?.message || err}`);
@@ -475,39 +476,19 @@ export function PromptEdit() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">采样器 (Sampler)</label>
-                <GlassDropdown 
+                <GlassDropdown
                   value={project.sampler || "euler"}
                   onChange={v => updateField('sampler', v)}
-                  options={[
-                    { label: "euler", value: "euler" },
-                    { label: "euler_ancestral", value: "euler_ancestral" },
-                    { label: "heun", value: "heun" },
-                    { label: "dpm_2", value: "dpm_2" },
-                    { label: "dpm_2_ancestral", value: "dpm_2_ancestral" },
-                    { label: "dpmpp_2s_ancestral", value: "dpmpp_2s_ancestral" },
-                    { label: "dpmpp_2m", value: "dpmpp_2m" },
-                    { label: "dpmpp_2m_sde", value: "dpmpp_2m_sde" },
-                    { label: "dpmpp_sde", value: "dpmpp_sde" },
-                    { label: "dpmpp_3m_sde", value: "dpmpp_3m_sde" },
-                  ]}
+                  options={SAMPLER_OPTIONS}
                 />
               </div>
               
               <div>
                 <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">调度器 (Scheduler)</label>
-                <GlassDropdown 
-                  value={project.scheduler || "beta57"}
+                <GlassDropdown
+                  value={project.scheduler || "normal"}
                   onChange={v => updateField('scheduler', v)}
-                  options={[
-                    { label: "normal", value: "normal" },
-                    { label: "karras", value: "karras" },
-                    { label: "exponential", value: "exponential" },
-                    { label: "sgm_uniform", value: "sgm_uniform" },
-                    { label: "simple", value: "simple" },
-                    { label: "ddim_uniform", value: "ddim_uniform" },
-                    { label: "beta", value: "beta" },
-                    { label: "beta57", value: "beta57" },
-                  ]}
+                  options={SCHEDULER_OPTIONS}
                 />
               </div>
 
@@ -520,9 +501,34 @@ export function PromptEdit() {
               </div>
               <div>
                 <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">CFG Scale</label>
-                <input 
+                <input
                   type="number" step="0.1" value={project.cfgScale || 5.0} onChange={e => updateField('cfgScale', Number(e.target.value))}
                   className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold"
+                />
+              </div>
+            </div>
+
+            {/* Resolution + Seed */}
+            <div className="grid grid-cols-3 gap-3 mt-3">
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">宽度</label>
+                <input
+                  type="number" value={project.width || 832} onChange={e => updateField('width', Number(e.target.value))}
+                  className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">高度</label>
+                <input
+                  type="number" value={project.height || 1216} onChange={e => updateField('height', Number(e.target.value))}
+                  className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-1.5 block">种子 (Seed)</label>
+                <input
+                  type="text" value={project.seed || "-1"} onChange={e => updateField('seed', e.target.value)}
+                  className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-3 py-2 text-[var(--text-primary)] text-xs outline-none focus:border-[var(--accent-2)]/50 transition-colors font-bold font-mono"
                 />
               </div>
             </div>
@@ -654,13 +660,12 @@ export function PromptEdit() {
                   VAE 模型
                 </label>
                 <div className="relative z-40">
-                  <GlassDropdown 
+                  <GlassDropdown
                     value={project.vaeModel || "auto"}
                     onChange={v => updateField('vaeModel', v)}
                     options={[
                       { label: "Automatic (自动)", value: "auto" },
-                      { label: "sdxl_vae.safetensors", value: "sdxl_vae.safetensors" },
-                      { label: "sd_xl_base_1.0_vae.safetensors", value: "sd_xl_base_1.0_vae.safetensors" }
+                      ...vaes.map(v => ({ label: v, value: v })),
                     ]}
                     accentColor="purple"
                   />

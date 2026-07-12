@@ -17,6 +17,7 @@ import { PromptTagEditor } from "../../components/prompt/PromptTagEditor";
 import { ArtistSelector } from "../../components/prompt/ArtistSelector";
 import { comfyService } from "../../services/comfyService";
 import { aiService } from "../../services/aiService";
+import { SAMPLER_OPTIONS, SCHEDULER_OPTIONS } from "../../lib/workflowOptions";
 import { getImgSrc } from "../../utils/imageUtils";
 import { toast } from "sonner";
 
@@ -93,7 +94,7 @@ export function Generate() {
 
   const { jobs, isConnected, connect, addJob } = useQueueStore();
   const workflows = useWorkflowStore(state => state.workflows);
-  const { checkpoints, loras, isLoading, isError, fetchModels } = useModelStore();
+  const { checkpoints, loras, vaes, isLoading, isError, fetchModels } = useModelStore();
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
 
   useEffect(() => {
@@ -141,9 +142,9 @@ export function Generate() {
       const newTags = await aiService.generateTags(textToAnalyze);
       if (newTags.length > 0) {
         await updatePrompt(project.id, { tags: newTags });
-        toast.success(`已生成 ${newTags.length} 个标签：${newTags.join("、")}`);
+        toast.success("AI 打标完成");
       } else {
-        toast.info("未能提取到标签");
+        toast.error("未能提取到标签，请检查提示词内容");
       }
     } catch (err: any) {
       toast.error(`打标失败：${err?.message || err}`);
@@ -543,13 +544,12 @@ export function Generate() {
                   <Cpu size={12} className="text-[var(--accent-2)]" /> VAE 模型
                 </label>
                 <div className="relative z-30">
-                  <GlassDropdown 
+                  <GlassDropdown
                     value={overrideVaeModel}
                     onChange={v => setOverrideVaeModel(v)}
                     options={[
                       { label: "Automatic (自动)", value: "auto" },
-                      { label: "sdxl_vae.safetensors", value: "sdxl_vae.safetensors" },
-                      { label: "sd_xl_base_1.0_vae.safetensors", value: "sd_xl_base_1.0_vae.safetensors" }
+                      ...vaes.map(v => ({ label: v, value: v })),
                     ]}
                     accentColor="purple"
                   />
@@ -611,35 +611,20 @@ export function Generate() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[9px] text-[var(--text-secondary)] uppercase font-bold block mb-1">采样器 (Sampler)</label>
-                  <GlassDropdown 
+                  <GlassDropdown
                     value={overrideSampler}
                     onChange={setOverrideSampler}
-                    options={[
-                      { label: "euler", value: "euler" },
-                      { label: "euler_ancestral", value: "euler_ancestral" },
-                      { label: "heun", value: "heun" },
-                      { label: "dpmpp_2m", value: "dpmpp_2m" },
-                      { label: "dpmpp_sde", value: "dpmpp_sde" },
-                      { label: "uni_pc", value: "uni_pc" }
-                    ]}
+                    options={SAMPLER_OPTIONS}
                     accentColor="blue"
                     small
                   />
                 </div>
                 <div>
                   <label className="text-[9px] text-[var(--text-secondary)] uppercase font-bold block mb-1">调度器 (Scheduler)</label>
-                  <GlassDropdown 
+                  <GlassDropdown
                     value={overrideScheduler}
                     onChange={setOverrideScheduler}
-                    options={[
-                      { label: "beta57", value: "beta57" },
-                      { label: "beta", value: "beta" },
-                      { label: "normal", value: "normal" },
-                      { label: "karras", value: "karras" },
-                      { label: "exponential", value: "exponential" },
-                      { label: "sgm_uniform", value: "sgm_uniform" },
-                      { label: "simple", value: "simple" }
-                    ]}
+                    options={SCHEDULER_OPTIONS}
                     accentColor="blue"
                     small
                   />

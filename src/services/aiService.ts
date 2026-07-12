@@ -1,6 +1,51 @@
 import { useSettingsStore } from "../stores/settingsStore";
 import { usePromptStore } from "../stores/promptStore";
 
+/**
+ * Robust tag parser for LLM outputs. Handles:
+ * 1. JSON array: `["原神","二次元"]`
+ * 2. Comma-separated: `原神, 二次元, 战斗`
+ * 3. Messy output with explanation text — extracts short CJK tags, filters out sentence fragments
+ */
+function parseTagsFromLLM(content: string): string[] {
+  const trimmed = content.trim();
+
+  // 1. Try JSON array first — this is the primary expected format
+  const jsonMatch = trimmed.match(/\[[\s\S]*\]/);
+  if (jsonMatch) {
+    try {
+      const arr = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(arr)) {
+        const tags = arr.map((t: any) => String(t).trim()).filter((t: string) => t.length > 0);
+        if (tags.length > 0) return tags;
+      }
+    } catch { /* fall through */ }
+  }
+
+  // 2. Fallback: extract CJK tags from free-form text.
+  let cleaned = trimmed.replace(/```[a-z]*\s*/gi, '').replace(/```\s*/g, '');
+  const parts = cleaned.split(/[,，、\n;；]+/).map((t: string) => t.trim()).filter(Boolean);
+
+  const cjkRe = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]/;
+  const sentenceRe = /[的是了着看们在和把将被让对从向给为会能可以要已经又也还都就只才]|^(好的|我来|为你|以下|这是|根据|需要|提取|标签|提示词|项目|首先|然后|接着|这个|那个|动作|风格|类型)/;
+
+  const tags = parts.map((t: string) =>
+    // Strip quotes, numbering, bullets, brackets
+    t.replace(/["""''''《》]/g, '')
+     .replace(/^[\d\.\-\*\s]+/, '')
+     .replace(/^[（(].*?[)）]\s*/, '')
+     .trim()
+  ).filter((t: string) => {
+    if (t.length < 1 || t.length > 8) return false;
+    if (!cjkRe.test(t)) return false;
+    if (sentenceRe.test(t)) return false;
+    if (/[：:]$/.test(t)) return false;
+    return true;
+  });
+
+  return tags;
+}
+
 export const aiService = {
   async generateTags(promptText: string): Promise<string[]> {
     const { llm } = useSettingsStore.getState().settings;
@@ -13,12 +58,15 @@ export const aiService = {
       apiUrl = apiUrl.replace(/\/$/, '') + '/chat/completions';
     }
 
-    const systemPrompt = `你是一个提示词标签提取助手。请根据用户提供的英文提示词（Stable Diffusion Prompt）及项目名称，提取5-8个最核心的**中文**标签。
-要求：
-1. 必须优先提取具体的**人物角色名**（如：初音未来, 玛奇玛）和**作品名/IP**（如：原神, 蔚蓝档案）。
-2. 然后提取核心特征：如画风（二次元, 写实）、核心主题、场景环境等。
-3. 标签必须简短，通常2-8个字。
-4. 仅输出标签，用逗号分隔，绝对不要输出任何其他解释性或过渡性文本。`;
+    const systemPrompt = `从用户提供的英文 Stable Diffusion 提示词和项目名称中，提取5-8个核心中文分类标签。
+
+规则：
+1. 优先提取作品名（如"原神"、"鸣潮"）和角色名（如"雷电将军"）。
+2. 然后提取场景、画风、主题等特征。
+3. 每个标签2-6个字。
+
+输出格式：JSON 数组，如 ["鸣潮","女角色","床","简单背景"]
+只输出JSON数组，不要任何其他文字。`;
 
     const bodyJson = JSON.stringify({
       model: llm.model || 'agnes-2.0-flash',
@@ -27,7 +75,7 @@ export const aiService = {
         { role: 'user', content: promptText }
       ],
       temperature: 0.3,
-      max_tokens: 50,
+      max_tokens: 200,
     });
 
     const response = await fetch(apiUrl, {
@@ -44,9 +92,12 @@ export const aiService = {
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "";
-    
-    const rawTags = content.split(/[,，、\n]+/).map((t: string) => t.trim()).filter(Boolean);
+    let content = data.choices?.[0]?.message?.content || "";
+    if (!content && data.choices?.[0]?.message?.reasoning_content) {
+      content = data.choices[0].message.reasoning_content;
+    }
+
+    const rawTags = parseTagsFromLLM(content);
     return Array.from(new Set(rawTags)).slice(0, 8) as string[];
   },
 
