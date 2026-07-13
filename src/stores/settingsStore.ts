@@ -92,7 +92,7 @@ const defaultSettings: AppSettings = {
     {
       name: "Danbooru 标签搜索",
       enabled: true,
-      url: "https://sakizuki-danboorusearchonline.ms.show/mcp/mcp"
+      url: "https://sakizuki-danboorusearch.hf.space/mcp/mcp"
     }
   ],
   mcpServer: {

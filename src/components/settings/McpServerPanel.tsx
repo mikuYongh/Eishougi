@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Server, Copy, RefreshCw, Eye, EyeOff, Power, Shield, Link2, Check,
+  Plug, Trash2, Plus, AlertCircle,
 } from "lucide-react";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { toast } from "sonner";
@@ -260,6 +261,9 @@ export function McpServerPanel() {
           </p>
         </div>
       </div>
+
+      {/* ── 外部 MCP 服务（AI 助手可调用的远程工具）── */}
+      <ExternalMcpServers />
     </div>
   );
 }
@@ -281,6 +285,108 @@ function ToolToggle({
       >
         <span className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${checked ? "translate-x-5" : "translate-x-0"}`} />
       </button>
+    </div>
+  );
+}
+
+/**
+ * 外部 MCP 服务器管理 — AI 助手可调用的远程工具服务（如 Danbooru 标签搜索）。
+ * 让用户在设置里直接增删改外部 MCP 服务器的 name / url / enabled，
+ * 而不用清 localStorage 或手动改 JSON。
+ */
+function ExternalMcpServers() {
+  const { settings, updateSettings } = useSettingsStore();
+  const servers = settings.mcpServers || [];
+
+  const update = (idx: number, patch: Partial<{ name: string; url: string; enabled: boolean }>) => {
+    const next = servers.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+    updateSettings({ mcpServers: next });
+  };
+
+  const remove = (idx: number) => {
+    updateSettings({ mcpServers: servers.filter((_, i) => i !== idx) });
+  };
+
+  const add = () => {
+    updateSettings({
+      mcpServers: [...servers, { name: "新服务", url: "", enabled: true }],
+    });
+  };
+
+  return (
+    <div className="mt-6 pt-6 border-t border-[var(--glass-border)]">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2 rounded-lg bg-[var(--accent-1)]/20 text-[var(--accent-1)] border border-[var(--accent-1)]/20">
+          <Plug size={18} />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-base font-bold text-[var(--text-primary)]">外部 MCP 服务</h3>
+          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+            AI 助手可调用的远程工具服务（如 Danbooru 标签搜索）。连接失败时请检查地址是否可用。
+          </p>
+        </div>
+        <button
+          onClick={add}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent-1)]/15 text-[var(--accent-1)] border border-[var(--accent-1)]/30 hover:bg-[var(--accent-1)]/25 text-[12px] font-bold transition-colors cursor-pointer"
+        >
+          <Plus size={14} /> 添加
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        {servers.length === 0 && (
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--bg-layer-1)] border border-[var(--glass-border)] text-[11px] text-[var(--text-secondary)]">
+            <AlertCircle size={13} className="text-[var(--text-muted)]" />
+            暂无外部 MCP 服务。点击「添加」配置一个。
+          </div>
+        )}
+        {servers.map((server, i) => (
+          <div key={i} className="p-3 rounded-lg bg-[var(--bg-layer-1)] border border-[var(--glass-border)]">
+            {/* 第一行：开关 + 名称 + 删除 */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => update(i, { enabled: !server.enabled })}
+                className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 cursor-pointer ${server.enabled ? "bg-[var(--accent-1)]" : "bg-[var(--glass-bg-hover)]"}`}
+                title={server.enabled ? "已启用" : "已禁用"}
+              >
+                <span className={`absolute left-0.5 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${server.enabled ? "translate-x-4" : "translate-x-0"}`} />
+              </button>
+              <input
+                type="text"
+                value={server.name}
+                onChange={(e) => update(i, { name: e.target.value })}
+                placeholder="名称"
+                className="flex-1 min-w-0 px-2 py-1.5 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50"
+              />
+              <button
+                onClick={() => remove(i)}
+                className="text-[var(--text-muted)] hover:text-red-400 cursor-pointer flex-shrink-0 p-1"
+                title="删除"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+            {/* 第二行：URL（全宽） */}
+            <input
+              type="text"
+              value={server.url}
+              onChange={(e) => update(i, { url: e.target.value })}
+              placeholder="https://.../mcp"
+              className="w-full mt-2 px-2 py-1.5 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[11px] font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50"
+            />
+          </div>
+        ))}
+      </div>
+
+      {servers.length > 0 && (
+        <p className="text-[10px] text-[var(--text-secondary)] mt-2">
+          修改后 AI 助手会自动重新连接。Danbooru 标签搜索的备用地址（互为备份）：
+          <br />
+          <code className="text-[var(--accent-1)]">https://sakizuki-danboorusearch.hf.space/mcp/mcp</code>
+          {"  /  "}
+          <code className="text-[var(--accent-1)]">https://sakizuki-danboorusearchonline.ms.show/mcp/mcp</code>
+        </p>
+      )}
     </div>
   );
 }
