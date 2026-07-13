@@ -79,6 +79,7 @@ pub async fn export_image_to_downloads(
     state: State<'_, crate::AppState>,
     url: String,
     save_folder: Option<String>,
+    save_dir: Option<String>,
 ) -> Result<String, String> {
     let folder = sanitize_folder(save_folder.as_deref().unwrap_or("Eishougi"));
 
@@ -118,12 +119,19 @@ pub async fn export_image_to_downloads(
     {
         use std::time::{SystemTime, UNIX_EPOCH};
         let _ = &state; // state only used for the Android tmp dir; desktop uses the OS download dir.
-        let download_dir = app
-            .path()
-            .download_dir()
-            .map_err(|e| format!("Failed to get download dir: {}", e))?;
 
-        let target_dir = download_dir.join(&folder).join("photo");
+        // If the user picked an absolute save directory, use it directly (no /photo subfolder).
+        // Otherwise fall back to Downloads/<saveFolder>/photo/ for backward compatibility.
+        let target_dir = match save_dir.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+            Some(dir) => std::path::PathBuf::from(dir),
+            None => {
+                let download_dir = app
+                    .path()
+                    .download_dir()
+                    .map_err(|e| format!("Failed to get download dir: {}", e))?;
+                download_dir.join(&folder).join("photo")
+            }
+        };
         if !target_dir.exists() {
             fs::create_dir_all(&target_dir).map_err(|e| e.to_string())?;
         }

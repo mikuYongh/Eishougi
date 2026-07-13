@@ -3,7 +3,7 @@ import { useSettingsStore, type McpServerConfig } from "../stores/settingsStore"
 import { useQueueStore } from "../stores/queueStore";
 import { useModelStore } from "../stores/modelStore";
 import { appLog } from "../utils/appLog";
-import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Check, Download, Upload, Database, Wand2, RefreshCw, Loader2, MessageCircle, ExternalLink } from "lucide-react";
+import { Search, Palette, Settings as SettingsIcon, Cpu, Info, Image as ImageIcon, RotateCcw, Monitor, ChevronDown, Check, Download, Upload, Database, Wand2, RefreshCw, Loader2, MessageCircle, ExternalLink, FolderOpen, X } from "lucide-react";
 import { useAppVersion } from "../hooks/useAppVersion";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -519,21 +519,73 @@ export function Settings() {
                     </div>
                   </div>
 
-                  {/* Save Folder */}
+                  {/* Save Directory */}
                   <div>
                     <div>
-                      <h4 className="text-sm font-bold text-[var(--text-primary)]">保存目录 (Save Folder)</h4>
-                      <p className="text-xs text-[var(--text-secondary)] mt-1">
-                        保存到相册/下载时使用的子目录名。桌面端：下载/{isAndroid ? '' : '<'}文件夹{isAndroid ? '' : '>'}/photo/，移动端：图库/Pictures/{isAndroid ? '' : '<'}文件夹{isAndroid ? '' : '>'}/
-                      </p>
+                      <h4 className="text-sm font-bold text-[var(--text-primary)]">保存目录 (Save Directory)</h4>
+                      {isAndroid ? (
+                        <>
+                          <p className="text-xs text-[var(--text-secondary)] mt-1">
+                            保存到图库时使用的子目录名。路径：图库/Pictures/&lt;文件夹&gt;/
+                          </p>
+                          <input
+                            type="text"
+                            value={settings.saveFolder}
+                            onChange={(e) => updateSettings({ saveFolder: e.target.value })}
+                            placeholder="Eishougi"
+                            className="mt-2 w-full bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-1)] transition-colors"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs text-[var(--text-secondary)] mt-1">
+                            {settings.saveDir
+                              ? `图片将保存到此目录：${settings.saveDir}`
+                              : `未指定自定义目录，默认保存到：下载/${settings.saveFolder || 'Eishougi'}/photo/`}
+                          </p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={settings.saveDir}
+                              readOnly
+                              placeholder={`默认：下载/${settings.saveFolder || 'Eishougi'}/photo/`}
+                              className="flex-1 bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent-1)] transition-colors"
+                            />
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const selected = await open({ directory: true, multiple: false });
+                                  if (selected) updateSettings({ saveDir: selected as string });
+                                } catch (err) { console.error("Folder picker failed:", err); }
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--accent-1)]/15 text-[var(--accent-1)] border border-[var(--accent-1)]/30 hover:bg-[var(--accent-1)]/25 transition-colors cursor-pointer text-sm font-medium whitespace-nowrap"
+                            >
+                              <FolderOpen size={15} />
+                              选择文件夹
+                            </button>
+                            {settings.saveDir && (
+                              <button
+                                onClick={() => updateSettings({ saveDir: '' })}
+                                className="px-2.5 py-2 rounded-lg bg-[var(--glass-bg)] text-[var(--text-muted)] border border-[var(--glass-border)] hover:text-red-400 hover:border-red-400/30 transition-colors cursor-pointer"
+                                title="清除自定义目录，回退到默认"
+                              >
+                                <X size={15} />
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+                            子目录名（无自定义目录时使用）：
+                          </p>
+                          <input
+                            type="text"
+                            value={settings.saveFolder}
+                            onChange={(e) => updateSettings({ saveFolder: e.target.value })}
+                            placeholder="Eishougi"
+                            className="mt-1 w-full bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-1)] transition-colors"
+                          />
+                        </>
+                      )}
                     </div>
-                    <input
-                      type="text"
-                      value={settings.saveFolder}
-                      onChange={(e) => updateSettings({ saveFolder: e.target.value })}
-                      placeholder="Eishougi"
-                      className="mt-2 w-full bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-1)] transition-colors"
-                    />
                   </div>
                 </div>
               </div>
