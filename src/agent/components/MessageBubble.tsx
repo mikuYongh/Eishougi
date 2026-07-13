@@ -6,6 +6,7 @@ import { memo, useState } from "react";
 import { PhotoView } from "react-photo-view";
 import { ChevronDown, ChevronUp, Bot, Wrench, Zap, Brain, ImageIcon } from "lucide-react";
 import { MarkdownContent } from "./MarkdownContent";
+import { ResultActions } from "./ResultActions";
 import { getImgSrc } from "../../utils/imageUtils";
 import { useSettingsStore } from "../../stores/settingsStore";
 import type { ChatMessage } from "../types";
@@ -69,7 +70,7 @@ function ToolCallCard({ name, args }: { name: string; args: string }) {
   );
 }
 
-function ToolResultCard({ name, content, images }: { name: string; content: string; images?: string[] }) {
+function ToolResultCard({ name, content }: { name: string; content: string }) {
   const [expanded, setExpanded] = useState(false);
   let parsed: any = null;
   try { parsed = JSON.parse(content); } catch {}
@@ -90,13 +91,6 @@ function ToolResultCard({ name, content, images }: { name: string; content: stri
         </button>
       </div>
       <p className={`text-[10px] truncate ${isError ? "text-red-400" : "text-[var(--text-secondary)]"}`}>{summary}</p>
-      {images && images.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {images.map((img, i) => (
-            <ChatImage key={i} src={img} />
-          ))}
-        </div>
-      )}
       {expanded && (
         <pre className="mt-1.5 p-2 bg-[var(--bg-layer-0)]/60 rounded-lg text-[10px] font-mono text-[var(--text-muted)] overflow-x-auto custom-scrollbar max-h-[150px] whitespace-pre-wrap break-all">
           {content}
@@ -106,16 +100,21 @@ function ToolResultCard({ name, content, images }: { name: string; content: stri
   );
 }
 
-export const MessageBubble = memo(function MessageBubble({ msg }: { msg: ChatMessage }) {
+export const MessageBubble = memo(function MessageBubble({ msg, onAction }: { msg: ChatMessage; onAction?: (message: string) => void }) {
   const isUser = msg.role === "user";
   const isAssistant = msg.role === "assistant";
   const isTool = msg.role === "tool";
 
   // 工具消息
   if (isTool) {
+    // 判断是否为图片生成结果（有 images 字段）→ 显示 ResultActions
+    const hasImages = msg.images && msg.images.length > 0;
     return (
       <div className="w-full px-1">
-        <ToolResultCard name={msg.name || "tool"} content={msg.content} images={msg.images} />
+        <ToolResultCard name={msg.name || "tool"} content={msg.content} />
+        {hasImages && onAction && (
+          <ResultActions images={msg.images!} onAction={onAction} />
+        )}
       </div>
     );
   }
@@ -130,10 +129,10 @@ export const MessageBubble = memo(function MessageBubble({ msg }: { msg: ChatMes
               {msg.images.map((img, i) => <ChatImage key={i} src={img} />)}
             </div>
           )}
-          <div className="bg-[var(--glass-bg)] rounded-2xl rounded-tr-sm border border-[var(--accent-1)]/30 backdrop-blur-md px-4 py-2.5 shadow-[0_4px_15px_rgba(var(--accent-1-rgb),0.1)]">
-            <div className="text-[13px] text-[var(--text-primary)] whitespace-pre-wrap break-words">{msg.content}</div>
+          <div className="bg-[var(--glass-bg)] rounded-2xl rounded-tr-sm border border-[var(--accent-1)]/30 backdrop-blur-md p-4 shadow-[0_4px_15px_rgba(var(--accent-1-rgb),0.1)]">
+            <div className="text-[14px] text-[var(--text-primary)] whitespace-pre-wrap break-words">{msg.content}</div>
           </div>
-          <div className="text-right text-[9px] font-mono text-[var(--text-muted)] mt-0.5 mr-1">YOU</div>
+          <div className="text-right text-[10px] font-mono text-[var(--text-muted)] mt-0.5 mr-1">YOU</div>
         </div>
       </div>
     );
@@ -147,8 +146,8 @@ export const MessageBubble = memo(function MessageBubble({ msg }: { msg: ChatMes
   if (isThinking) {
     return (
       <div className="flex items-center gap-2 py-2">
-        <Bot size={14} className="text-[var(--accent-1)]" />
-        <span className="text-[11px] text-[var(--text-secondary)]">思考中</span>
+        <Bot size={16} className="text-[var(--accent-1)]" />
+        <span className="text-[13px] text-[var(--text-secondary)]">思考中</span>
         <div className="flex gap-1">
           {[0, 1, 2].map((i) => (
             <div key={i} className="w-1.5 h-1.5 rounded-full bg-[var(--accent-1)] animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
@@ -161,20 +160,20 @@ export const MessageBubble = memo(function MessageBubble({ msg }: { msg: ChatMes
   return (
     <div className="flex gap-2">
       {/* Bot avatar */}
-      <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--accent-1)]/30 to-[var(--accent-2)]/30 border border-[var(--accent-1)]/20 flex items-center justify-center mt-0.5">
-        <Bot size={14} className="text-[var(--accent-1)]" />
+      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--accent-1)]/30 to-[var(--accent-2)]/30 border border-[var(--accent-1)]/20 flex items-center justify-center mt-0.5">
+        <Bot size={16} className="text-[var(--accent-1)]" />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 text-[14px]">
         {msg.reasoning_content && <ReasoningBlock content={msg.reasoning_content} />}
         {hasToolCalls && msg.tool_calls!.map((tc) => (
           <ToolCallCard key={tc.id} name={tc.function.name} args={tc.function.arguments} />
         ))}
         {hasContent && (
-          <div className="bg-[var(--glass-bg)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl px-4 py-2.5">
+          <div className="bg-[var(--glass-bg)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl p-4">
             <MarkdownContent content={msg.content} />
           </div>
         )}
-        <div className="text-[9px] font-mono text-[var(--text-muted)] mt-0.5 ml-1">AI</div>
+        <div className="text-[10px] font-mono text-[var(--text-muted)] mt-0.5 ml-1">AI</div>
       </div>
     </div>
   );

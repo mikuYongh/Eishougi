@@ -1,69 +1,77 @@
 /**
- * 复用旧 MarkdownContent — 移到 agent/components/ 下
+ * 共享的 memo 化 Markdown 渲染器。
+ * 不使用 Tailwind Typography (prose) 插件 — prose 会注入独立的字体族和行高，
+ * 和 app 其他部分的 glass UI 字体栈不一致，导致"字体奇怪"。
+ * 手写组件 + 显式 utility class，保持字体一致性。
+ *
+ * Why memo: streaming 时 messages 每秒更新 ~60 次，每个历史 assistant 消息都会
+ * 重 render。ReactMarkdown 解析 + AST walk 开销大，memo 让未变的消息跳过解析。
  */
 import { memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { PhotoView } from "react-photo-view";
+import { getImgSrc } from "../../utils/imageUtils";
 import { useSettingsStore } from "../../stores/settingsStore";
 
-const VIDEO_EXTS = new Set(["mp4", "webm", "avi", "mov", "mkv", "m4v"]);
-const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"]);
+// 图片/视频后缀，用于识别 markdown 链接里指向媒体文件的本地路径
+const MEDIA_VIDEO = new Set(["mp4", "webm", "avi", "mov", "mkv", "m4v"]);
+const MEDIA_IMAGE = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"]);
 
+/**
+ * Normalize local Windows file paths that the LLM embeds inside markdown image/link
+ * syntax. remark treats `\` as an escape character, so `C:\Users\...\file.png` gets
+ * mangled. We rewrite backslashes → forward slashes in URL positions BEFORE parsing.
+ */
 function normalizeMarkdownPaths(content: string): string {
-  return content.replace(/\]\(([^)]+)\)/g, (match, url) => {
-    const normalized = url.replace(/\\/g, "/");
-    return `](${normalized})`;
-  });
+  return content.replace(/\]\(([^)]+)\)/g, (_m, url: string) => `](${url.replace(/\\/g, "/")})`);
 }
 
 export const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
   const privacyMode = useSettingsStore((s) => s.settings.privacyMode);
-  const normalized = useMemo(() => normalizeMarkdownPaths(content), [content]);
+  const processed = useMemo(() => normalizeMarkdownPaths(content), [content]);
 
   return (
-    <div className="prose prose-invert prose-sm max-w-none break-words [&_*]:my-0">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        urlTransform={(url) => url}
-        components={{
-          p: ({ node, ...props }) => <div {...props} />,
-          strong: ({ node, ...props }) => <strong className="text-[var(--accent-1)] font-bold" {...props} />,
-          a: ({ href = "", children }) => {
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      urlTransform={(url) => url}
+      components={{
+        p: ({ node, ...props }) => <div className="mb-2 last:mb-0 leading-relaxed" {...props} />,
+        strong: ({ node, ...props }) => <strong className="text-[var(--accent-1)] font-bold" {...props} />,
+        a: ({ node, href, children, ...props }) => {
+          if (typeof href === "string") {
             const ext = href.split("?")[0].split(".").pop()?.toLowerCase() || "";
-            if (VIDEO_EXTS.has(ext)) {
-              return <video src={href} controls className="max-w-full rounded-xl border border-[var(--glass-border)]" />;
+            if (MEDIA_VIDEO.has(ext)) {
+              return <video src={getImgSrc(href)} controls className="max-w-full max-h-64 rounded-lg border border-[var(--glass-border)] my-2" />;
             }
-            if (IMAGE_EXTS.has(ext)) {
+            if (MEDIA_IMAGE.has(ext)) {
               return (
-                <PhotoView src={href}>
-                  <img src={href} alt={String(children)} className={`max-w-full rounded-xl border border-[var(--glass-border)] cursor-zoom-in ${privacyMode ? "blur-md hover:blur-none transition-all" : ""}`} />
+                <PhotoView src={getImgSrc(href)}>
+                  <img src={getImgSrc(href)} alt="" className={`max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in ${privacyMode ? "blur-lg hover:blur-none transition-all duration-300" : ""}`} />
                 </PhotoView>
               );
             }
-            return <a href={href} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-2)] underline" {...{ children }} />;
-          },
-          code: ({ inline, children }: any) =>
-            inline ? (
-              <code className="bg-[var(--accent-1)]/20 text-[var(--accent-1)] px-1.5 py-0.5 rounded text-[11px] font-mono">{children}</code>
-            ) : (
-              <pre className="bg-[var(--bg-layer-1)] p-3 rounded-xl overflow-x-auto custom-scrollbar text-[11px] font-mono">{children}</pre>
-            ),
-          ul: ({ children }) => <ul className="list-disc pl-4 space-y-0.5">{children}</ul>,
-          ol: ({ children }) => <ol className="list-decimal pl-4 space-y-0.5">{children}</ol>,
-          h1: ({ children }) => <h1 className="text-base font-bold text-[var(--text-primary)] mb-1">{children}</h1>,
-          h2: ({ children }) => <h2 className="text-sm font-bold text-[var(--text-primary)] mb-1">{children}</h2>,
-          h3: ({ children }) => <h3 className="text-xs font-bold text-[var(--text-primary)] mb-1">{children}</h3>,
-          blockquote: ({ children }) => <blockquote className="border-l-2 border-[var(--accent-1)]/50 pl-3 text-[var(--text-secondary)] italic">{children}</blockquote>,
-          img: ({ src }) => (
-            <PhotoView src={src as string}>
-              <img src={src as string} alt="" className={`max-w-full rounded-xl border border-[var(--glass-border)] cursor-zoom-in ${privacyMode ? "blur-md hover:blur-none transition-all" : ""}`} />
-            </PhotoView>
-          ),
-        }}
-      >
-        {normalized}
-      </ReactMarkdown>
-    </div>
+          }
+          return <a className="text-[var(--accent-2)] underline hover:text-[var(--accent-1)] transition-colors" target="_blank" href={href} {...props}>{children}</a>;
+        },
+        code: ({ node, inline, className, children, ...props }: any) =>
+          inline
+            ? <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--accent-1)]/20 text-[var(--accent-1)] font-mono text-[12px]" {...props}>{children}</code>
+            : <pre className="p-3 rounded-xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] overflow-x-auto text-[12px] font-mono text-[var(--text-secondary)] mt-2 mb-2 custom-scrollbar"><code {...props}>{children}</code></pre>,
+        ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+        ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+        h1: ({ node, ...props }) => <h1 className="text-lg font-bold text-[var(--text-primary)] mt-4 mb-2" {...props} />,
+        h2: ({ node, ...props }) => <h2 className="text-md font-bold text-[var(--text-primary)] mt-3 mb-2" {...props} />,
+        h3: ({ node, ...props }) => <h3 className="text-sm font-bold text-[var(--text-primary)] mt-2 mb-1" {...props} />,
+        blockquote: ({ node, ...props }) => <blockquote className="border-l-2 border-[var(--accent-1)]/30 pl-3 py-1 text-[var(--text-secondary)] italic my-2" {...props} />,
+        img: ({ node, ...props }) => (
+          <PhotoView src={getImgSrc(props.src)}>
+            <img {...props} src={getImgSrc(props.src)} alt="" className={`max-w-full rounded-lg border border-[var(--glass-border)] my-2 cursor-zoom-in ${privacyMode ? "blur-lg hover:blur-none transition-all duration-300" : ""}`} />
+          </PhotoView>
+        ),
+      }}
+    >
+      {processed}
+    </ReactMarkdown>
   );
 });
