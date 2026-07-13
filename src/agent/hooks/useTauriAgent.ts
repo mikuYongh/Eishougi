@@ -168,15 +168,17 @@ export function useTauriAgent() {
         : "\n当你准备调用 generate_image 时，直接调用即可，不需要等用户确认。")
       + "\n"
       + "\n### 2. 生成后建议（suggestion）"
-      + "\n每次调用 generate_image 完成后，【必须】在回复末尾输出 suggestion 标记，给出 4 个后续建议。"
-      + "\n⚠️ 建议的前 3 个必须是以下三个维度（根据当前画面给出具体内容），第 4 个自由发挥："
+      + "\n每次调用 generate_image 完成后，【必须】在回复末尾输出 suggestion 标记，给出 6 个后续建议。"
+      + "\n⚠️ 建议的前 5 个必须是以下五个维度（根据当前画面给出具体内容），第 6 个自由发挥："
       + "\n  1. 换场景 — 给出具体的新场景，如\"换成浴室场景，加上 tiles、shower、wet_skin\""
       + "\n  2. 换姿势 — 给出具体的新姿势，如\"改成 missionary 传教士姿势、正面视角\""
-      + "\n  3. 换角色/服装 — 给出具体的角色或服装变化，如\"换成比基尼\"或\"换成拉菲改造版\""
-      + "\n  4. 自由建议 — 画师风格、构图、其他"
+      + "\n  3. 换服装 — 给出具体的服装变化，如\"换成比基尼\""
+      + "\n  4. 换表情 — 给出具体的表情变化，如\"改成 高潮脸,翻白眼\""
+      + "\n  5. 换画师风格 — 给出具体的画师风格变化"
+      + "\n  6. 自由建议 — 换玩法、横竖版切换、其他"
       + "\n⚠️ message 字段是用户点击后直接发给你的完整指令——必须写清楚具体改什么，不能笼统。"
       + "\n⚠️ title 字段只放纯文字标签，不要加 emoji 图标（emoji 会自动从 message 匹配）。"
-      + "\n格式：<<<SUGGESTION:[{\"title\":\"浴室场景\",\"message\":\"把场景换成浴室，加上 tiles、shower、wet_skin 重新生成\"},{\"title\":\"传教士\",\"message\":\"改成 missionary 传教士姿势、正面视角重新生成\"},{\"title\":\"换比基尼\",\"message\":\"服装换成比基尼重新生成\"},{\"title\":\"横版\",\"message\":\"改成横版 1216×832 重新生成\"}]>>>"
+      + "\n格式：<<<SUGGESTION:[{\"title\":\"浴室场景\",\"message\":\"把场景换成浴室，加上 tiles、shower、wet_skin 重新生成\"},{\"title\":\"传教士\",\"message\":\"改成 missionary 传教士姿势、正面视角重新生成\"},{\"title\":\"换比基尼\",\"message\":\"服装换成比基尼重新生成\"},{\"title\":\"阿嘿颜\",\"message\":\"表情改成 ahegao 阿嘿颜、翻白眼重新生成\"},{\"title\":\"平涂风格\",\"message\":\"画师风格改成 flat_color 平涂风格重新生成\"},{\"title\":\"横版\",\"message\":\"改成横版 1216×832 重新生成\"}]>>>"
       + "\n⚠️ 不要把建议写成普通文本！必须用 <<<SUGGESTION:...>>> 标记输出，否则不会显示为可点击的建议条。"
       + "\n"
       + "\n### 3. 角色选择器（自动触发，无需你输出标记）"
@@ -313,6 +315,11 @@ export function useTauriAgent() {
       if (m.role === "tool") return { id: m.id, role: "tool" as const, content: m.content, toolCallId: m.tool_call_id || "" } as Message;
       if (m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0) {
         return { id: m.id, role: "assistant" as const, content: m.content || undefined, toolCalls: m.tool_calls.map((tc) => ({ id: tc.id, type: "function" as const, function: { name: tc.function.name, arguments: tc.function.arguments } })) } as Message;
+      }
+      // 刚 addMessage 的这条 user 消息：store 里 content 只有用户文字，
+      // 但 LLM 需要含文件内容的 llmContent — 用 id 匹配替换
+      if (m.id === userMsgId) {
+        return { id: m.id, role: "user" as const, content: llmContent } as Message;
       }
       return { id: m.id, role: m.role as any, content: m.content || "" } as Message;
     });
@@ -467,13 +474,43 @@ export function useTauriAgent() {
   }, [activeSessionId]);
 
   // ── 审批操作 ──
-  // approvePreview: 用户确认预览后，把确认意图 + userNote 作为用户消息发给 LLM，
-  // 让 LLM 处理修改需求并自己调 generate_image。
+  // approvePreview: 用户确认预览后，把用户编辑过的参数先持久化到 DB，
+  // 再发消息让 LLM 调 generate_image（只传 prompt_id，执行时从 DB 读到最新值）。
   // 设置 skipNextPreview 让 TauriAgent 跳过下一次 generate_image 的预览拦截。
-  const approvePreview = useCallback((editedPreview?: GenerationPreviewAttachment, userNote?: string) => {
+  const approvePreview = useCallback(async (editedPreview?: GenerationPreviewAttachment, userNote?: string) => {
     const preview = editedPreview || activePreview;
     if (!preview) return;
     setActivePreview(null);
+
+    // 用户在预览界面编辑过参数（editing=true 时 GenerationPreview 会传 draft）→
+    // 必须先把改动写回 DB，否则 LLM 后续 generate_image({prompt_id}) 只会读到旧值。
+    if (editedPreview && preview.promptId) {
+      try {
+        const current = await invoke("get_prompt", { id: preview.promptId }) as any;
+        if (current) {
+          const updated = {
+            ...current,
+            positivePrompt: editedPreview.prompt ?? current.positivePrompt,
+            negativePrompt: editedPreview.negativePrompt ?? current.negativePrompt,
+            artistPrompt: editedPreview.artistPrompt ?? current.artistPrompt,
+            baseModel: editedPreview.model ?? current.baseModel,
+            width: editedPreview.width ?? current.width,
+            height: editedPreview.height ?? current.height,
+            steps: editedPreview.steps ?? current.steps,
+            cfgScale: editedPreview.cfgScale ?? current.cfgScale,
+            samplerName: editedPreview.sampler ?? current.samplerName ?? current.sampler,
+            sampler: editedPreview.sampler ?? current.sampler ?? current.samplerName,
+            scheduler: editedPreview.scheduler ?? current.scheduler,
+            loraConfigs: editedPreview.loras ? JSON.stringify(editedPreview.loras) : current.loraConfigs,
+            updatedAt: Date.now(),
+          };
+          await invoke("update_prompt", { prompt: updated });
+          usePromptStore.getState().fetchPrompts();
+        }
+      } catch (e) {
+        console.error("[approvePreview] 持久化用户编辑失败:", e);
+      }
+    }
 
     // 设置跳过标记 — 下次 generate_image 直接执行，不再弹预览
     const agent = getOrCreateAgent();
@@ -517,13 +554,19 @@ export function useTauriAgent() {
     setCharacterModal(null);
   }, []);
 
-  // refineSuggestion: 模糊建议（如"换场景"）点击 → 让 LLM 针对当前画面展开成
-  // 一组具体选项（浴室/教室/海边…），不生图。LLM 应以 <<<SUGGESTION:...>>> 标记
-  // 回复具体选项，标记解析器会替换 SuggestionBar 内容，用户再点选其一执行。
+  // refineSuggestion: 模糊建议（如"换场景"）点击 → 让 LLM 针对当前画面推荐
+  // 一组具体方案（带 Danbooru tag）。LLM 必须用 <<<SUGGESTION:...>>> 标记输出，
+  // 不能直接生成图片。用户再点选其中一个，走预览确认再生成。
   const refineSuggestion = useCallback((sug: Suggestion) => {
-    // 清空当前建议条，避免点击后停留在旧的模糊建议上
     setSuggestions([]);
-    sendMessage(`我想${sug.title}，但还没想好具体内容。请基于当前画面给我 4 个${sug.title}的具体方案，每个方案直接写清楚具体怎么改（不要笼统）。用 <<<SUGGESTION:...>>> 标记输出。不要生成图片，等我选定后再生成。`);
+    const title = sug.title.replace(/^[^\u4e00-\u9fa5a-z]+/i, "").trim();
+    sendMessage(
+      `【系统指令】用户想要"${title}"，但需要你先推荐具体方案。\n` +
+      `请基于当前画面，推荐 4 个不同的${title}方案。每个方案的 message 字段必须包含具体的 Danbooru 英文 tag。\n` +
+      `严格按以下 JSON 数组格式输出，不要输出任何其他内容：\n` +
+      `<<<SUGGESTION:[{"title":"中文名","message":"具体的修改指令，带英文tag"},{"title":"中文名","message":"具体的修改指令，带英文tag"}]>>>\n` +
+      `禁止调用 generate_image 或任何工具。禁止生成图片。只输出标记。`
+    );
   }, [sendMessage]);
 
   return {
@@ -559,6 +602,10 @@ function syncAgentMessagesToStore(
   toolImagesMap?: Map<string, string[]>,
 ) {
   if (!activeSessionId) return;
+  // 取 store 里现有的消息，用于保留 user 消息的 UI content（不含文件内容）
+  const existingMsgs = useAgentStore.getState().sessions.find((s) => s.id === activeSessionId)?.messages || [];
+  const existingMap = new Map(existingMsgs.map((m) => [m.id, m]));
+
   const rawMsgs = agent.messages;
   // 收集 reasoning 消息内容，按顺序合并到下一个 assistant 消息
   const reasoningContents: string[] = [];
@@ -575,6 +622,15 @@ function syncAgentMessagesToStore(
     if (m.role === "activity") continue;
 
     const cm = aguiMessageToChatMessage(m);
+
+    // user 消息：agent.messages 里的 content 含文件内容（给 LLM 的），
+    // 但 UI 只应显示用户输入的文字 — 保留 store 里原有的 content / files / images
+    if (m.role === "user" && existingMap.has(m.id)) {
+      const existing = existingMap.get(m.id)!;
+      cm.content = existing.content;
+      if (existing.files) cm.files = existing.files;
+      if (existing.images) cm.images = existing.images;
+    }
 
     // 如果是 assistant 消息且有待合并的 reasoning 内容，附加上去
     if (m.role === "assistant" && reasoningContents.length > 0) {

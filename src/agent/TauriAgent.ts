@@ -320,8 +320,9 @@ export class TauriAgent extends AbstractAgent {
             matchedMarker = marker;
           }
           // 检测 partial（combined 以 marker 的前缀结尾但还没完整出现）
-          for (let prefixLen = Math.min(combined.length, marker.length - 1); prefixLen >= 1; prefixLen--) {
-            if (combined.endsWith(marker.slice(0, prefixLen)) && marker.slice(0, prefixLen) !== "") {
+          // 只检测长度 >= 2 的前缀（避免单个 "<" 误匹配 HTML/markdown 内容）
+          for (let prefixLen = Math.min(combined.length, marker.length - 1); prefixLen >= 2; prefixLen--) {
+            if (combined.endsWith(marker.slice(0, prefixLen))) {
               // 如果 combined 完全以 marker 前缀结尾且没有更早的完整标记，暂存
               if (earliestStart === -1) {
                 pendingBuffer = combined;
@@ -463,23 +464,50 @@ export class TauriAgent extends AbstractAgent {
       pendingBuffer = "";
     }
 
-    // ── 自动注入 suggestion 标记（兜底）──
-    // 如果 LLM 没有自己输出 SUGGESTION 标记（hadSuggestionMarker 仍为 false），
-    // 注入一组模糊的维度建议（换姿势/场景/服装等）。这类建议是笼统的，需要用户确认具体内容。
-    if (toolCalls.length > 0 && toolCalls.some((tc) => tc.function.name === "generate_image")) {
-      // 记录 generate_image 完成事实，下一轮递归（纯文本回复）时检查
-      this._lastGenImageRound = round;
-    }
+    // ── 自动注入 suggestion（兜底）──
+    // LLM 在 medium reasoning 下几乎从不输出 <<<SUGGESTION:>>> 标记，
+    // 所以这里作为主要建议来源——根据当前 prompt 内容动态生成有针对性的建议。
+    // _lastGenImageRound 在下方 tool 执行循环里，仅当 generate_image 真正返回图片（非 pending）时才设置。
     if (toolCalls.length === 0 && assistantContent && this._lastGenImageRound !== undefined && this._lastGenImageRound === round - 1) {
-      // 这是 generate_image 后的下一轮（纯文本回复），仅在 LLM 未自行输出建议标记时兜底
       if (!hadSuggestionMarker) {
-        const defaultSuggestions = [
+        // 从最近的 tool 结果里提取 prompt_id，读 DB 获取当前 prompt 内容
+        let currentPrompt = "";
+        let currentWidth = 832, currentHeight = 1216;
+        try {
+          // 从 input.messages 里找最近的 generate_image 调用，提取 prompt_id
+          for (let mi = input.messages.length - 1; mi >= 0; mi--) {
+            const m = input.messages[mi] as any;
+            if (m.role === "assistant" && m.toolCalls) {
+              for (const tc of m.toolCalls) {
+                if (tc.function?.name === "generate_image") {
+                  const args = JSON.parse(tc.function.arguments || "{}");
+                  if (args.prompt_id) {
+                    const dbP = await invoke("get_prompt", { id: args.prompt_id }) as any;
+                    currentPrompt = (dbP?.positivePrompt || "").toLowerCase();
+                    currentWidth = dbP?.width || 832;
+                    currentHeight = dbP?.height || 1216;
+                  }
+                }
+              }
+            }
+          }
+        } catch {}
+
+        // 根据当前尺寸决定横竖版切换建议
+        const isLandscape = currentWidth > currentHeight;
+
+        const suggestions = [
+          // 重新生成（confirm:false，明确无歧义，直接执行）
+          { title: "🔄 重新抽", message: "用相同参数重新生成一张", confirm: false },
+          // 笼统维度（confirm:true，点击后让 LLM 展开成具体选项让用户选）
           { title: "换姿势", message: "换一个姿势重新生成这张图", confirm: true },
           { title: "换场景", message: "换一个场景重新生成这张图", confirm: true },
           { title: "换服装", message: "换一套服装重新生成这张图", confirm: true },
-          { title: "横版", message: "改成横版 1216×832 重新生成", confirm: false },
+          { title: "换表情", message: "换一个表情重新生成这张图", confirm: true },
+          // 横竖版切换（confirm:false，明确操作）
+          { title: isLandscape ? "📱 竖版" : "🖥️ 横版", message: isLandscape ? "改成竖版 832×1216 重新生成" : "改成横版 1216×832 重新生成", confirm: false },
         ];
-        observer.next({ type: EventType.CUSTOM, name: "suggestion", value: defaultSuggestions } as BaseEvent);
+        observer.next({ type: EventType.CUSTOM, name: "suggestion", value: suggestions } as BaseEvent);
       }
       this._lastGenImageRound = undefined;
     }
@@ -543,6 +571,30 @@ export class TauriAgent extends AbstractAgent {
           resultStr = JSON.stringify({ error: "Invalid JSON arguments" });
         }
 
+        // ── refine 模式拦截：用户点了模糊建议（换姿势/换场景等），要求 LLM 先推荐具体方案。
+        // 如果 LLM 试图直接生成图片或修改 prompt，拦截它，提醒只输出建议标记。
+        if (!resultStr && input.messages.length > 0) {
+          const lastUserMsg = [...input.messages].reverse().find((m: any) => m.role === "user");
+          const userContent = (lastUserMsg as any)?.content || "";
+          if (typeof userContent === "string" && userContent.startsWith("【系统指令】")) {
+            const blocked = ["generate_image", "generate_video_from_image", "update_prompt_content", "update_prompt_settings", "create_prompt"];
+            if (blocked.includes(call.function.name)) {
+              resultStr = JSON.stringify({
+                error: "用户正在请求你推荐方案，不要执行任何操作。请直接用 <<<SUGGESTION:[...]]>>> 标记输出 4 个具体方案，不要调用任何工具。"
+              });
+              toolResults.push({ id: call.id, content: resultStr });
+              observer.next({
+                type: EventType.TOOL_CALL_RESULT,
+                messageId,
+                toolCallId: call.id,
+                content: resultStr,
+                role: "tool",
+              } as BaseEvent);
+              continue;
+            }
+          }
+        }
+
         // ── 专注模式拦截：generate_image 调用前弹出预览卡片让用户确认 ──
         // 不依赖 LLM 输出标记 — 在工具执行层强制拦截，100% 可靠。
         // skipNextPreview 标记：用户已确认预览，直接执行不拦截（执行后重置）。
@@ -552,6 +604,18 @@ export class TauriAgent extends AbstractAgent {
           if (parsedArgs.prompt_id) {
             try {
               dbPrompt = await invoke("get_prompt", { id: parsedArgs.prompt_id });
+            } catch {}
+          }
+          // loraConfigs 在 DB 里存的是 JSON 字符串，需解析成数组给预览组件
+          let loraConfigs: any[] | undefined;
+          if (Array.isArray(parsedArgs.lora_configs)) {
+            loraConfigs = parsedArgs.lora_configs;
+          } else if (dbPrompt?.loraConfigs) {
+            try {
+              const parsed = typeof dbPrompt.loraConfigs === "string"
+                ? JSON.parse(dbPrompt.loraConfigs)
+                : dbPrompt.loraConfigs;
+              loraConfigs = Array.isArray(parsed) ? parsed : undefined;
             } catch {}
           }
           const previewValue = {
@@ -567,7 +631,7 @@ export class TauriAgent extends AbstractAgent {
             cfgScale: parsedArgs.cfg_scale || dbPrompt?.cfgScale,
             sampler: parsedArgs.sampler_name || dbPrompt?.sampler,
             scheduler: parsedArgs.scheduler || dbPrompt?.scheduler,
-            loras: parsedArgs.lora_configs || dbPrompt?.loraConfigs,
+            loras: loraConfigs,
             promptId: parsedArgs.prompt_id,
             status: "pending" as const,
           };
@@ -583,6 +647,19 @@ export class TauriAgent extends AbstractAgent {
             role: "tool",
           } as BaseEvent);
           continue;
+        }
+
+        // ── 用户已确认预览（skipNextPreview=true）：LLM 会重新调 generate_image，
+        // 但它仍带着原始的 base_model/lora_configs 等参数 — 这些是用户在预览界面
+        // 编辑之前的旧值。如果让它们覆盖 DB（DB 里已是用户编辑后的新值），
+        // 用户在预览里的修改就白费了。
+        // 修复：此时剥掉 LLM 传的所有参数，只留 prompt_id + batch_count，
+        // 强制 executeTool 从 DB 读取用户确认后的真实参数。
+        if (call.function.name === "generate_image" && this.skipNextPreview) {
+          parsedArgs = {
+            prompt_id: parsedArgs.prompt_id,
+            ...(parsedArgs.batch_count != null ? { batch_count: parsedArgs.batch_count } : {}),
+          };
         }
 
         if (!resultStr) {
@@ -618,6 +695,11 @@ export class TauriAgent extends AbstractAgent {
         // generate_image 执行完毕后重置 skipNextPreview
         if (call.function.name === "generate_image") {
           this.skipNextPreview = false;
+          // 仅当真正生成完成（非 pending 拦截）时记录轮次，供下一轮纯文本回复的 suggestion 兜底用。
+          // focusMode 拦截返回的 pending 结果不算，否则会在"预览已弹出"的文字轮提前触发 fallback。
+          if (!resultStr.includes('"status":"pending"')) {
+            this._lastGenImageRound = round;
+          }
         }
 
         // 发射 TOOL_CALL_RESULT

@@ -85,24 +85,26 @@ export async function executeTool(
       }
 
       const localCheckpoints = useModelStore.getState().checkpoints || [];
+      // 优先级：LLM 显式传的参数（= 用户意图）> 工作流默认值 > 本地列表第一个 > 空
+      // 之前工作流解析值优先级最高，导致用户切换基础模型后被工作流自带的旧模型覆盖
       let resolvedBaseModel: string;
-      if (workflowParsedBaseModel) {
-        resolvedBaseModel = workflowParsedBaseModel;
-      } else if (parsedArgs.base_model) {
+      if (parsedArgs.base_model) {
         resolvedBaseModel = parsedArgs.base_model;
+      } else if (workflowParsedBaseModel) {
+        resolvedBaseModel = workflowParsedBaseModel;
       } else if (localCheckpoints.length > 0) {
         resolvedBaseModel = localCheckpoints[0];
       } else {
         resolvedBaseModel = "";
       }
 
-      const resolvedWidth = workflowParsedWidth ?? parsedArgs.width ?? 1024;
-      const resolvedHeight = workflowParsedHeight ?? parsedArgs.height ?? 1024;
-      const resolvedSteps = workflowParsedSteps ?? parsedArgs.steps ?? 25;
-      const resolvedCfg = workflowParsedCfg ?? parsedArgs.cfg_scale ?? 5.0;
-      const resolvedSampler = workflowParsedSampler ?? parsedArgs.sampler_name ?? "euler";
-      const resolvedScheduler = workflowParsedScheduler ?? parsedArgs.scheduler ?? "normal";
-      const resolvedVae = workflowParsedVaeModel ?? parsedArgs.vae_model ?? "auto";
+      const resolvedWidth = parsedArgs.width ?? workflowParsedWidth ?? 1024;
+      const resolvedHeight = parsedArgs.height ?? workflowParsedHeight ?? 1024;
+      const resolvedSteps = parsedArgs.steps ?? workflowParsedSteps ?? 25;
+      const resolvedCfg = parsedArgs.cfg_scale ?? workflowParsedCfg ?? 5.0;
+      const resolvedSampler = parsedArgs.sampler_name ?? workflowParsedSampler ?? "euler";
+      const resolvedScheduler = parsedArgs.scheduler ?? workflowParsedScheduler ?? "normal";
+      const resolvedVae = parsedArgs.vae_model ?? workflowParsedVaeModel ?? "auto";
 
       const resolvedLoraConfigs: string | null = workflowParsedLoras.length > 0
         ? JSON.stringify(workflowParsedLoras)
