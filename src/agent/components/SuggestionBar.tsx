@@ -28,7 +28,7 @@ export function SuggestionBar({ suggestions, onSelect, onRefine }: SuggestionBar
             <button
               key={i}
               onClick={() => (needsRefine ? onRefine(sug) : onSelect(sug.message))}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--glass-bg)] border border-[var(--accent-1)]/20 hover:border-[var(--accent-1)]/40 hover:bg-[var(--accent-1)]/10 text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-1)] transition-all cursor-pointer group"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--glass-bg)] border border-[var(--accent-1)]/20 hover:border-[var(--accent-1)]/40 hover:bg-[var(--accent-1)]/10 text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent-1)] transition-all cursor-pointer group flex-shrink-0 whitespace-nowrap"
             >
               {sug.confirm ? (
                 <Sparkle size={9} className="text-[var(--accent-2)] group-hover:text-[var(--accent-1)]" />

@@ -18,12 +18,14 @@ interface SearchableDropdownProps {
   containerClassName?: string;
   isLoading?: boolean;
   isError?: boolean;
+  /** 向上展开下拉面板（用于组件位于滚动容器底部、向下展开会被裁切的场景） */
+  dropUp?: boolean;
 }
 
-export function SearchableDropdown({ 
-  value, 
-  onChange, 
-  options, 
+export function SearchableDropdown({
+  value,
+  onChange,
+  options,
   accentColor = "blue",
   placeholder = "请选择...",
   searchPlaceholder = "搜索选项...",
@@ -32,6 +34,7 @@ export function SearchableDropdown({
   containerClassName = "",
   isLoading = false,
   isError = false,
+  dropUp = false,
 }: SearchableDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -122,7 +125,7 @@ export function SearchableDropdown({
       </button>
 
       {isOpen && (
-        <div className={`absolute z-[100] mt-2 bg-[var(--bg-layer-1)] backdrop-blur-3xl border border-[var(--glass-border-active)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in slide-in-from-top-2 duration-200 ${dropdownClassName || 'w-full left-0'}`}>
+        <div className={`absolute z-[100] ${dropUp ? 'bottom-full mb-2 slide-in-from-bottom-2' : 'top-full mt-2 slide-in-from-top-2'} bg-[var(--bg-layer-1)] backdrop-blur-3xl border border-[var(--glass-border-active)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[300px] animate-in fade-in duration-200 ${dropdownClassName || 'w-full left-0'}`}>
           
           <div className="p-2 border-b border-[var(--glass-border)] flex-shrink-0">
             <div className="relative flex items-center">

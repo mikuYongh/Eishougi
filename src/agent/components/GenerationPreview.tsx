@@ -65,10 +65,10 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
 
   // ── 只读参数行 ──
   const ParamRow = ({ icon: Icon, label, value }: { icon: any; label: string; value: string }) => (
-    <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)]">
-      <Icon size={10} className="text-[var(--text-muted)]" />
-      <span className="text-[var(--text-muted)]">{label}:</span>
-      <span className="font-mono text-[var(--text-primary)]">{value}</span>
+    <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-secondary)] min-w-0">
+      <Icon size={10} className="text-[var(--text-muted)] flex-shrink-0" />
+      <span className="text-[var(--text-muted)] flex-shrink-0">{label}:</span>
+      <span className="font-mono text-[var(--text-primary)] truncate min-w-0">{value}</span>
     </div>
   );
 
@@ -183,7 +183,7 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
                   onChange={(e) => updateField("steps", parseInt(e.target.value) || 20)}
                   min={1}
                   max={100}
-                  className="w-full mt-0.5 px-2 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50"
+                  className="w-full mt-0.5 px-2 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
               <div>
@@ -195,7 +195,7 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
                   onChange={(e) => updateField("cfgScale", parseFloat(e.target.value) || 5.0)}
                   min={0.1}
                   max={30}
-                  className="w-full mt-0.5 px-2 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50"
+                  className="w-full mt-0.5 px-2 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
             </div>
@@ -211,7 +211,7 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
                   min={64}
                   max={2048}
                   step={64}
-                  className="w-full mt-0.5 px-2 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50"
+                  className="w-full mt-0.5 px-2 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
               <div>
@@ -223,7 +223,7 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
                   min={64}
                   max={2048}
                   step={64}
-                  className="w-full mt-0.5 px-2 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50"
+                  className="w-full mt-0.5 px-2 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[11px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
             </div>
@@ -234,48 +234,46 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
                 <EditLabel icon={Layers} label="LoRA" />
                 <button onClick={addLora} className="text-[9px] text-[var(--accent-1)] hover:underline cursor-pointer">+ 添加</button>
               </div>
-              <div className="space-y-1 mt-0.5">
-                {(draft.loras || []).map((lora, i) => (
-                  <div key={i} className="flex items-center gap-1.5 p-2 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)]">
-                    <button
-                      onClick={() => updateLora(i, { enabled: !lora.enabled })}
-                      className={`w-4 h-4 rounded-full flex-shrink-0 transition-colors cursor-pointer ${lora.enabled ? "bg-[var(--accent-1)]" : "bg-[var(--glass-border)]"}`}
-                    />
-                    {loras.length > 0 ? (
-                      <select
-                        value={lora.name}
-                        onChange={(e) => updateLora(i, { name: e.target.value })}
-                        className="flex-1 min-w-0 bg-transparent text-[10px] text-[var(--text-primary)] outline-none cursor-pointer"
-                      >
-                        <option value="">{lora.name || "选择 LoRA..."}</option>
-                        {loras.map((l) => (
-                          <option key={l} value={l}>{l}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        value={lora.name}
-                        onChange={(e) => updateLora(i, { name: e.target.value })}
-                        placeholder="LoRA 文件名"
-                        className="flex-1 min-w-0 bg-transparent text-[10px] text-[var(--text-primary)] outline-none"
+              <div className="space-y-1 mt-0.5 max-h-48 overflow-y-auto custom-scrollbar">
+                {(Array.isArray(draft.loras) ? draft.loras : []).map((rawLora, i) => {
+                  const lora = {
+                    name: rawLora.name ?? "",
+                    strength: typeof rawLora.strength === "number" ? rawLora.strength : 0.8,
+                    enabled: typeof rawLora.enabled === "boolean" ? rawLora.enabled : true,
+                  };
+                  return (
+                    <div key={i} className="flex items-center gap-1.5 p-2 rounded-lg bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+                      <button
+                        onClick={() => updateLora(i, { enabled: !lora.enabled })}
+                        className={`w-4 h-4 rounded-full flex-shrink-0 transition-colors cursor-pointer ${lora.enabled ? "bg-[var(--accent-1)]" : "bg-[var(--glass-border)]"}`}
                       />
-                    )}
-                    <input
-                      type="range"
-                      min={0}
-                      max={2}
-                      step={0.05}
-                      value={lora.strength}
-                      onChange={(e) => updateLora(i, { strength: parseFloat(e.target.value) })}
-                      className="w-16 accent-[var(--accent-1)] cursor-pointer flex-shrink-0"
-                    />
-                    <span className="text-[9px] font-mono text-[var(--text-secondary)] w-7 text-right flex-shrink-0">{lora.strength.toFixed(2)}</span>
-                    <button onClick={() => removeLora(i)} className="text-[var(--text-muted)] hover:text-red-400 cursor-pointer flex-shrink-0 p-0.5">
-                      <X size={11} />
-                    </button>
-                  </div>
-                ))}
+                      <SearchableDropdown
+                        value={lora.name}
+                        onChange={(v) => updateLora(i, { name: v })}
+                        options={loras.map((l) => ({ label: l, value: l }))}
+                        accentColor="orange"
+                        placeholder="选择 LoRA..."
+                        searchPlaceholder="搜索 LoRA..."
+                        containerClassName="flex-1 min-w-0"
+                        triggerClassName="!text-[10px] !py-1 !px-2"
+                        dropUp
+                      />
+                      <input
+                        type="range"
+                        min={0}
+                        max={2}
+                        step={0.05}
+                        value={lora.strength}
+                        onChange={(e) => updateLora(i, { strength: parseFloat(e.target.value) })}
+                        className="w-16 accent-[var(--accent-1)] cursor-pointer flex-shrink-0"
+                      />
+                      <span className="text-[9px] font-mono text-[var(--text-secondary)] w-7 text-right flex-shrink-0">{lora.strength.toFixed(2)}</span>
+                      <button onClick={() => removeLora(i)} className="text-[var(--text-muted)] hover:text-red-400 cursor-pointer flex-shrink-0 p-0.5">
+                        <X size={11} />
+                      </button>
+                    </div>
+                  );
+                })}
                 {(!Array.isArray(draft.loras) || draft.loras.length === 0) && (
                   <p className="text-[9px] text-[var(--text-muted)] py-1">无 LoRA</p>
                 )}
@@ -284,17 +282,57 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
           </div>
         ) : (
           /* 只读模式：保持原有 ParamRow 展示，补充 scheduler */
-          <div className="grid grid-cols-2 gap-1.5 mb-2.5">
-            {draft.model && <ParamRow icon={Cpu} label="模型" value={draft.model} />}
-            {draft.width && draft.height && <ParamRow icon={Maximize2} label="尺寸" value={`${draft.width}×${draft.height}`} />}
-            {draft.steps && <ParamRow icon={Sliders} label="步数" value={String(draft.steps)} />}
-            {draft.cfgScale && <ParamRow icon={Sliders} label="CFG" value={String(draft.cfgScale)} />}
-            {draft.sampler && <ParamRow icon={Sliders} label="采样器" value={draft.sampler} />}
-            {draft.scheduler && <ParamRow icon={Sliders} label="调度器" value={draft.scheduler} />}
-            {Array.isArray(draft.loras) && draft.loras.length > 0 && (
-              <ParamRow icon={Layers} label="LoRA" value={draft.loras.map((l) => `${l.name.split(".")[0]}(${l.strength})`).join(", ")} />
+          <>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-2.5">
+            {draft.model && (
+              <div className="min-w-0">
+                <ParamRow icon={Cpu} label="模型" value={draft.model} />
+              </div>
+            )}
+            {draft.width && draft.height && (
+              <div className="min-w-0">
+                <ParamRow icon={Maximize2} label="尺寸" value={`${draft.width}×${draft.height}`} />
+              </div>
+            )}
+            {draft.steps && (
+              <div className="min-w-0">
+                <ParamRow icon={Sliders} label="步数" value={String(draft.steps)} />
+              </div>
+            )}
+            {draft.cfgScale && (
+              <div className="min-w-0">
+                <ParamRow icon={Sliders} label="CFG" value={String(draft.cfgScale)} />
+              </div>
+            )}
+            {draft.sampler && (
+              <div className="min-w-0">
+                <ParamRow icon={Sliders} label="采样器" value={draft.sampler} />
+              </div>
+            )}
+            {draft.scheduler && (
+              <div className="min-w-0">
+                <ParamRow icon={Sliders} label="调度器" value={draft.scheduler} />
+              </div>
             )}
           </div>
+
+          {/* LoRA 列表（单独区块，可滚动，不挤在 grid 里撑破布局） */}
+          {!editing && Array.isArray(draft.loras) && draft.loras.length > 0 && (
+            <div className="mb-2.5">
+              <div className="flex items-center gap-1 text-[9px] text-[var(--text-muted)] mb-1">
+                <Layers size={10} />
+                <span>LoRA ({draft.loras.length})</span>
+              </div>
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto custom-scrollbar">
+                {draft.loras.map((l, i) => (
+                  <span key={i} className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${l.enabled === false ? "bg-[var(--bg-layer-0)]/50 text-[var(--text-muted)] border-[var(--glass-border)] line-through" : "bg-[var(--accent-1)]/10 text-[var(--accent-1)] border-[var(--accent-1)]/20"}`}>
+                    {l.name?.split(".")[0] || l.name}{typeof l.strength === "number" ? ` ×${l.strength}` : ""}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          </>
         )}
 
         {/* 负面提示词（只读模式） */}
