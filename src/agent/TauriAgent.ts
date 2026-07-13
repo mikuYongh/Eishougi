@@ -54,8 +54,8 @@ export interface TauriAgentConfig {
   getTools: () => ToolDef[];
   /** 获取 MCP 工具列表 */
   getMcpTools: () => any[];
-  /** 获取当前 agent 设置（effort, maxRounds, reasoningEffort） */
-  getAgentSettings: () => { effort: string; maxRounds: number; reasoningEffort: string };
+  /** 获取当前 agent 设置（effort, maxRounds, reasoningEffort, focusMode） */
+  getAgentSettings: () => { effort: string; maxRounds: number; reasoningEffort: string; focusMode: boolean };
   /** 回调：token 使用量更新 */
   onTokenUsage?: (usage: TokenUsage) => void;
   /** 回调：添加消息到 store */
@@ -135,6 +135,11 @@ function parseEmbeddedToolCalls(content: string): {
 
 export class TauriAgent extends AbstractAgent {
   private config: TauriAgentConfig;
+  // 专注模式：用户确认预览后设为 true，下次 generate_image 直接执行不拦截。
+  // 执行后自动重置为 false。
+  public skipNextPreview = false;
+  // 记录 generate_image 完成的轮次，用于下一轮自动注入 suggestion
+  public _lastGenImageRound: number | undefined;
 
   constructor(config: TauriAgentConfig) {
     super({
@@ -279,6 +284,98 @@ export class TauriAgent extends AbstractAgent {
 
     // SSE 缓冲
     let sseBuffer = "";
+    // 本轮流是否已通过标记发射过 suggestion（避免兜底逻辑重复发射）
+    let hadSuggestionMarker = false;
+
+    // ── 人机交互标记拦截 ──
+    // LLM 在文本流中输出特殊标记（<<<SUGGESTION:...>>>, <<<GEN_PREVIEW:...>>>, <<<CHARACTER_PICKER:...>>>）
+    // 我们在流过程中检测这些标记：标记内容不作为 TEXT_MESSAGE_CHUNK 转发（不显示给用户），
+    // 而是解析后作为 CUSTOM 事件发射，前端据此渲染富 UI 组件。
+    //
+    // 由于标记可能跨多个 SSE chunk 边界，我们用一个 pending buffer 暂存可能不完整的标记头部。
+    // 完整标记被截获后触发 CUSTOM 事件；非标记文本正常逐 token 转发（保持流式渲染体验）。
+    let pendingBuffer = "";  // 暂存可能不完整的标记片段
+    const MARKERS = ["<<<SUGGESTION:", "<<<GEN_PREVIEW:", "<<<CHARACTER_PICKER:"];
+    const END_MARKER = ">>>";
+
+    const flushText = (text: string) => {
+      if (!text) return;
+      assistantContent += text;
+      observer.next({ type: EventType.TEXT_MESSAGE_CHUNK, messageId, role: "assistant", delta: text } as BaseEvent);
+    };
+
+    const processTextDelta = (deltaText: string) => {
+      let combined = pendingBuffer + deltaText;
+      pendingBuffer = "";
+
+      while (combined.length > 0) {
+        // 查找最近的开标记位置
+        let earliestStart = -1;
+        let matchedMarker = "";
+        for (const marker of MARKERS) {
+          // 标记可能部分出现在 combined 末尾（跨 chunk），需要检测前缀
+          const fullIdx = combined.indexOf(marker);
+          if (fullIdx !== -1 && (earliestStart === -1 || fullIdx < earliestStart)) {
+            earliestStart = fullIdx;
+            matchedMarker = marker;
+          }
+          // 检测 partial（combined 以 marker 的前缀结尾但还没完整出现）
+          for (let prefixLen = Math.min(combined.length, marker.length - 1); prefixLen >= 1; prefixLen--) {
+            if (combined.endsWith(marker.slice(0, prefixLen)) && marker.slice(0, prefixLen) !== "") {
+              // 如果 combined 完全以 marker 前缀结尾且没有更早的完整标记，暂存
+              if (earliestStart === -1) {
+                pendingBuffer = combined;
+                return;
+              }
+              break;
+            }
+          }
+        }
+
+        if (earliestStart === -1) {
+          // 没有标记 — 全部转发
+          flushText(combined);
+          return;
+        }
+
+        // 先转发标记之前的普通文本
+        if (earliestStart > 0) {
+          flushText(combined.slice(0, earliestStart));
+        }
+
+        const afterMarker = combined.slice(earliestStart + matchedMarker.length);
+
+        // 查找结束标记 >>>
+        const endIdx = afterMarker.indexOf(END_MARKER);
+        if (endIdx === -1) {
+          // 标记尚未完整 — 暂存（连同标记头部）
+          pendingBuffer = combined.slice(earliestStart);
+          return;
+        }
+
+        // 完整标记！解析 JSON 内容并触发 CUSTOM 事件
+        const jsonStr = afterMarker.slice(0, endIdx).trim();
+        combined = afterMarker.slice(endIdx + END_MARKER.length);
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (matchedMarker === "<<<SUGGESTION:") {
+            // LLM 给出的建议是具体的（已写明改什么），点击直接执行，confirm=false
+            const suggestions = (Array.isArray(parsed) ? parsed : [parsed]).map((s: any) => ({ confirm: false, ...s }));
+            hadSuggestionMarker = true;
+            observer.next({ type: EventType.CUSTOM, name: "suggestion", value: suggestions } as BaseEvent);
+          } else if (matchedMarker === "<<<GEN_PREVIEW:") {
+            observer.next({ type: EventType.CUSTOM, name: "gen_preview", value: { ...parsed, type: "generation_preview", status: "pending" } } as BaseEvent);
+          } else if (matchedMarker === "<<<CHARACTER_PICKER:") {
+            observer.next({ type: EventType.CUSTOM, name: "character_picker", value: { ...parsed, type: "character_picker" } } as BaseEvent);
+          }
+        } catch (e) {
+          // JSON 解析失败 — 把标记内容作为普通文本输出（降级处理）
+          console.warn("[TauriAgent] failed to parse marker JSON:", jsonStr, e);
+          flushText(`[${matchedMarker}${jsonStr}${END_MARKER}]`);
+        }
+      }
+    };
 
     const processChunk = (chunk: string) => {
       if (isAborted()) return;
@@ -301,11 +398,8 @@ export class TauriAgent extends AbstractAgent {
           const delta = data.choices?.[0]?.delta;
           if (!delta) continue;
           if (delta.content) {
-            assistantContent += delta.content;
-            // 用 TEXT_MESSAGE_CHUNK（官方推荐的便捷事件）—— transformChunks 中间件会
-            // 自动展开为 TEXT_MESSAGE_START → CONTENT → END，apply() 据此管理 agent.messages。
-            // 不用手动发 START/END，不手动改 agent.messages。
-            observer.next({ type: EventType.TEXT_MESSAGE_CHUNK, messageId, role: "assistant", delta: delta.content } as BaseEvent);
+            // 通过标记拦截器处理，而非直接转发
+            processTextDelta(delta.content);
           }
           if (delta.reasoning_content && llmConfig.reasoningEnabled !== false) {
             assistantReasoning += delta.reasoning_content;
@@ -361,6 +455,33 @@ export class TauriAgent extends AbstractAgent {
         observer.next({ type: EventType.CUSTOM, name: "token_usage", value: tokenUsage } as BaseEvent);
       }
       return;
+    }
+
+    // ── 流结束后刷新残留的 pendingBuffer（不完整标记的尾部文本）──
+    if (pendingBuffer) {
+      flushText(pendingBuffer);
+      pendingBuffer = "";
+    }
+
+    // ── 自动注入 suggestion 标记（兜底）──
+    // 如果 LLM 没有自己输出 SUGGESTION 标记（hadSuggestionMarker 仍为 false），
+    // 注入一组模糊的维度建议（换姿势/场景/服装等）。这类建议是笼统的，需要用户确认具体内容。
+    if (toolCalls.length > 0 && toolCalls.some((tc) => tc.function.name === "generate_image")) {
+      // 记录 generate_image 完成事实，下一轮递归（纯文本回复）时检查
+      this._lastGenImageRound = round;
+    }
+    if (toolCalls.length === 0 && assistantContent && this._lastGenImageRound !== undefined && this._lastGenImageRound === round - 1) {
+      // 这是 generate_image 后的下一轮（纯文本回复），仅在 LLM 未自行输出建议标记时兜底
+      if (!hadSuggestionMarker) {
+        const defaultSuggestions = [
+          { title: "换姿势", message: "换一个姿势重新生成这张图", confirm: true },
+          { title: "换场景", message: "换一个场景重新生成这张图", confirm: true },
+          { title: "换服装", message: "换一套服装重新生成这张图", confirm: true },
+          { title: "横版", message: "改成横版 1216×832 重新生成", confirm: false },
+        ];
+        observer.next({ type: EventType.CUSTOM, name: "suggestion", value: defaultSuggestions } as BaseEvent);
+      }
+      this._lastGenImageRound = undefined;
     }
 
     // ── Token 使用量通过 CUSTOM 事件发射 ──
@@ -422,6 +543,48 @@ export class TauriAgent extends AbstractAgent {
           resultStr = JSON.stringify({ error: "Invalid JSON arguments" });
         }
 
+        // ── 专注模式拦截：generate_image 调用前弹出预览卡片让用户确认 ──
+        // 不依赖 LLM 输出标记 — 在工具执行层强制拦截，100% 可靠。
+        // skipNextPreview 标记：用户已确认预览，直接执行不拦截（执行后重置）。
+        if (!resultStr && call.function.name === "generate_image" && agentSettings.focusMode && !this.skipNextPreview) {
+          // LLM 经常只传 prompt_id 不传 positive_prompt — 从数据库补全真实参数
+          let dbPrompt: any = null;
+          if (parsedArgs.prompt_id) {
+            try {
+              dbPrompt = await invoke("get_prompt", { id: parsedArgs.prompt_id });
+            } catch {}
+          }
+          const previewValue = {
+            type: "generation_preview",
+            previewId: `preview_${call.id}`,
+            prompt: parsedArgs.positive_prompt || dbPrompt?.positivePrompt || "",
+            negativePrompt: parsedArgs.negative_prompt || dbPrompt?.negativePrompt,
+            artistPrompt: parsedArgs.artist_prompt || dbPrompt?.artistPrompt,
+            model: parsedArgs.base_model || dbPrompt?.baseModel,
+            width: parsedArgs.width || dbPrompt?.width,
+            height: parsedArgs.height || dbPrompt?.height,
+            steps: parsedArgs.steps || dbPrompt?.steps,
+            cfgScale: parsedArgs.cfg_scale || dbPrompt?.cfgScale,
+            sampler: parsedArgs.sampler_name || dbPrompt?.sampler,
+            scheduler: parsedArgs.scheduler || dbPrompt?.scheduler,
+            loras: parsedArgs.lora_configs || dbPrompt?.loraConfigs,
+            promptId: parsedArgs.prompt_id,
+            status: "pending" as const,
+          };
+          observer.next({ type: EventType.CUSTOM, name: "gen_preview", value: previewValue } as BaseEvent);
+          // 返回占位结果告诉 LLM 等待用户确认
+          resultStr = JSON.stringify({ status: "pending", message: "已弹出生成预览，等待用户确认参数后执行。" });
+          toolResults.push({ id: call.id, content: resultStr });
+          observer.next({
+            type: EventType.TOOL_CALL_RESULT,
+            messageId,
+            toolCallId: call.id,
+            content: resultStr,
+            role: "tool",
+          } as BaseEvent);
+          continue;
+        }
+
         if (!resultStr) {
           try {
             const result = await executeTool(call.function.name, parsedArgs, {
@@ -436,7 +599,26 @@ export class TauriAgent extends AbstractAgent {
           }
         }
 
+        // ── 角色搜索结果自动触发 character_picker 选择器 ──
+        // 不依赖 LLM 输出标记 — 工具执行后自动检测返回的是角色/画师列表
+        // 发 kind + series 信号：Modal 内部用 series 预选作品筛选，显示 LLM 搜出的那批角色
+        // （本地重新拉，数据完整、图片 URL 正确）。用户仍可清掉筛选浏览全部。
+        if (call.function.name === "search_characters_in_series" || call.function.name === "search_artists") {
+          const isArtist = call.function.name === "search_artists";
+          const series = !isArtist ? (parsedArgs.series as string | undefined) : undefined;
+          observer.next({
+            type: EventType.CUSTOM,
+            name: "character_picker",
+            value: { type: "character_picker", kind: isArtist ? "artist" : "character", series },
+          } as BaseEvent);
+        }
+
         toolResults.push({ id: call.id, content: resultStr });
+
+        // generate_image 执行完毕后重置 skipNextPreview
+        if (call.function.name === "generate_image") {
+          this.skipNextPreview = false;
+        }
 
         // 发射 TOOL_CALL_RESULT
         observer.next({

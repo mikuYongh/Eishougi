@@ -52,6 +52,8 @@ export interface Suggestion {
   title: string;
   message: string;
   icon?: string;
+  /** true = 模糊建议（如"换场景"未给具体内容），点击需用户确认/编辑后再发送；false = 具体建议，点击直接发送 */
+  confirm?: boolean;
 }
 
 export interface GenerationPreviewAttachment {
