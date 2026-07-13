@@ -16,7 +16,7 @@ import { usePromptStore } from "../../stores/promptStore";
 import { invoke } from "@tauri-apps/api/core";
 import { TauriAgent, type ToolDef } from "../TauriAgent";
 import { buildOutputSpec, type PromptSyntax } from "../../lib/agentPrompts";
-import type { ChatMessage, ChatAttachment, TokenUsage, Suggestion, GenerationPreviewAttachment } from "../types";
+import type { ChatMessage, ChatAttachment, TokenUsage, Suggestion, GenerationPreviewAttachment, CharacterCard } from "../types";
 
 // ── Tool schema definitions ──
 export function getToolDefinitions(): ToolDef[] {
@@ -84,10 +84,15 @@ export function useTauriAgent() {
   const messages = activeSession?.messages || [];
 
   const agentRef = useRef<TauriAgent | null>(null);
+  // systemPromptRef 始终指向最新的 buildSystemPrompt — agent 创建后不再重建，
+  // 但 getSystemPrompt 回调通过 ref 读取最新值，确保 focusMode 等设置变更即时生效。
+  const systemPromptRef = useRef<() => string>(() => "");
   const [mcpTools, setMcpTools] = useState<any[]>([]);
   const [mcpEnabled, setMcpEnabled] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [activePreview, setActivePreview] = useState<GenerationPreviewAttachment | null>(null);
+  // 角色/画师选择 Modal 状态：null=关闭；{open,kind}=打开
+  const [characterModal, setCharacterModal] = useState<{ open: boolean; kind: "character" | "artist"; series?: string | null } | null>(null);
   const tokenUsageRef = useRef<TokenUsage | null>(null);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
@@ -148,8 +153,41 @@ export function useTauriAgent() {
       + "\n\n## 工具路由规则"
       + "\n用户问\"有什么角色\" → list_character_series"
       + "\n用户问\"有什么画师\" → search_artists"
-      + "\n⚠️ search_tags/get_related_tags 不存在";
-  }, [agentSettings.systemPrompt]);
+      + "\nsearch_tags 等是可选 MCP 工具，可能不可用。报错时不要重试，改用自己的知识。"
+      + "\n\n## 人机交互标记（重要）"
+      + "\n你可以在回复文本中输出特殊标记来触发富 UI 交互。标记不会显示给用户，而是被前端拦截并渲染为交互卡片。"
+      + "\n标记格式：<<<MARKER_NAME:JSON>>>"
+      + "\n"
+      + "\n### 1. 生图流程（专注模式）"
+      + (agentSettings.focusMode
+        ? "\n⚠️ 专注模式已开启。当你准备好生成图片时，【直接调用 generate_image 工具】，不要用文本说\"确认生成\"等用户回复。"
+        + "\n系统会自动拦截 generate_image 调用，弹出参数预览卡片让用户确认/修改，用户确认后系统自动执行生成。"
+        + "\n你不需要输出任何标记，不需要等用户回复\"确认\"。直接调工具即可。"
+        + "\n❌ 错误做法：输出\"确认没问题跟我说确认生成\"然后等用户回复"
+        + "\n✅ 正确做法：直接调用 generate_image(prompt_id=...) 工具"
+        : "\n当你准备调用 generate_image 时，直接调用即可，不需要等用户确认。")
+      + "\n"
+      + "\n### 2. 生成后建议（suggestion）"
+      + "\n每次调用 generate_image 完成后，【必须】在回复末尾输出 suggestion 标记，给出 4 个后续建议。"
+      + "\n⚠️ 建议的前 3 个必须是以下三个维度（根据当前画面给出具体内容），第 4 个自由发挥："
+      + "\n  1. 换场景 — 给出具体的新场景，如\"换成浴室场景，加上 tiles、shower、wet_skin\""
+      + "\n  2. 换姿势 — 给出具体的新姿势，如\"改成 missionary 传教士姿势、正面视角\""
+      + "\n  3. 换角色/服装 — 给出具体的角色或服装变化，如\"换成比基尼\"或\"换成拉菲改造版\""
+      + "\n  4. 自由建议 — 画师风格、构图、其他"
+      + "\n⚠️ message 字段是用户点击后直接发给你的完整指令——必须写清楚具体改什么，不能笼统。"
+      + "\n⚠️ title 字段只放纯文字标签，不要加 emoji 图标（emoji 会自动从 message 匹配）。"
+      + "\n格式：<<<SUGGESTION:[{\"title\":\"浴室场景\",\"message\":\"把场景换成浴室，加上 tiles、shower、wet_skin 重新生成\"},{\"title\":\"传教士\",\"message\":\"改成 missionary 传教士姿势、正面视角重新生成\"},{\"title\":\"换比基尼\",\"message\":\"服装换成比基尼重新生成\"},{\"title\":\"横版\",\"message\":\"改成横版 1216×832 重新生成\"}]>>>"
+      + "\n⚠️ 不要把建议写成普通文本！必须用 <<<SUGGESTION:...>>> 标记输出，否则不会显示为可点击的建议条。"
+      + "\n"
+      + "\n### 3. 角色选择器（自动触发，无需你输出标记）"
+      + "\n当你调用 search_characters_in_series 或 search_artists 后，系统会【自动】弹出角色/画师选择器（全屏 Modal，直连本地 36,492 角色 + 15,000 画师图鉴，支持搜索/作品筛选/多选）。用户在里面选好后会发消息告诉你选了谁，你再据此生成。"
+      + "\n⚠️ 你不需要、也不应该输出 <<<CHARACTER_PICKER:>>> 标记。搜索完角色后直接用文字总结结果即可，选择器会自动出现。"
+      + "\n"
+      + "\n⚠️ 标记（<<<SUGGESTION:>>>）必须在一行内完整输出，不要跨行。JSON 必须合法。标记外的文本正常显示。";
+  }, [agentSettings.systemPrompt, agentSettings.focusMode]);
+
+  // 保持 ref 指向最新的 buildSystemPrompt
+  systemPromptRef.current = buildSystemPrompt;
 
   // ── 创建/复用 TauriAgent ──
   const getOrCreateAgent = useCallback((): TauriAgent => {
@@ -159,7 +197,7 @@ export function useTauriAgent() {
         const { llm } = useSettingsStore.getState().settings;
         return { apiUrl: llm.apiUrl, apiKey: llm.apiKey, model: llm.model, temperature: llm.temperature, maxTokens: llm.maxTokens, provider: llm.provider, reasoningEnabled: llm.reasoningEnabled ?? true };
       },
-      getSystemPrompt: buildSystemPrompt,
+      getSystemPrompt: () => systemPromptRef.current(),
       getTools: getToolDefinitions,
       getMcpTools: () => mcpTools,
       getAgentSettings: () => agentSettings,
@@ -183,7 +221,7 @@ export function useTauriAgent() {
     });
     agentRef.current = agent;
     return agent;
-  }, [agentSettings, mcpTools, buildSystemPrompt]);
+  }, [agentSettings, mcpTools]);
 
   // ── 发送消息 ──
   const sendMessage = useCallback(async (text: string, imagesOrAttachments?: string[] | ChatAttachment[]) => {
@@ -232,6 +270,7 @@ export function useTauriAgent() {
     setIsGenerating(true);
     setSuggestions([]);
     setActivePreview(null);
+    setCharacterModal(null);
     tokenUsageRef.current = null;
     setTokenUsage(null);
 
@@ -240,8 +279,35 @@ export function useTauriAgent() {
     // 设置 agent 的 messages 为当前会话的消息（AG-UI Message 格式）
     // 注意：syncAgentMessagesToStore 已将 reasoning/activity 消息过滤并合并到 assistant.reasoning_content，
     // 所以 store 里的 ChatMessage 只有 user/assistant/tool/system 角色。
-    const currentChatMessages = useAgentStore.getState().sessions.find((s) => s.id === useAgentStore.getState().activeSessionId)?.messages || [];
-    agent.messages = currentChatMessages.map((m: ChatMessage) => {
+    const rawMessages = useAgentStore.getState().sessions.find((s) => s.id === useAgentStore.getState().activeSessionId)?.messages || [];
+
+    // 过滤悬空的 tool_calls / tool 结果 — 用户中途停止生成时可能留下
+    // assistant 有 tool_calls 但后面没有对应的 tool 响应消息，这会让 API 报 400
+    const validMessages = rawMessages.filter((m: ChatMessage) => {
+      // tool 消息必须有 tool_call_id 且对应一条 assistant tool_calls，否则 API 报 400
+      if (m.role === "tool") {
+        // 没有 tool_call_id 的孤儿 tool 消息（静默执行 generate_image 产生的）直接移除
+        if (!m.tool_call_id) return false;
+        const hasMatchingCall = rawMessages.some((msg) =>
+          msg.role === "assistant" && msg.tool_calls?.some((tc) => tc.id === m.tool_call_id)
+        );
+        if (!hasMatchingCall) return false;
+      }
+      if (m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0) {
+        const hasAllResults = m.tool_calls.every((tc) =>
+          rawMessages.some((msg) => msg.role === "tool" && msg.tool_call_id === tc.id)
+        );
+        if (!hasAllResults) return false;
+      }
+      return true;
+    });
+
+    // 如果过滤移除了坏消息，把清理后的列表写回 store（持久化修复，避免下次还出错）
+    if (validMessages.length !== rawMessages.length) {
+      setMessages(validMessages);
+    }
+
+    agent.messages = validMessages.map((m: ChatMessage) => {
       if (m.role === "tool") return { id: m.id, role: "tool" as const, content: m.content, toolCallId: m.tool_call_id || "" } as Message;
       if (m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0) {
         return { id: m.id, role: "assistant" as const, content: m.content || undefined, toolCalls: m.tool_calls.map((tc) => ({ id: tc.id, type: "function" as const, function: { name: tc.function.name, arguments: tc.function.arguments } })) } as Message;
@@ -301,9 +367,17 @@ export function useTauriAgent() {
           // ── 自定义事件 ──
           onCustomEvent: ({ event }: any) => {
             if (event.name === "suggestion") {
-              setSuggestions((prev) => [...prev, ...(event.value || [])]);
+              // 替换而非追加：每次 generate_image 后只展示一组建议，避免重复
+              setSuggestions([...(event.value || [])]);
             } else if (event.name === "gen_preview") {
               setActivePreview(event.value);
+            } else if (event.name === "character_picker") {
+              // AI 搜索后触发：带 kind + series（作品范围），Modal 用 series 预选筛选显示 LLM 搜出的那批
+              setCharacterModal({
+                open: true,
+                kind: event.value?.kind === "artist" ? "artist" : "character",
+                series: event.value?.series || null,
+              });
             }
           },
         },
@@ -350,7 +424,29 @@ export function useTauriAgent() {
     if (sess.activeSessionId) {
       const current = sess.sessions.find((s) => s.id === sess.activeSessionId);
       if (current) {
-        const cleaned = current.messages.filter((m) => !(m.role === "assistant" && (m.content ?? "") === "" && (!m.tool_calls || m.tool_calls.length === 0)));
+        const cleaned = current.messages.filter((m) => {
+          // 清理空 content 的 assistant 占位符
+          if (m.role === "assistant" && (m.content ?? "") === "" && (!m.tool_calls || m.tool_calls.length === 0)) {
+            return false;
+          }
+          // 清理悬空的 tool_calls — assistant 有 tool_calls 但后面没有对应的 tool 结果
+          // 这会在用户中途停止生成时留下，导致下次发消息时 API 400
+          if (m.role === "assistant" && m.tool_calls && m.tool_calls.length > 0) {
+            const toolCallIds = m.tool_calls.map((tc) => tc.id);
+            const hasAllResults = toolCallIds.every((id) =>
+              current.messages.some((msg) => msg.role === "tool" && msg.tool_call_id === id)
+            );
+            if (!hasAllResults) return false;
+          }
+          // 同时清理悬空的 tool 结果（对应的 assistant tool_calls 已被移除）
+          if (m.role === "tool" && m.tool_call_id) {
+            const hasMatchingCall = current.messages.some((msg) =>
+              msg.role === "assistant" && msg.tool_calls?.some((tc) => tc.id === m.tool_call_id)
+            );
+            if (!hasMatchingCall) return false;
+          }
+          return true;
+        });
         if (cleaned.length !== current.messages.length) {
           useAgentStore.getState().setMessages(cleaned);
         }
@@ -365,19 +461,68 @@ export function useTauriAgent() {
     setTokenUsage(null);
     setSuggestions([]);
     setActivePreview(null);
+    setCharacterModal(null);
   }, [activeSessionId]);
 
   // ── 审批操作 ──
-  const approvePreview = useCallback(() => {
-    if (activePreview) {
-      setActivePreview(null);
-      sendMessage(`确认生成: ${activePreview.prompt}`);
+  // approvePreview: 用户确认预览后，把确认意图 + userNote 作为用户消息发给 LLM，
+  // 让 LLM 处理修改需求并自己调 generate_image。
+  // 设置 skipNextPreview 让 TauriAgent 跳过下一次 generate_image 的预览拦截。
+  const approvePreview = useCallback((editedPreview?: GenerationPreviewAttachment, userNote?: string) => {
+    const preview = editedPreview || activePreview;
+    if (!preview) return;
+    setActivePreview(null);
+
+    // 设置跳过标记 — 下次 generate_image 直接执行，不再弹预览
+    const agent = getOrCreateAgent();
+    agent.skipNextPreview = true;
+
+    // 构建用户消息发给 LLM
+    let msg = "已确认生成预览，请直接调用 generate_image 执行生成。";
+    if (userNote) {
+      msg += `\n用户额外需求：${userNote}`;
     }
-  }, [activePreview, sendMessage]);
+    sendMessage(msg);
+  }, [activePreview, getOrCreateAgent, sendMessage]);
 
   const rejectPreview = useCallback(() => {
     setActivePreview(null);
   }, []);
+
+  // ── 角色/画师选择（多选）──
+  // confirmCharacters: Modal 确认后把选中项作为用户消息发给 LLM
+  const confirmCharacters = useCallback((cards: CharacterCard[]) => {
+    setCharacterModal(null);
+    if (cards.length === 0) return;
+    const isArtist = characterModal?.kind === "artist";
+    const names = cards.map((c) => c.name).join("、");
+    const triggers = cards.map((c) => c.trigger || c.nameEn || c.name).join(", ");
+    const noun = isArtist ? "画师" : "角色";
+    const message =
+      cards.length === 1
+        ? `我选择${noun} ${cards[0].name}（触发词: ${triggers}），请用这个${noun}继续`
+        : `我选择了以下 ${cards.length} 个${noun}：${names}（触发词: ${triggers}），请结合这些${noun}继续`;
+    sendMessage(message);
+  }, [sendMessage, characterModal?.kind]);
+
+  // openCharacterLibrary: 用户主动从工具栏打开 Modal
+  const openCharacterLibrary = useCallback((kind: "character" | "artist" = "character") => {
+    setCharacterModal({ open: true, kind });
+  }, []);
+
+  // closeCharacterModal: 关闭 Modal（取消）
+  const closeCharacterModal = useCallback(() => {
+    setCharacterModal(null);
+  }, []);
+
+  // refineSuggestion: 模糊建议（如"换场景"）点击 → 让 LLM 针对当前画面展开成
+  // 一组具体选项（浴室/教室/海边…），不生图。LLM 应以 <<<SUGGESTION:...>>> 标记
+  // 回复具体选项，标记解析器会替换 SuggestionBar 内容，用户再点选其一执行。
+  const refineSuggestion = useCallback((sug: Suggestion) => {
+    // 清空当前建议条，避免点击后停留在旧的模糊建议上
+    setSuggestions([]);
+    sendMessage(`我想${sug.title}，但还没想好具体内容。请基于当前画面给我 4 个${sug.title}的具体方案，每个方案直接写清楚具体怎么改（不要笼统）。用 <<<SUGGESTION:...>>> 标记输出。不要生成图片，等我选定后再生成。`);
+  }, [sendMessage]);
 
   return {
     messages,
@@ -389,9 +534,14 @@ export function useTauriAgent() {
     tokenUsage,
     suggestions,
     clearSuggestions: () => setSuggestions([]),
+    refineSuggestion,
     activePreview,
     approvePreview,
     rejectPreview,
+    characterModal,
+    confirmCharacters,
+    openCharacterLibrary,
+    closeCharacterModal,
     mcpEnabled,
   };
 }

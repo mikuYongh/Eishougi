@@ -2,7 +2,7 @@
  * AgentInput — 输入栏：文本输入 + 文件上传 + 快速预设 + Token 环 + 发送/停止
  */
 import { useState, useRef, useCallback } from "react";
-import { Send, Square, ImagePlus, Paperclip, History, FileText, X } from "lucide-react";
+import { Send, Square, ImagePlus, Paperclip, History, FileText, X, Focus, User, Palette } from "lucide-react";
 import { invoke, Channel } from "@tauri-apps/api/core";
 import type { ChatAttachment, TokenUsage } from "../types";
 import { QUICK_PRESETS, type QuickPreset } from "../types";
@@ -13,11 +13,14 @@ interface AgentInputProps {
   isGenerating: boolean;
   tokenUsage: TokenUsage | null;
   onOpenHistory: () => void;
+  focusMode: boolean;
+  onToggleFocusMode: () => void;
+  onOpenCharacterLibrary: (kind: "character" | "artist") => void;
 }
 
 const SELECTED_PRESETS_KEY = "agent-selected-presets";
 
-export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHistory }: AgentInputProps) {
+export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHistory, focusMode, onToggleFocusMode, onOpenCharacterLibrary }: AgentInputProps) {
   const [input, setInput] = useState("");
   const [selectedImages, setSelectedImages] = useState<{ path: string; previewUrl: string }[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<ChatAttachment[]>([]);
@@ -197,12 +200,12 @@ export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHis
           onKeyDown={handleKeyDown}
           placeholder="描述你想要的画面... (Ctrl+Enter 发送)"
           rows={1}
-          className="w-full bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none resize-none px-1 py-0.5"
+          className="w-full bg-transparent text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none resize-none px-1 py-0.5"
           style={{ height: "auto", maxHeight: "120px" }}
         />
 
         {/* 工具栏 */}
-        <div className="flex items-center gap-1.5 mt-1">
+        <div className="flex items-center gap-1 mt-1 flex-wrap">
           {/* 快速预设切换 */}
           <button
             onClick={() => setShowPresets(!showPresets)}
@@ -229,6 +232,25 @@ export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHis
             <History size={14} />
           </button>
 
+          {/* 选择角色 */}
+          <button onClick={() => onOpenCharacterLibrary("character")} className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--accent-1)] transition-all cursor-pointer" title="选择角色">
+            <User size={14} />
+          </button>
+
+          {/* 选择画师 */}
+          <button onClick={() => onOpenCharacterLibrary("artist")} className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--accent-2)] transition-all cursor-pointer" title="选择画师">
+            <Palette size={14} />
+          </button>
+
+          {/* 专注模式 */}
+          <button
+            onClick={onToggleFocusMode}
+            className={`p-1.5 rounded-lg transition-all cursor-pointer ${focusMode ? "bg-[var(--accent-1)]/20 text-[var(--accent-1)] shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.3)]" : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]"}`}
+            title={focusMode ? "专注模式已开启：生图前需确认参数" : "专注模式：开启后生图前需确认参数"}
+          >
+            <Focus size={14} />
+          </button>
+
           {/* Token 环 */}
           {tokenUsage && (
             <div className="ml-auto flex items-center gap-1" title={`输入: ${formatTokens(tokenUsage.promptTokens)} | 输出: ${formatTokens(tokenUsage.completionTokens)} | 总计: ${formatTokens(totalTokens)}`}>
@@ -244,23 +266,30 @@ export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHis
           {isGenerating ? (
             <button
               onClick={onStop}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer active:scale-95"
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer active:scale-95"
               style={{ background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
             >
-              <Square size={14} fill="currentColor" />
+              <Square size={15} fill="currentColor" />
             </button>
           ) : (
             <button
               onClick={handleSend}
               disabled={!input.trim() && selectedImages.length === 0 && selectedFiles.length === 0}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
               style={{ background: "linear-gradient(135deg, #d946ef, #9333ea)" }}
             >
-              <Send size={14} />
+              <Send size={15} />
             </button>
           )}
         </div>
       </div>
+
+      {/* 专注模式提示 */}
+      {focusMode && (
+        <div className="mt-1 text-[9px] text-[var(--accent-1)]/70 text-center">
+          专注模式已开启 — 每次生图前会显示参数预览供你确认和调整
+        </div>
+      )}
     </div>
   );
 }

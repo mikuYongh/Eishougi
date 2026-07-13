@@ -14,6 +14,7 @@ import { AgentChat } from "./components/AgentChat";
 import { AgentInput } from "./components/AgentInput";
 import { SuggestionBar } from "./components/SuggestionBar";
 import { GenerationPreview } from "./components/GenerationPreview";
+import { CharacterLibraryModal } from "./components/CharacterLibraryModal";
 
 export function AgentPanel() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -31,6 +32,11 @@ export function AgentPanel() {
     activePreview,
     approvePreview,
     rejectPreview,
+    characterModal,
+    confirmCharacters,
+    openCharacterLibrary,
+    closeCharacterModal,
+    refineSuggestion,
   } = useTauriAgent();
 
   const [tempSystemPrompt, setTempSystemPrompt] = useState(agentSettings.systemPrompt);
@@ -126,16 +132,16 @@ export function AgentPanel() {
       {isExpanded && (
         <div className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-300">
           {/* Header */}
-          <div className="flex-shrink-0 px-3 py-2.5 flex items-center justify-between border-b border-[var(--glass-border)]">
+          <div className="flex-shrink-0 px-4 py-3 flex items-center justify-between border-b border-[var(--glass-border)]">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--accent-1)] to-[var(--accent-2)] flex items-center justify-center shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.3)]">
-                <Bot size={15} className="text-white" />
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--accent-1)] to-[var(--accent-2)] flex items-center justify-center shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.3)]">
+                <Bot size={17} className="text-white" />
               </div>
               <div>
-                <div className="text-[12px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)]">咏唱助手</div>
+                <div className="text-[14px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)]">咏唱助手</div>
                 <div className="flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                  <span className="text-[9px] text-[var(--text-muted)]">{isGenerating ? "生成中" : "在线"}</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">{isGenerating ? "生成中" : "在线"}</span>
                 </div>
               </div>
             </div>
@@ -163,16 +169,27 @@ export function AgentPanel() {
           {/* Chat view */}
           {viewMode === "chat" && (
             <>
-              <AgentChat messages={messages} />
+              <AgentChat messages={messages} onAction={sendMessage} isGenerating={isGenerating} />
 
               {activePreview && (
                 <GenerationPreview preview={activePreview} onApprove={approvePreview} onReject={rejectPreview} />
+              )}
+
+              {characterModal?.open && (
+                <CharacterLibraryModal
+                  isOpen={characterModal.open}
+                  initialKind={characterModal.kind}
+                  initialSeries={characterModal.series}
+                  onClose={closeCharacterModal}
+                  onConfirm={confirmCharacters}
+                />
               )}
 
               {suggestions.length > 0 && (
                 <SuggestionBar
                   suggestions={suggestions}
                   onSelect={(msg) => { clearSuggestions(); sendMessage(msg); }}
+                  onRefine={refineSuggestion}
                 />
               )}
 
@@ -182,6 +199,9 @@ export function AgentPanel() {
                 isGenerating={isGenerating}
                 tokenUsage={tokenUsage}
                 onOpenHistory={() => setViewMode("history")}
+                focusMode={agentSettings.focusMode}
+                onToggleFocusMode={() => updateSettings({ focusMode: !agentSettings.focusMode })}
+                onOpenCharacterLibrary={openCharacterLibrary}
               />
             </>
           )}
