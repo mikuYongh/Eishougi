@@ -4,15 +4,17 @@ import { useSettingsStore } from "../stores/settingsStore";
 
 /**
  * Save an image (by any supported URL/path scheme) to the OS gallery/downloads.
- * The destination subfolder is read from the global settings (saveFolder), so the
- * user can customise where images land on both desktop and Android.
+ * - Desktop: if settings.saveDir is set, images go into that absolute directory;
+ *   otherwise fall back to Downloads/<saveFolder>/photo/.
+ * - Mobile: always uses saveFolder via the gallery API (saveDir ignored).
  */
 export const downloadImage = async (url: string, _filename: string) => {
   try {
-    const folder = useSettingsStore.getState().settings.saveFolder;
+    const { saveFolder, saveDir } = useSettingsStore.getState().settings;
     const destPath = await invoke<string>('export_image_to_downloads', {
       url,
-      saveFolder: folder,
+      saveFolder,
+      saveDir,
     });
     toast.success(`已保存至 ${destPath}`);
   } catch (err) {

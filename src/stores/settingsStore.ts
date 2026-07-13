@@ -34,6 +34,10 @@ export interface AppSettings {
   /// Subfolder name (relative to OS Pictures/Downloads) where saved images go.
   /// Empty = use default ("Eishougi"). On Android: Pictures/<folder>/, on desktop: Downloads/<folder>/photo/.
   saveFolder: string;
+  /// Desktop-only absolute save directory. When set, generated images go directly
+  /// into this folder (e.g. D:\Pictures\AI). Empty = fall back to Downloads/<saveFolder>/photo/.
+  /// Mobile ignores this field entirely (uses saveFolder via the gallery API).
+  saveDir: string;
   wallpaperPath: string;
   appTheme: 'dark' | 'light' | 'system';
   colorTheme: 'sakura' | 'classic' | 'green' | 'night' | 'cyber';
@@ -80,6 +84,7 @@ const defaultSettings: AppSettings = {
   },
   slimToolsMode: false,
   saveFolder: 'Eishougi',
+  saveDir: '',
   mcpServers: [
     {
       name: "Danbooru 标签搜索",
