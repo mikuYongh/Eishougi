@@ -54,7 +54,7 @@ class MainActivity : TauriActivity() {
                           put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
                       }
                       val resolver = context.contentResolver
-                      val collection = android.provider.MediaStore.Images.Media.getContentUri(android.os.MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                      val collection = android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
                       val uri = resolver.insert(collection, contentValues)
                       if (uri != null) {
                           resolver.openOutputStream(uri)?.use { outputStream ->
