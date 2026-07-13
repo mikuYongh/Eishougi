@@ -4,7 +4,7 @@
  */
 import { memo, useState } from "react";
 import { PhotoView } from "react-photo-view";
-import { ChevronDown, ChevronUp, Bot, Wrench, Zap, Brain, ImageIcon } from "lucide-react";
+import { ChevronDown, ChevronUp, Bot, Wrench, Zap, Brain, ImageIcon, FileText } from "lucide-react";
 import { MarkdownContent } from "./MarkdownContent";
 import { ResultActions } from "./ResultActions";
 import { getImgSrc } from "../../utils/imageUtils";
@@ -127,6 +127,16 @@ export const MessageBubble = memo(function MessageBubble({ msg, onAction }: { ms
           {msg.images && msg.images.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-2 justify-end">
               {msg.images.map((img, i) => <ChatImage key={i} src={img} />)}
+            </div>
+          )}
+          {msg.files && msg.files.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5 justify-end">
+              {msg.files.map((file, i) => (
+                <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[var(--glass-bg)] border border-[var(--accent-1)]/20">
+                  <FileText size={13} className="text-[var(--accent-1)] flex-shrink-0" />
+                  <span className="text-[11px] text-[var(--text-secondary)] max-w-[120px] truncate">{file.name}</span>
+                </div>
+              ))}
             </div>
           )}
           <div className="bg-[var(--glass-bg)] rounded-2xl rounded-tr-sm border border-[var(--accent-1)]/30 backdrop-blur-md p-4 shadow-[0_4px_15px_rgba(var(--accent-1-rgb),0.1)]">

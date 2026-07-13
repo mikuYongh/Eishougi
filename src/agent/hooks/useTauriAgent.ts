@@ -235,7 +235,8 @@ export function useTauriAgent() {
     if (!text.trim() && attachments.length === 0) return;
 
     const inlineTextExtensions = ["txt", "md", "json", "yaml", "yml", "csv", "html", "css", "js", "ts", "tsx", "jsx", "py", "rs", "java", "c", "cpp", "h", "sh", "xml", "svg", "log"];
-    let finalContent = text;
+    // LLM 收到的内容（含文件内容）；UI 显示只用原始 text
+    let llmContent = text;
     const imagePaths: string[] = [];
     for (const att of attachments) {
       if (att.isImage) { imagePaths.push(att.path); continue; }
@@ -244,10 +245,10 @@ export function useTauriAgent() {
         try {
           const fileContent = await invoke<string>("read_text_file", { path: att.path });
           const truncated = fileContent.length > 20000 ? fileContent.substring(0, 20000) + `\n... [truncated]` : fileContent;
-          finalContent += `\n\n--- ${att.name} ---\n\`\`\`\n${truncated}\n\`\`\`\n`;
-        } catch (e) { finalContent += `\n\n[Attachment ${att.name} read failed]`; }
+          llmContent += `\n\n--- ${att.name} ---\n\`\`\`\n${truncated}\n\`\`\`\n`;
+        } catch (e) { llmContent += `\n\n[Attachment ${att.name} read failed]`; }
       } else {
-        finalContent += `\n\n[Attached file: ${att.name}]`;
+        llmContent += `\n\n[Attached file: ${att.name}]`;
       }
     }
 
@@ -256,12 +257,13 @@ export function useTauriAgent() {
     const userMsg: Message = {
       id: userMsgId,
       role: "user",
-      content: finalContent,
+      content: llmContent,
     } as Message;
 
-    // 同步到 zustand store（用 ChatMessage 格式）
+    // 同步到 zustand store（用 ChatMessage 格式）— UI 只显示用户输入的文字，
+    // 文件作为附件标签展示（files 字段），不把原始内容塞进 content
     const userChatMsg: ChatMessage = {
-      id: userMsgId, role: "user", content: finalContent,
+      id: userMsgId, role: "user", content: text,
       images: imagePaths.length > 0 ? imagePaths : undefined,
       files: attachments.filter((a) => !a.isImage).length > 0 ? attachments.filter((a) => !a.isImage) : undefined,
     };

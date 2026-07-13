@@ -88,7 +88,7 @@ export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHis
       const dataUrl = reader.result as string;
       const base64 = dataUrl.split(",")[1];
       try {
-        const path = await invoke<string>("save_base64_file", { base64, filename: file.name, mime: file.type });
+        const path = await invoke<string>("save_base64_file", { base64Data: dataUrl, originalName: file.name });
         setSelectedFiles((prev) => [...prev, { path, name: file.name, mime: file.type, isImage: false }]);
       } catch (err) { console.error("File upload failed:", err); }
     };
