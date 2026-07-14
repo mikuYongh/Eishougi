@@ -5,6 +5,7 @@
 import { RefreshCw, Film, Star, Download, Lock, Copy } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
+import { usePromptStore } from "../../stores/promptStore";
 
 interface ResultActionsProps {
   images: string[];
@@ -32,7 +33,15 @@ export function ResultActions({ images, promptId, onAction }: ResultActionsProps
       return;
     }
     try {
-      await invoke("update_prompt", { prompt: { id: promptId, coverImage: images[0] } });
+      // 用 promptStore 的 updatePrompt（做正确的 toRustPrompt 转换），
+      // 把图片路径追加到 instanceImages
+      const store = usePromptStore.getState();
+      const prompt = store.prompts.find((p) => p.id === promptId);
+      if (!prompt) throw new Error("找不到提示词项目");
+      const existing = prompt.instanceImages || [];
+      await store.updatePrompt(promptId, {
+        instanceImages: [...existing, images[0]],
+      });
       toast.success("已设为示范图");
     } catch (e) {
       toast.error("设置失败: " + String(e));

@@ -110,6 +110,13 @@ export async function executeTool(
         ? JSON.stringify(workflowParsedLoras)
         : (Array.isArray(parsedArgs.lora_configs) ? JSON.stringify(parsedArgs.lora_configs) : null);
 
+      // LLM 偶尔把 tags 传成 JSON 字符串而非数组，做容错
+      let rawTags: any[] = parsedArgs.tags;
+      if (typeof rawTags === "string") {
+        try { rawTags = JSON.parse(rawTags); } catch { rawTags = []; }
+      }
+      if (!Array.isArray(rawTags)) rawTags = [];
+
       const newPrompt = {
         id: "p_" + Date.now().toString(),
         title: parsedArgs.title || parsedArgs.tags?.[0] || "Agent Generated",
@@ -129,7 +136,7 @@ export async function executeTool(
         vaeModel: resolvedVae,
         workflowId: resolvedWorkflowId,
         loraConfigs: resolvedLoraConfigs,
-        tags: (parsedArgs.tags || []).map((t: string, i: number) => ({
+        tags: rawTags.map((t: string, i: number) => ({
           id: "tag_" + Date.now() + i,
           name: t,
           color: "#ff6b9d",
@@ -246,7 +253,7 @@ export async function executeTool(
       const batchCount = parsedArgs.batch_count || 1;
       const results = await useQueueStore.getState().addJob(project, wfId, batchCount);
       const allImages = results ? results.flat() : [];
-      res = { status: "completed", images: allImages, message: `Successfully generated ${allImages.length} image(s).` };
+      res = { status: "completed", images: allImages, prompt_id: parsedArgs.prompt_id, message: `Successfully generated ${allImages.length} image(s).` };
 
     } else if (fnName === 'generate_video_from_image') {
       const prompt = typeof parsedArgs.prompt === 'string' ? parsedArgs.prompt : '';

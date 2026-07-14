@@ -109,11 +109,19 @@ export const MessageBubble = memo(function MessageBubble({ msg, onAction }: { ms
   if (isTool) {
     // 判断是否为图片生成结果（有 images 字段）→ 显示 ResultActions
     const hasImages = msg.images && msg.images.length > 0;
+    // 从 tool 结果 JSON 里提取 prompt_id，用于"设为示范"
+    let promptId: string | undefined;
+    if (hasImages && msg.content) {
+      try {
+        const parsed = JSON.parse(msg.content);
+        promptId = parsed.prompt_id;
+      } catch {}
+    }
     return (
       <div className="w-full px-1">
         <ToolResultCard name={msg.name || "tool"} content={msg.content} />
         {hasImages && onAction && (
-          <ResultActions images={msg.images!} onAction={onAction} />
+          <ResultActions images={msg.images!} promptId={promptId} onAction={onAction} />
         )}
       </div>
     );
