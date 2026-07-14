@@ -33,7 +33,7 @@
 
 ## 🖼️ 界面预览
 
-| 仪表盘 | 提示词编辑 |
+| 仪表盘 | 创作编辑 |
 |:---:|:---:|
 | <img src="docs/screenshots/dashboard.png" width="400" /> | <img src="docs/screenshots/prompt-edit.png" width="400" /> |
 
@@ -41,7 +41,7 @@
 |:---:|:---:|
 | <img src="docs/screenshots/agent.png" width="400" /> | <img src="docs/screenshots/vault.png" width="400" /> |
 
-| 提示词项目界面 |
+| 创作项目界面 |
 |:---:|
 | <img src="docs/screenshots/projects.png" width="812" /> |
 
@@ -49,18 +49,18 @@
 
 ## 🌟 核心特性
 
-### 🔮 提示词项目管理 (Prompt Projects)
+### 🔮 创作项目管理 (Prompt Projects)
 
-告别散乱的文本文件。将你的每个创作灵感组织为一个**项目**，包含正向/负向提示词、画师风格、生成参数（尺寸 / 步数 / CFG / Seed / 采样器）、LoRA 配置等，一键注入绑定的 ComfyUI 工作流。
+告别散乱的文本文件。将你的每个创作灵感组织为一个**项目**，包含正向/负向 prompt、画师风格、生成参数（尺寸 / 步数 / CFG / Seed / 采样器）、LoRA 配置等，一键注入绑定的 ComfyUI 工作流。
 
-- **多语法支持**：Danbooru 标签、自然语言 (Natural)、XML 结构化提示词
+- **多语法支持**：Danbooru 标签、自然语言 (Natural)、XML 结构化 prompt
 - **参数注入**：自动将项目参数写入 ComfyUI 工作流 JSON 的对应节点（KSampler、CLIPTextEncode、Loader、SizePicker、Power Lora Loader 等）
 - **实时进度**：深度对接 ComfyUI WebSocket，生成进度实时反馈
 - **批量生成**：支持一次生成多张，Seed 自动递增
 
 ### 🤖 内置 AI 助手 (NEXUS Agent)
 
-接入任何 OpenAI 兼容 API（支持 GPT、Claude、DeepSeek-R1、O 系列推理模型等），让 AI 成为你专属的提示词架构师。
+接入任何 OpenAI 兼容 API（支持 GPT、Claude、DeepSeek-R1、O 系列推理模型等），让 AI 成为你专属的创作架构师。
 
 - **自然语言生图**：直接对 AI 说"画一个躺在床上的蕾姆"，AI 自动查询角色库、组装 trigger + 画面描述、触发生成
 - **角色保护机制**：AI 自动识别知名 IP 角色，只使用正确的 trigger tag，不会画蛇添足地瞎改发色/瞳色
@@ -75,7 +75,7 @@
 
 | 类别 | 能力 |
 |------|------|
-| **提示词** | 搜索 / 查看 / 创建 / 更新项目 |
+| **创作** | 搜索 / 查看 / 创建 / 更新项目 |
 | **生图** | 直接用参数生图（无需项目）、查看生成历史 |
 | **角色库** | 36,000+ 角色按系列下钻查询、随机抽角色、收藏管理 |
 | **画师库** | 15,000+ 画师 trigger 搜索、收藏管理 |
@@ -143,8 +143,8 @@
 📁 **示例工作流**：[`docs/workflows/Anima+Preview3_Txt2Img_Example.json`](./docs/workflows/Anima+Preview3_Txt2Img_Example.json)
 
 1. 打开 **Workflows** 页面 → 新建 → 导入 JSON
-2. 新建一个提示词项目，在底部选择绑定的工作流
-3. 输入提示词，点击生成
+2. 新建一个创作项目，在底部选择绑定的工作流
+3. 输入 prompt，点击生成
 
 > 你也可以用自己的工作流——在 ComfyUI 中开启 "Enable Dev mode Options"，点击 "Save (API format)" 导出 JSON 即可。
 
@@ -154,7 +154,7 @@
 - **rgthree-comfy** — `Power Lora Loader (rgthree)`
 - **pysssss** — `Simple String` 文本输入节点
 - **Inspire Pack** — `SDXLEmptyLatentSizePicker+` 高级分辨率节点
-- **ToriiGate_Captioner** — 提示词预处理（可替换为原生 CLIP Text Encode）
+- **ToriiGate_Captioner** — prompt 预处理（可替换为原生 CLIP Text Encode）
 
 可通过 *ComfyUI Manager* 搜索安装。
 </details>

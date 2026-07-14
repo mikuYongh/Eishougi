@@ -134,7 +134,7 @@ export function Generate() {
     if (!project || isTagging) return;
     const textToAnalyze = [project.title, positivePrompt].filter(Boolean).join("\n").trim();
     if (!textToAnalyze) {
-      toast.error("项目没有可分析的提示词文本");
+      toast.error("项目没有可分析的创作文本");
       return;
     }
     setIsTagging(true);
@@ -144,7 +144,7 @@ export function Generate() {
         await updatePrompt(project.id, { tags: newTags });
         toast.success("AI 打标完成");
       } else {
-        toast.error("未能提取到标签，请检查提示词内容");
+        toast.error("未能提取到标签，请检查创作内容");
       }
     } catch (err: any) {
       toast.error(`打标失败：${err?.message || err}`);
@@ -282,18 +282,15 @@ export function Generate() {
     if (!project) return;
     const existing = project.instanceImages || [];
     // Prepend (newest first) so instanceImages[0] is always the most recently chosen demo
-    // image. PromptList / Dashboard fall back to instanceImages[0] when coverImage is absent,
-    // so this is what actually shows up as the project cover across the app.
+    // image — this is what shows up as the project cover across the app.
     let updatedImages: string[];
     if (existing.includes(imageUrl)) {
-      // Already a demo image — move it to the front so it becomes the cover.
       updatedImages = [imageUrl, ...existing.filter(u => u !== imageUrl)];
     } else {
       updatedImages = [imageUrl, ...existing];
     }
     await usePromptStore.getState().updatePrompt(project.id, {
       instanceImages: updatedImages,
-      coverImage: imageUrl,
     });
     toast.success('已设置为项目示范图！');
   };
@@ -347,7 +344,7 @@ export function Generate() {
   };
 
   if (!project) {
-    return <div className="p-10 text-[var(--text-secondary)] text-center">请先选择或创建一个提示词项目</div>;
+    return <div className="p-10 text-[var(--text-secondary)] text-center">请先选择或创建一个创作项目</div>;
   }
 
   return (
@@ -377,7 +374,7 @@ export function Generate() {
             onClick={handleAutoTagSingle}
             disabled={isTagging}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            title="用 AI 分析当前提示词并生成分类标签"
+            title="用 AI 分析当前创作并生成分类标签"
           >
             {isTagging ? <Loader2 size={16} className="animate-spin" /> : <Tags size={16} />}
             {isTagging ? '打标中...' : 'AI 打标'}

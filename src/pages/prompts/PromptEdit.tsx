@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Play, Plus, Image as ImageIcon, UploadCloud, Cpu, Layers, X, Trash2, History, FileText, RefreshCw, Tags, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Play, Plus, Image as ImageIcon, Cpu, Layers, X, Trash2, History, FileText, RefreshCw, Tags, Loader2 } from "lucide-react";
 import { usePromptStore, type PromptProject, type LoraConfig } from "../../stores/promptStore";
 import { useModelStore } from "../../stores/modelStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -38,7 +38,7 @@ export function PromptEdit() {
   const workflows = useWorkflowStore(state => state.workflows);
 
   const [project, setProject] = useState<Partial<PromptProject>>({
-    title: "", description: "", coverImage: "", positivePrompt: "", negativePrompt: "", artistPrompt: "",
+    title: "", description: "", positivePrompt: "", negativePrompt: "", artistPrompt: "",
     width: 896, height: 1088, steps: 20, cfgScale: 5.0, seed: "-1",
     baseModel: "", vaeModel: "auto", loraConfigs: [], tags: [], instanceImages: []
   });
@@ -46,7 +46,6 @@ export function PromptEdit() {
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const tagContainerRef = useRef<HTMLDivElement>(null);
   const [showHistoryPicker, setShowHistoryPicker] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   // Single-project AI tagging state
   const [isTagging, setIsTagging] = useState<boolean>(false);
 
@@ -54,7 +53,7 @@ export function PromptEdit() {
     if (isTagging) return;
     const textToAnalyze = [project.title, project.positivePrompt].filter(Boolean).join("\n").trim();
     if (!textToAnalyze) {
-      toast.error("项目没有可分析的提示词文本");
+      toast.error("项目没有可分析的创作文本");
       return;
     }
     setIsTagging(true);
@@ -67,7 +66,7 @@ export function PromptEdit() {
         setProject(prev => ({ ...prev, tags: merged }));
         toast.success("AI 打标完成");
       } else {
-        toast.error("未能提取到标签，请检查提示词内容");
+        toast.error("未能提取到标签，请检查创作内容");
       }
     } catch (err: any) {
       toast.error(`打标失败：${err?.message || err}`);
@@ -173,7 +172,6 @@ export function PromptEdit() {
         id: newId,
         title: project.title || "未命名项目",
         description: project.description || "",
-        coverImage: project.coverImage,
         positivePrompt: project.positivePrompt || "",
         negativePrompt: project.negativePrompt || "",
         artistPrompt: project.artistPrompt || "",
@@ -244,7 +242,7 @@ export function PromptEdit() {
           </button>
           <div className="hidden md:block">
             <h2 className="text-xl font-bold text-[var(--text-primary)] drop-shadow-md">
-              {!id ? '新建提示词项目' : '编辑提示词项目'}
+              {!id ? '新建创作项目' : '编辑创作项目'}
             </h2>
             <p className="text-[12px] text-[var(--text-secondary)]">{project.title || "未命名项目"}</p>
           </div>
@@ -255,7 +253,7 @@ export function PromptEdit() {
             onClick={handleAutoTagSingle}
             disabled={isTagging}
             className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-[13px] font-bold bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] text-[var(--text-primary)] transition-colors cursor-pointer border border-[var(--glass-border)] w-full sm:w-auto disabled:opacity-60 disabled:cursor-not-allowed"
-            title="用 AI 分析当前提示词并生成分类标签"
+            title="用 AI 分析当前创作并生成分类标签"
           >
             {isTagging ? <Loader2 size={16} className="animate-spin" /> : <Tags size={16} />}
             {isTagging ? '打标中...' : 'AI 打标'}
@@ -534,45 +532,11 @@ export function PromptEdit() {
             </div>
           </div>
 
-          {/* Cover Image Uploader */}
-          <div className="glass-panel p-5 relative z-[40]">
-            <h3 className="text-[13px] font-bold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-              <ImageIcon size={16} className="text-[var(--accent-1)]" /> 示范预览图
-            </h3>
-            <div 
-              className="h-48 w-full rounded-xl border-2 border-dashed border-[var(--glass-border)] hover:border-[var(--accent-1)]/50 bg-[var(--glass-bg-hover)] flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {project.coverImage ? (
-                <div className="absolute inset-0 z-0 group-hover/cover:bg-[var(--bg-layer-2)] transition-colors flex items-center justify-center cursor-pointer">
-                  <img src={getImgSrc(project.coverImage)} alt="Cover" className={`w-full h-full object-cover opacity-80 group-hover:opacity-60 transition-all duration-300 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
-                  <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover/cover:opacity-100 transition-opacity">
-                    <span className="bg-[var(--glass-bg)] backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--text-primary)]">点击更换图片</span>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="w-12 h-12 rounded-full bg-[var(--glass-bg)] flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                    <UploadCloud size={20} className="text-[var(--text-secondary)] group-hover:text-[var(--accent-1)] transition-colors" />
-                  </div>
-                  <span className="text-[11px] font-bold text-[var(--text-secondary)]">点击或拖拽上传封面</span>
-                </>
-              )}
-              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  // Dummy URL for now
-                  updateField('coverImage', URL.createObjectURL(file));
-                }
-              }} />
-            </div>
-          </div>
-
-          {/* Reference Images */}
+          {/* 示范图 — 第一张自动作为封面，在列表/Dashboard 显示 */}
           <div className="glass-panel p-5 relative z-[30]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[13px] font-bold text-[var(--text-primary)] flex items-center gap-2">
-                <ImageIcon size={16} className="text-[var(--accent-1)]" /> 实例图片 (Reference)
+                <ImageIcon size={16} className="text-[var(--accent-1)]" /> 示范图
               </h3>
               <div className="flex gap-2">
                 <button 
@@ -598,7 +562,7 @@ export function PromptEdit() {
               ))}
               {(!project.instanceImages || project.instanceImages.length === 0) && (
                 <div className="w-full h-16 flex items-center justify-center border border-dashed border-[var(--glass-border)] rounded-lg text-[var(--text-secondary)] text-[11px] font-bold tracking-widest">
-                  暂无参考图
+                  暂无示范图
                 </div>
               )}
             </div>

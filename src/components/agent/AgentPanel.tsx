@@ -619,7 +619,7 @@ export function AgentPanel() {
                 </div>
                 <p className="text-[var(--text-secondary)] mb-4">我是您的专属创意中枢。您可以通过自然语言向我下达以下指令：</p>
                 <ul className="space-y-2 text-[var(--text-secondary)] font-mono text-xs">
-                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-1)]" /> 检索本地提示词库</li>
+                  <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-1)]" /> 检索本地创作库</li>
                   <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-2)]" /> 自动构建并保存 Prompt</li>
                   <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-1)] opacity-70" /> 一键触发引擎生成图片</li>
                 </ul>

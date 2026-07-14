@@ -29,7 +29,7 @@ export function ResultActions({ images, promptId, onAction }: ResultActionsProps
 
   const handleSetExample = async () => {
     if (!promptId) {
-      toast.warning("未关联提示词项目");
+      toast.warning("未关联创作项目");
       return;
     }
     try {
@@ -37,10 +37,14 @@ export function ResultActions({ images, promptId, onAction }: ResultActionsProps
       // 把图片路径追加到 instanceImages
       const store = usePromptStore.getState();
       const prompt = store.prompts.find((p) => p.id === promptId);
-      if (!prompt) throw new Error("找不到提示词项目");
+      if (!prompt) throw new Error("找不到创作项目");
       const existing = prompt.instanceImages || [];
+      // Prepend so the newly set image becomes instanceImages[0] (cover)
+      const updated = existing.includes(images[0])
+        ? [images[0], ...existing.filter(u => u !== images[0])]
+        : [images[0], ...existing];
       await store.updatePrompt(promptId, {
-        instanceImages: [...existing, images[0]],
+        instanceImages: updated,
       });
       toast.success("已设为示范图");
     } catch (e) {

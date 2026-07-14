@@ -196,7 +196,7 @@ export function Vault() {
               <div>
                 <label className="text-[10px] text-[var(--text-secondary)] font-bold uppercase block mb-1">正向提示词</label>
                 <div className="text-[12px] text-[var(--text-primary)] font-mono leading-relaxed bg-[var(--glass-bg)] p-3 rounded-xl border border-[var(--glass-border)] max-h-40 overflow-y-auto custom-scrollbar">
-                  {previewImage.promptId || "暂无对应的提示词记录"}
+                  {previewImage.promptId || "暂无对应的创作记录"}
                 </div>
               </div>
 

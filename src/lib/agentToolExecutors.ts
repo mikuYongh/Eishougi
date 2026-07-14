@@ -336,7 +336,7 @@ export async function executeTool(
     } else if (fnName === 'auto_tag_all_prompts') {
       const { aiService } = await import('../services/aiService');
       aiService.batchAutoTagPrompts();
-      res = { status: "success", message: "后台批量打标已启动，将自动为所有提示词生成标签" };
+      res = { status: "success", message: "后台批量打标已启动，将自动为所有创作生成标签" };
 
     } else if (fnName === 'list_local_models') {
       await useModelStore.getState().fetchModels(true);

@@ -155,7 +155,7 @@ export function Tagger() {
                   disabled={results.length === 0}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-[11px] font-bold border border-orange-500/20 transition-colors disabled:opacity-50"
                 >
-                  <CheckCircle2 size={12} /> 创建为提示词项目
+                  <CheckCircle2 size={12} /> 创建为创作项目
                 </button>
               </div>
             </div>

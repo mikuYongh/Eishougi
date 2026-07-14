@@ -892,7 +892,7 @@ export function Settings() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">数据导出与导入</h3>
-                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">导出全部数据（提示词、工作流、生成记录、设置等）为 JSON 文件，方便设备间迁移。</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">导出全部数据（创作、工作流、生成记录、设置等）为 JSON 文件，方便设备间迁移。</p>
                   </div>
                 </div>
 
@@ -941,10 +941,10 @@ export function Settings() {
                   <div className="text-xs text-[var(--text-secondary)] space-y-1 border-t border-[var(--glass-border)] pt-4">
                     <p className="font-bold text-[var(--text-primary)]">备份内容包括：</p>
                     <ul className="list-disc list-inside space-y-0.5 ml-2">
-                      <li>提示词项目（正面/负面提示词、模型配置、LoRA等）</li>
+                      <li>创作项目（正面/负面 prompt、模型配置、LoRA等）</li>
                       <li>工作流定义（ComfyUI JSON）</li>
                       <li>生成历史记录与示范图片（本地图片打包进备份）</li>
-                      <li>收藏提示词 / 自定义风格</li>
+                      <li>收藏创作 / 自定义风格</li>
                       <li>Agent 会话记录</li>
                       <li>应用设置（主题、LLM配置、壁纸等）</li>
                     </ul>

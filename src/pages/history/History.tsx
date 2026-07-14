@@ -147,7 +147,7 @@ export function History() {
       }
       const updatedPrompt = {
         ...currentPrompt,
-        images: [...existing, { id: "img_" + Date.now(), promptId: targetPromptId, filePath: imageUrl, fileName: "", createdAt: Date.now() }],
+        images: [{ id: "img_" + Date.now(), promptId: targetPromptId, filePath: imageUrl, fileName: "", createdAt: Date.now() }, ...existing],
         updatedAt: Date.now()
       };
       await invoke('update_prompt', { prompt: updatedPrompt });
@@ -405,7 +405,7 @@ export function History() {
                 <h3 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
                   <BookmarkPlus size={16} className="text-[var(--accent-1)]" /> 添加为示范图
                 </h3>
-                <p className="text-[11px] text-[var(--text-secondary)] mt-1">选择要添加到的提示词项目</p>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-1">选择要添加到的创作项目</p>
               </div>
               <button onClick={() => setAddingToPrompt(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer">
                 <X size={18} />
@@ -431,8 +431,8 @@ export function History() {
                       : 'bg-white/5 border-[var(--glass-border)] hover:bg-[var(--accent-1)]/10 hover:border-[var(--accent-1)]/30'
                   }`}
                 >
-                  {p.coverImage && <img src={getImgSrc(p.coverImage)} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
-                  {!p.coverImage && <div className="w-10 h-10 rounded-lg bg-[var(--accent-1)]/20 flex items-center justify-center flex-shrink-0 text-[var(--accent-1)]"><FileText size={18} /></div>}
+                  {p.instanceImages && p.instanceImages.length > 0 && <img src={getImgSrc(p.instanceImages[0])} className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />}
+                  {(!p.instanceImages || p.instanceImages.length === 0) && <div className="w-10 h-10 rounded-lg bg-[var(--accent-1)]/20 flex items-center justify-center flex-shrink-0 text-[var(--accent-1)]"><FileText size={18} /></div>}
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-bold text-[var(--text-primary)] truncate">{p.title}</p>
                     <p className="text-[10px] text-[var(--text-secondary)] truncate">{p.positivePrompt?.slice(0, 60)}...</p>

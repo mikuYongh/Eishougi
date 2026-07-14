@@ -257,7 +257,7 @@ export function McpServerPanel() {
           <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
             <Check size={11} className="inline text-[var(--accent-2)] mr-1" />
             <strong className="text-[var(--text-primary)]">使用方式：</strong>
-            启动服务后，点击「复制配置」把 JSON 粘贴到 Claude Desktop 的 <code className="text-[var(--accent-1)]">claude_desktop_config.json</code> 即可。AI 助手就能帮你管理提示词项目并触发生图。
+            启动服务后，点击「复制配置」把 JSON 粘贴到 Claude Desktop 的 <code className="text-[var(--accent-1)]">claude_desktop_config.json</code> 即可。AI 助手就能帮你管理创作项目并触发生图。
           </p>
         </div>
       </div>
