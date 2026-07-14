@@ -64,6 +64,7 @@ export function getToolDefinitions(): ToolDef[] {
     { type: "function", function: { name: "select_characters", description: "Open the character/artist library picker for the user to select from the local database of 36,000+ characters or 15,000+ artists. Use this when the user needs to choose specific characters or artists from search results. The picker supports multi-select, search, and series filtering.", parameters: { type: "object", properties: { kind: { type: "string", enum: ["character", "artist"], description: "Whether to show the character picker or artist picker" }, series: { type: "string", description: "Optional series/copyright filter to pre-select (e.g. 'genshin_impact', 'wuthering_waves')" } }, required: ["kind"] } } },
     { type: "function", function: { name: "confirm_generation", description: "Show a generation preview card for the user to review and edit image generation parameters before executing. Use this in focus mode before calling generate_image, or whenever you want the user to confirm/edit the generation settings (model, size, steps, CFG, LoRA, prompts).", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The prompt project ID to generate from" }, prompt: { type: "string" }, negative_prompt: { type: "string" }, artist_prompt: { type: "string" }, model: { type: "string" }, width: { type: "number" }, height: { type: "number" }, steps: { type: "number" }, cfg_scale: { type: "number" }, sampler: { type: "string" }, scheduler: { type: "string" }, loras: { type: "array", items: { type: "object", properties: { name: { type: "string" }, strength: { type: "number" }, enabled: { type: "boolean" } } } } }, required: ["prompt_id"] } } },
     { type: "function", function: { name: "show_suggestions", description: "Display a set of clickable suggestion buttons to the user. Each suggestion has a title (short Chinese name) and a message (full modification instruction with Danbooru tags). The user clicks one to apply it. Use this when you want to offer the user multiple differentiated options (e.g. different poses, scenes, outfits, expressions).", parameters: { type: "object", properties: { suggestions: { type: "array", items: { type: "object", properties: { title: { type: "string", description: "Short Chinese name (2-5 chars)" }, message: { type: "string", description: "Full modification instruction with Danbooru English tags, e.g. 'Change scene to bathroom, add tiles, shower, wet_skin and regenerate'" } }, required: ["title", "message"] } } }, required: ["suggestions"] } } },
+    { type: "function", function: { name: "select_model", description: "Open a model picker for the user to choose a base model (checkpoint) from their local ComfyUI models. Use this when the user wants to change/switch the base model (e.g. '换个模型', '用xx模型生成'). The user selects a model and it will be applied to the current prompt project.", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The prompt project to apply the selected model to" }, kind: { type: "string", enum: ["checkpoint", "vae", "lora"], description: "Type of model to pick. Default: checkpoint (base model)." } }, required: [] } } },
   ];
 }
 
@@ -103,6 +104,8 @@ export function useTauriAgent() {
   const [activePreview, setActivePreview] = useState<GenerationPreviewAttachment | null>(null);
   // 角色/画师选择 Modal 状态：null=关闭；{open,kind}=打开
   const [characterModal, setCharacterModal] = useState<{ open: boolean; kind: "character" | "artist"; series?: string | null } | null>(null);
+  // 模型选择器状态：null=关闭；{open,kind,promptId}=打开
+  const [modelModal, setModelModal] = useState<{ open: boolean; kind: "checkpoint" | "vae" | "lora"; promptId?: string | null } | null>(null);
   const tokenUsageRef = useRef<TokenUsage | null>(null);
   // 当前 refine 维度（用户点了"推荐xx"后设置），用于 LLM 输出标记后追加"换一批"等操作
   const refineDimRef = useRef<string | null>(null);
@@ -194,7 +197,11 @@ export function useTauriAgent() {
       + "\n建议内容：4 个不同维度的修改方案（如换场景、换姿势、换服装、换表情），每个 title 简短中文名（2-5字），message 完整修改指令含 Danbooru 英文 tag。"
       + "\n用户点击其中一个后会发消息应用该方案。"
       + "\n示例：show_suggestions(suggestions=[{title:\"浴室\",message:\"把场景换成浴室，加上 tiles, shower, wet_skin 重新生成\"}, ...])"
-      + "\n⚠️ 调用 show_suggestions 时不要同时调用 generate_image 或其他修改工具。";
+      + "\n⚠️ 调用 show_suggestions 时不要同时调用 generate_image 或其他修改工具。"
+      + "\n"
+      + "\n### select_model（模型选择器）"
+      + "\n当用户想换基础模型/VAE/LoRA 时调用。用户说\"换个模型\"、\"用XX模型\"时，调 select_model(prompt_id=\"xxx\", kind=\"checkpoint\") 弹出模型列表让用户选。"
+      + "\n用户选好后会发消息告诉你选了哪个模型，你再据此 update_prompt_settings。";
   }, [agentSettings.systemPrompt, agentSettings.focusMode]);
 
   // 保持 ref 指向最新的 buildSystemPrompt
@@ -389,19 +396,30 @@ export function useTauriAgent() {
           // ── 自定义事件 ──
           onCustomEvent: ({ event }: any) => {
             if (event.name === "suggestion") {
-              // 替换而非追加：每次 generate_image 后只展示一组建议，避免重复
-              let list = [...(event.value || [])];
-              // 如果是 refine 推荐的（用户点了"推荐xx"），追加"换一批"和"返回"操作
-              if (refineDimRef.current && list.length > 0) {
-                const dim = refineDimRef.current;
-                list = [
-                  ...list,
-                  { title: `🔄 再推荐${dim}`, message: `__refine_again:${dim}`, confirm: true },
-                  { title: "↩ 返回", message: `__refine_back`, confirm: true },
+              const val = event.value;
+              // 自动注入（generate_image 后兜底）：只有固定维度，不追加
+              if (val?._auto) {
+                setSuggestions([...val.items]);
+              } else {
+                // AI 通过 show_suggestions 给的具体建议 + 追加固定维度
+                const aiSuggestions = [...(val || [])];
+                if (refineDimRef.current && aiSuggestions.length > 0) {
+                  const dim = refineDimRef.current;
+                  aiSuggestions.push(
+                    { title: `🔄 再推荐${dim}`, message: `__refine_again:${dim}`, confirm: true },
+                    { title: "↩ 返回", message: `__refine_back`, confirm: true },
+                  );
+                  refineDimRef.current = null;
+                }
+                const fixedDims = [
+                  { title: "推荐场景", message: "推荐场景", confirm: true },
+                  { title: "推荐姿势", message: "推荐姿势", confirm: true },
+                  { title: "推荐服装", message: "推荐服装", confirm: true },
+                  { title: "推荐表情", message: "推荐表情", confirm: true },
+                  { title: "推荐玩法", message: "推荐玩法", confirm: true },
                 ];
-                refineDimRef.current = null; // 消费后清空
+                setSuggestions([...aiSuggestions, ...fixedDims]);
               }
-              setSuggestions(list);
             } else if (event.name === "gen_preview") {
               setActivePreview(event.value);
             } else if (event.name === "character_picker") {
@@ -410,6 +428,12 @@ export function useTauriAgent() {
                 open: true,
                 kind: event.value?.kind === "artist" ? "artist" : "character",
                 series: event.value?.series || null,
+              });
+            } else if (event.name === "model_picker") {
+              setModelModal({
+                open: true,
+                kind: event.value?.kind || "checkpoint",
+                promptId: event.value?.promptId || null,
               });
             }
           },
@@ -575,6 +599,19 @@ export function useTauriAgent() {
     setCharacterModal(null);
   }, []);
 
+  // confirmModel: 用户选好模型后，把选择作为消息发给 AI
+  const confirmModel = useCallback((modelName: string, kind: string) => {
+    setModelModal(null);
+    if (!modelName) return;
+    const kindLabel = kind === "vae" ? "VAE" : kind === "lora" ? "LoRA" : "基础模型";
+    const message = `我选择了${kindLabel}：${modelName}${modelModal?.promptId ? `（项目 ${modelModal.promptId}）` : ""}，请用这个模型继续。`;
+    sendMessage(message);
+  }, [sendMessage, modelModal?.promptId]);
+
+  const closeModelModal = useCallback(() => {
+    setModelModal(null);
+  }, []);
+
   // refineSuggestion: 用户点击模糊建议（如"推荐场景"）→ 让 AI 推荐具体方案。
   // AI 会调用 show_suggestions 工具展示具体选项，用户再点选其中一个执行。
   const refineSuggestion = useCallback((sug: Suggestion) => {
@@ -624,6 +661,9 @@ export function useTauriAgent() {
     confirmCharacters,
     openCharacterLibrary,
     closeCharacterModal,
+    modelModal,
+    confirmModel,
+    closeModelModal,
     mcpEnabled,
   };
 }

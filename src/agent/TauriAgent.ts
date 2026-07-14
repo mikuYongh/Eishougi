@@ -558,6 +558,23 @@ export class TauriAgent extends AbstractAgent {
             observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
             continue;
           }
+
+          if (call.function.name === "select_model") {
+            // 模型选择器 — 弹出模型列表让用户选
+            observer.next({
+              type: EventType.CUSTOM,
+              name: "model_picker",
+              value: {
+                type: "model_picker",
+                kind: parsedArgs.kind || "checkpoint",
+                promptId: parsedArgs.prompt_id || null,
+              },
+            } as BaseEvent);
+            resultStr = JSON.stringify({ status: "pending", message: "已弹出模型选择器，等待用户选择。" });
+            toolResults.push({ id: call.id, content: resultStr });
+            observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
+            continue;
+          }
         }
 
         if (!resultStr) {
@@ -575,6 +592,26 @@ export class TauriAgent extends AbstractAgent {
         }
 
         toolResults.push({ id: call.id, content: resultStr });
+
+        // generate_image 成功后自动注入固定维度建议按钮（兜底）
+        // 不管 AI 是否调了 show_suggestions，用户都能看到推荐场景/姿势等入口。
+        // 如果 AI 也调了 show_suggestions，onCustomEvent 会覆盖这组（AI 的在前 + 固定的在后）。
+        if (call.function.name === "generate_image" && !resultStr.includes('"status":"pending"') && !resultStr.includes('"error"')) {
+          observer.next({
+            type: EventType.CUSTOM,
+            name: "suggestion",
+            value: {
+              _auto: true,
+              items: [
+                { title: "推荐场景", message: "推荐场景", confirm: true },
+                { title: "推荐姿势", message: "推荐姿势", confirm: true },
+                { title: "推荐服装", message: "推荐服装", confirm: true },
+                { title: "推荐表情", message: "推荐表情", confirm: true },
+                { title: "推荐玩法", message: "推荐玩法", confirm: true },
+              ],
+            },
+          } as BaseEvent);
+        }
 
         // 发射 TOOL_CALL_RESULT
         observer.next({
