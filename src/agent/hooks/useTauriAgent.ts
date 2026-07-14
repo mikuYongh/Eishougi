@@ -83,6 +83,10 @@ export function useTauriAgent() {
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const messages = activeSession?.messages || [];
 
+  // 用 ref 持有最新的 agentSettings，让缓存的 TauriAgent 能读到实时值（如 focusMode 开关）
+  const agentSettingsRef = useRef(agentSettings);
+  agentSettingsRef.current = agentSettings;
+
   const agentRef = useRef<TauriAgent | null>(null);
   // systemPromptRef 始终指向最新的 buildSystemPrompt — agent 创建后不再重建，
   // 但 getSystemPrompt 回调通过 ref 读取最新值，确保 focusMode 等设置变更即时生效。
@@ -94,6 +98,8 @@ export function useTauriAgent() {
   // 角色/画师选择 Modal 状态：null=关闭；{open,kind}=打开
   const [characterModal, setCharacterModal] = useState<{ open: boolean; kind: "character" | "artist"; series?: string | null } | null>(null);
   const tokenUsageRef = useRef<TokenUsage | null>(null);
+  // 当前 refine 维度（用户点了"推荐xx"后设置），用于 LLM 输出标记后追加"换一批"等操作
+  const refineDimRef = useRef<string | null>(null);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
 
   // ── MCP tool discovery ──
@@ -154,6 +160,12 @@ export function useTauriAgent() {
       + "\n用户问\"有什么角色\" → list_character_series"
       + "\n用户问\"有什么画师\" → search_artists"
       + "\nsearch_tags 等是可选 MCP 工具，可能不可用。报错时不要重试，改用自己的知识。"
+      + "\n\n## 角色搜索兜底（重要）"
+      + "\n本地角色图鉴只有 36,492 个角色，冷门角色可能搜不到。search_characters_in_series 返回空数组时："
+      + "\n1. 先尝试用 MCP search_tags 搜索角色名（query=\"角色中文名\"），拿到准确的 Danbooru 英文 tag"
+      + "\n2. 如果 search_tags 不可用或报错，最多再试 1 次 search_characters_in_series 用英文/日文原名"
+      + "\n3. 都搜不到 → 用你自己的 Danbooru 知识推断角色 tag，创建 prompt 生成，告诉用户'用了推断的 tag，不准请纠正'"
+      + "\n⚠️ 绝对不要因为搜不到角色就卡住问用户——先用自己的知识生成，让用户看结果再说。"
       + "\n\n## 人机交互标记（重要）"
       + "\n你可以在回复文本中输出特殊标记来触发富 UI 交互。标记不会显示给用户，而是被前端拦截并渲染为交互卡片。"
       + "\n标记格式：<<<MARKER_NAME:JSON>>>"
@@ -167,19 +179,12 @@ export function useTauriAgent() {
         + "\n✅ 正确做法：直接调用 generate_image(prompt_id=...) 工具"
         : "\n当你准备调用 generate_image 时，直接调用即可，不需要等用户确认。")
       + "\n"
-      + "\n### 2. 生成后建议（suggestion）"
-      + "\n每次调用 generate_image 完成后，【必须】在回复末尾输出 suggestion 标记，给出 6 个后续建议。"
-      + "\n⚠️ 建议的前 5 个必须是以下五个维度（根据当前画面给出具体内容），第 6 个自由发挥："
-      + "\n  1. 换场景 — 给出具体的新场景，如\"换成浴室场景，加上 tiles、shower、wet_skin\""
-      + "\n  2. 换姿势 — 给出具体的新姿势，如\"改成 missionary 传教士姿势、正面视角\""
-      + "\n  3. 换服装 — 给出具体的服装变化，如\"换成比基尼\""
-      + "\n  4. 换表情 — 给出具体的表情变化，如\"改成 高潮脸,翻白眼\""
-      + "\n  5. 换画师风格 — 给出具体的画师风格变化"
-      + "\n  6. 自由建议 — 换玩法、横竖版切换、其他"
-      + "\n⚠️ message 字段是用户点击后直接发给你的完整指令——必须写清楚具体改什么，不能笼统。"
-      + "\n⚠️ title 字段只放纯文字标签，不要加 emoji 图标（emoji 会自动从 message 匹配）。"
-      + "\n格式：<<<SUGGESTION:[{\"title\":\"浴室场景\",\"message\":\"把场景换成浴室，加上 tiles、shower、wet_skin 重新生成\"},{\"title\":\"传教士\",\"message\":\"改成 missionary 传教士姿势、正面视角重新生成\"},{\"title\":\"换比基尼\",\"message\":\"服装换成比基尼重新生成\"},{\"title\":\"阿嘿颜\",\"message\":\"表情改成 ahegao 阿嘿颜、翻白眼重新生成\"},{\"title\":\"平涂风格\",\"message\":\"画师风格改成 flat_color 平涂风格重新生成\"},{\"title\":\"横版\",\"message\":\"改成横版 1216×832 重新生成\"}]>>>"
-      + "\n⚠️ 不要把建议写成普通文本！必须用 <<<SUGGESTION:...>>> 标记输出，否则不会显示为可点击的建议条。"
+      + "\n### 2. 推荐标记（SUGGESTION）"
+      + "\n当用户点击「推荐场景/推荐姿势/推荐服装/推荐表情/推荐玩法」按钮时，系统会发一条【系统指令】消息让你推荐方案。你必须用 <<<SUGGESTION:...>>> 标记输出具体方案。"
+      + "\n格式：<<<SUGGESTION:[{\"title\":\"中文名\",\"message\":\"完整修改指令，带 Danbooru 英文 tag\"}]>>>"
+      + "\n示例：<<<SUGGESTION:[{\"title\":\"浴室\",\"message\":\"把场景换成浴室，加上 tiles、shower、wet_skin 重新生成\"},{\"title\":\"教室\",\"message\":\"把场景换成教室，加上 classroom、desk 重新生成\"}]>>>"
+      + "\n⚠️ title 是简短中文名，message 必须包含具体英文 tag，让用户点击后能直接更新 prompt 重新生成。"
+      + "\n⚠️ 被要求推荐时，禁止调用 generate_image 或任何修改工具，只输出标记。"
       + "\n"
       + "\n### 3. 角色选择器（自动触发，无需你输出标记）"
       + "\n当你调用 search_characters_in_series 或 search_artists 后，系统会【自动】弹出角色/画师选择器（全屏 Modal，直连本地 36,492 角色 + 15,000 画师图鉴，支持搜索/作品筛选/多选）。用户在里面选好后会发消息告诉你选了谁，你再据此生成。"
@@ -202,7 +207,7 @@ export function useTauriAgent() {
       getSystemPrompt: () => systemPromptRef.current(),
       getTools: getToolDefinitions,
       getMcpTools: () => mcpTools,
-      getAgentSettings: () => agentSettings,
+      getAgentSettings: () => agentSettingsRef.current,
       onTokenUsage: (usage) => {
         tokenUsageRef.current = tokenUsageRef.current
           ? { promptTokens: tokenUsageRef.current.promptTokens + usage.promptTokens, completionTokens: tokenUsageRef.current.completionTokens + usage.completionTokens, totalTokens: tokenUsageRef.current.totalTokens + usage.totalTokens }
@@ -226,7 +231,10 @@ export function useTauriAgent() {
   }, [agentSettings, mcpTools]);
 
   // ── 发送消息 ──
-  const sendMessage = useCallback(async (text: string, imagesOrAttachments?: string[] | ChatAttachment[]) => {
+  // text: UI 显示的文本（也是默认 LLM 收到的内容）
+  // options.displayText: 如果提供，UI 显示用 displayText，LLM 收到 text（用于内部指令）
+  const sendMessage = useCallback(async (text: string, imagesOrAttachments?: string[] | ChatAttachment[], options?: { displayText?: string }) => {
+    const displayText = options?.displayText || text;
     const attachments: ChatAttachment[] = [];
     if (imagesOrAttachments && imagesOrAttachments.length > 0) {
       for (const item of imagesOrAttachments) {
@@ -265,7 +273,7 @@ export function useTauriAgent() {
     // 同步到 zustand store（用 ChatMessage 格式）— UI 只显示用户输入的文字，
     // 文件作为附件标签展示（files 字段），不把原始内容塞进 content
     const userChatMsg: ChatMessage = {
-      id: userMsgId, role: "user", content: text,
+      id: userMsgId, role: "user", content: displayText,
       images: imagePaths.length > 0 ? imagePaths : undefined,
       files: attachments.filter((a) => !a.isImage).length > 0 ? attachments.filter((a) => !a.isImage) : undefined,
     };
@@ -377,7 +385,18 @@ export function useTauriAgent() {
           onCustomEvent: ({ event }: any) => {
             if (event.name === "suggestion") {
               // 替换而非追加：每次 generate_image 后只展示一组建议，避免重复
-              setSuggestions([...(event.value || [])]);
+              let list = [...(event.value || [])];
+              // 如果是 refine 推荐的（用户点了"推荐xx"），追加"换一批"和"返回"操作
+              if (refineDimRef.current && list.length > 0) {
+                const dim = refineDimRef.current;
+                list = [
+                  ...list,
+                  { title: `🔄 再推荐${dim}`, message: `__refine_again:${dim}`, confirm: true },
+                  { title: "↩ 返回", message: `__refine_back`, confirm: true },
+                ];
+                refineDimRef.current = null; // 消费后清空
+              }
+              setSuggestions(list);
             } else if (event.name === "gen_preview") {
               setActivePreview(event.value);
             } else if (event.name === "character_picker") {
@@ -427,7 +446,10 @@ export function useTauriAgent() {
   // ── 停止生成 ──
   const stopGenerating = useCallback(() => {
     if (agentRef.current) {
-      agentRef.current.abortRun();
+      // AG-UI 的正确停止方式：detachActiveRun() 触发 activeRunDetach$ 信号，
+      // 管道里的 takeUntil 立即取消订阅 → run() 的 teardown 执行 → aborted = true。
+      // AbstractAgent.abortRun() 是空方法，不会做任何事。
+      agentRef.current.detachActiveRun();
     }
     const sess = useAgentStore.getState();
     if (sess.activeSessionId) {
@@ -554,18 +576,46 @@ export function useTauriAgent() {
     setCharacterModal(null);
   }, []);
 
-  // refineSuggestion: 模糊建议（如"换场景"）点击 → 让 LLM 针对当前画面推荐
+  // refineSuggestion: 推荐维度（如"推荐场景"）点击 → 让 LLM 针对当前画面推荐
   // 一组具体方案（带 Danbooru tag）。LLM 必须用 <<<SUGGESTION:...>>> 标记输出，
   // 不能直接生成图片。用户再点选其中一个，走预览确认再生成。
   const refineSuggestion = useCallback((sug: Suggestion) => {
+    // 特殊操作：换一批 / 返回
+    if (sug.message === "__refine_back") {
+      setSuggestions([]);
+      return;
+    }
+    if (sug.message?.startsWith("__refine_again:")) {
+      const dim = sug.message.replace("__refine_again:", "");
+      refineDimRef.current = dim;
+      setSuggestions([]);
+      sendMessage(
+        `【系统指令】用户对上一批${dim}推荐不满意，请重新推荐 4 个完全不同的${dim}方案，不要和之前的重复。\n` +
+        `要求：title 简短中文名（2-5字），message 必须包含具体的 Danbooru 英文 tag。\n` +
+        `先说一句话介绍，然后用标记输出：\n` +
+        `<<<SUGGESTION:[{"title":"示例","message":"把${dim}改成 XXX，加上 tag1, tag2 重新生成"}]>>>\n` +
+        `禁止调用任何工具。禁止生成图片。`,
+        undefined,
+        { displayText: `再推荐${dim}` }
+      );
+      return;
+    }
     setSuggestions([]);
-    const title = sug.title.replace(/^[^\u4e00-\u9fa5a-z]+/i, "").trim();
+    // "推荐场景" → "场景"，"推荐姿势" → "姿势"
+    const dim = sug.title.replace(/^推荐/, "").replace(/^[^\u4e00-\u9fa5a-z]+/i, "").trim();
+    refineDimRef.current = dim;
     sendMessage(
-      `【系统指令】用户想要"${title}"，但需要你先推荐具体方案。\n` +
-      `请基于当前画面，推荐 4 个不同的${title}方案。每个方案的 message 字段必须包含具体的 Danbooru 英文 tag。\n` +
-      `严格按以下 JSON 数组格式输出，不要输出任何其他内容：\n` +
-      `<<<SUGGESTION:[{"title":"中文名","message":"具体的修改指令，带英文tag"},{"title":"中文名","message":"具体的修改指令，带英文tag"}]>>>\n` +
-      `禁止调用 generate_image 或任何工具。禁止生成图片。只输出标记。`
+      `【系统指令】用户想让你推荐${dim}方案。\n` +
+      `请基于当前画面的角色和内容，推荐 4 个不同的${dim}方案。\n` +
+      `要求：\n` +
+      `- title：简短中文名（2-5字）\n` +
+      `- message：完整的修改指令，必须包含具体的 Danbooru 英文 tag，让用户点击后可以直接更新 prompt 重新生成\n` +
+      `- 每个方案要有画面感和差异化，不要重复\n\n` +
+      `先说一句话介绍你的推荐，然后在最后用标记输出方案：\n` +
+      `<<<SUGGESTION:[{"title":"示例名","message":"把${dim}改成 XXX，加上 tag1, tag2 重新生成"}]>>>\n` +
+      `禁止调用任何工具。禁止生成图片。`,
+      undefined,
+      { displayText: `推荐${dim}` }
     );
   }, [sendMessage]);
 
