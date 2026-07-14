@@ -15,6 +15,7 @@ import { AgentInput } from "./components/AgentInput";
 import { SuggestionBar } from "./components/SuggestionBar";
 import { GenerationPreview } from "./components/GenerationPreview";
 import { CharacterLibraryModal } from "./components/CharacterLibraryModal";
+import { ModelPickerModal } from "./components/ModelPickerModal";
 
 export function AgentPanel() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -36,6 +37,9 @@ export function AgentPanel() {
     confirmCharacters,
     openCharacterLibrary,
     closeCharacterModal,
+    modelModal,
+    confirmModel,
+    closeModelModal,
     refineSuggestion,
   } = useTauriAgent();
 
@@ -72,21 +76,17 @@ export function AgentPanel() {
 
   return (
     <div
-      className={`relative flex flex-col bg-[var(--glass-bg)] border-l border-[var(--glass-border)] backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex-shrink-0 h-full ${
-        isExpanded ? "w-[420px]" : "w-[60px]"
+      className={`absolute right-0 top-0 h-full flex flex-col bg-[var(--glass-bg)] border-l border-[var(--glass-border)] backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${
+        isExpanded
+          ? "w-[420px] shadow-[-10px_0_40px_rgba(0,0,0,0.4)] opacity-100"
+          : "w-[60px] opacity-100"
       }`}
-      style={{ zIndex: 50, overflow: "visible" }}
+      style={{ zIndex: 50 }}
     >
-      {/* 内层裁剪容器 — 只裁渐变线装饰，不裁浮动 tab，不拦截点击 */}
-      <div className="absolute inset-0 overflow-hidden rounded-none pointer-events-none">
-        {/* 装饰渐变线 */}
-        <div className="absolute inset-y-0 left-0 w-[2px] bg-gradient-to-b from-transparent via-[var(--accent-1)]/30 to-transparent" />
-      </div>
-
-      {/* 浮动收缩/展开 tab — 在外层（不被 overflow:hidden 裁剪） */}
+      {/* 浮动展开/收起 tab — 不受 overflow 裁剪 */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`absolute top-1/2 -translate-y-1/2 -left-[24px] w-[24px] h-[80px] flex items-center justify-center border-y border-l cursor-pointer transition-all duration-300 backdrop-blur-xl rounded-l-xl z-50 ${
+        className={`absolute top-1/2 -translate-y-1/2 -left-[24px] w-[24px] h-[80px] flex items-center justify-center border-y border-l cursor-pointer transition-all duration-300 backdrop-blur-xl rounded-l-xl z-[60] ${
           isExpanded
             ? "bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] hover:border-[var(--glass-border-active)] hover:text-[var(--accent-1)] shadow-[-4px_0_15px_rgba(0,0,0,0.3)]"
             : isGenerating
@@ -113,7 +113,6 @@ export function AgentPanel() {
             </div>
             <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-400 border-2 border-[var(--glass-bg)] animate-pulse" />
           </div>
-          {/* 竖排功能按钮 */}
           <div className="flex flex-col gap-2 mt-2">
             <button onClick={() => { useAgentStore.getState().createSession(); setIsExpanded(true); }} className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--accent-1)] hover:bg-[var(--glass-bg-hover)] transition-all cursor-pointer" title="新会话">
               <Plus size={14} />
@@ -128,8 +127,9 @@ export function AgentPanel() {
         </div>
       )}
 
-      {/* ── 展开内容 ── */}
-      {isExpanded && (
+      {/* ── 展开内容（内层 overflow-hidden 裁剪）── */}
+      <div className={`flex-1 flex flex-col min-h-0 ${isExpanded ? "opacity-100" : "opacity-0 pointer-events-none"} overflow-hidden`}>
+        {isExpanded && (
         <div className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-300">
           {/* Header */}
           <div className="flex-shrink-0 px-4 py-3 flex items-center justify-between border-b border-[var(--glass-border)]">
@@ -182,6 +182,14 @@ export function AgentPanel() {
                   initialSeries={characterModal.series}
                   onClose={closeCharacterModal}
                   onConfirm={confirmCharacters}
+                />
+              )}
+
+              {modelModal?.open && (
+                <ModelPickerModal
+                  kind={modelModal.kind}
+                  onClose={closeModelModal}
+                  onConfirm={(name) => confirmModel(name, modelModal.kind)}
                 />
               )}
 
@@ -357,7 +365,8 @@ export function AgentPanel() {
               </div>
             )}
         </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

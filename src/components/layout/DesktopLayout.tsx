@@ -18,8 +18,8 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
     <div className="flex-1 flex overflow-hidden relative">
       <Sidebar />
 
-      {/* Main Area */}
-      <div id="main-content-area" className="flex-1 flex flex-col overflow-hidden bg-transparent relative">
+      {/* Main Area — padding-right 给 agent overlay 窄栏让出空间 */}
+      <div id="main-content-area" className="flex-1 flex flex-col overflow-hidden bg-transparent relative" style={{ paddingRight: "60px" }}>
         <TopBar />
         <CompletionToast />
         <div 

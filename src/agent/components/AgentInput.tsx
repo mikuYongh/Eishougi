@@ -238,7 +238,7 @@ export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHis
 
           {/* Token 环 */}
           {tokenUsage && (
-            <div className="ml-auto flex items-center gap-1" title={`输入: ${formatTokens(tokenUsage.promptTokens)} | 输出: ${formatTokens(tokenUsage.completionTokens)} | 总计: ${formatTokens(totalTokens)}`}>
+            <div className="flex items-center gap-1" title={`输入: ${formatTokens(tokenUsage.promptTokens)} | 输出: ${formatTokens(tokenUsage.completionTokens)} | 总计: ${formatTokens(totalTokens)}`}>
               <svg width="28" height="28" viewBox="0 0 32 32" className="-rotate-90">
                 <circle cx="16" cy="16" r="14" fill="none" stroke="var(--glass-border)" strokeWidth="2.5" />
                 <circle cx="16" cy="16" r="14" fill="none" stroke={ringColor} strokeWidth="2.5" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" className="transition-all duration-500" />
@@ -247,11 +247,11 @@ export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHis
             </div>
           )}
 
-          {/* 发送/停止 */}
+          {/* 发送/停止 — ml-auto 固定靠右，不依赖 token 统计是否存在 */}
           {isGenerating ? (
             <button
               onClick={onStop}
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer active:scale-95"
+              className="ml-auto w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer active:scale-95"
               style={{ background: "linear-gradient(135deg, #ef4444, #b91c1c)" }}
             >
               <Square size={15} fill="currentColor" />
@@ -260,7 +260,7 @@ export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHis
             <button
               onClick={handleSend}
               disabled={!input.trim() && selectedImages.length === 0 && selectedFiles.length === 0}
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="ml-auto w-10 h-10 rounded-xl flex items-center justify-center text-white transition-all cursor-pointer active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
               style={{ background: "linear-gradient(135deg, #d946ef, #9333ea)" }}
             >
               <Send size={15} />
