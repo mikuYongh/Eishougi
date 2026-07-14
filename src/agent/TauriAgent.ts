@@ -135,11 +135,6 @@ function parseEmbeddedToolCalls(content: string): {
 
 export class TauriAgent extends AbstractAgent {
   private config: TauriAgentConfig;
-  // 专注模式：用户确认预览后设为 true，下次 generate_image 直接执行不拦截。
-  // 执行后自动重置为 false。
-  public skipNextPreview = false;
-  // 记录 generate_image 完成的轮次，用于下一轮自动注入 suggestion
-  public _lastGenImageRound: number | undefined;
   // 图片路径 → data URL 缓存，避免同一轮 / 跨轮重复读取文件
   private _imageCache = new Map<string, string>();
 
@@ -339,98 +334,11 @@ export class TauriAgent extends AbstractAgent {
 
     // SSE 缓冲
     let sseBuffer = "";
-    // 本轮流是否已通过标记发射过 suggestion（避免兜底逻辑重复发射）
-    let hadSuggestionMarker = false;
-
-    // ── 人机交互标记拦截 ──
-    // LLM 在文本流中输出特殊标记（<<<SUGGESTION:...>>>, <<<GEN_PREVIEW:...>>>, <<<CHARACTER_PICKER:...>>>）
-    // 我们在流过程中检测这些标记：标记内容不作为 TEXT_MESSAGE_CHUNK 转发（不显示给用户），
-    // 而是解析后作为 CUSTOM 事件发射，前端据此渲染富 UI 组件。
-    //
-    // 由于标记可能跨多个 SSE chunk 边界，我们用一个 pending buffer 暂存可能不完整的标记头部。
-    // 完整标记被截获后触发 CUSTOM 事件；非标记文本正常逐 token 转发（保持流式渲染体验）。
-    let pendingBuffer = "";  // 暂存可能不完整的标记片段
-    const MARKERS = ["<<<SUGGESTION:", "<<<GEN_PREVIEW:", "<<<CHARACTER_PICKER:"];
-    const END_MARKER = ">>>";
 
     const flushText = (text: string) => {
       if (!text) return;
       assistantContent += text;
       observer.next({ type: EventType.TEXT_MESSAGE_CHUNK, messageId, role: "assistant", delta: text } as BaseEvent);
-    };
-
-    const processTextDelta = (deltaText: string) => {
-      let combined = pendingBuffer + deltaText;
-      pendingBuffer = "";
-
-      while (combined.length > 0) {
-        // 查找最近的开标记位置
-        let earliestStart = -1;
-        let matchedMarker = "";
-        for (const marker of MARKERS) {
-          // 标记可能部分出现在 combined 末尾（跨 chunk），需要检测前缀
-          const fullIdx = combined.indexOf(marker);
-          if (fullIdx !== -1 && (earliestStart === -1 || fullIdx < earliestStart)) {
-            earliestStart = fullIdx;
-            matchedMarker = marker;
-          }
-          // 检测 partial（combined 以 marker 的前缀结尾但还没完整出现）
-          // 只检测长度 >= 2 的前缀（避免单个 "<" 误匹配 HTML/markdown 内容）
-          for (let prefixLen = Math.min(combined.length, marker.length - 1); prefixLen >= 2; prefixLen--) {
-            if (combined.endsWith(marker.slice(0, prefixLen))) {
-              // 如果 combined 完全以 marker 前缀结尾且没有更早的完整标记，暂存
-              if (earliestStart === -1) {
-                pendingBuffer = combined;
-                return;
-              }
-              break;
-            }
-          }
-        }
-
-        if (earliestStart === -1) {
-          // 没有标记 — 全部转发
-          flushText(combined);
-          return;
-        }
-
-        // 先转发标记之前的普通文本
-        if (earliestStart > 0) {
-          flushText(combined.slice(0, earliestStart));
-        }
-
-        const afterMarker = combined.slice(earliestStart + matchedMarker.length);
-
-        // 查找结束标记 >>>
-        const endIdx = afterMarker.indexOf(END_MARKER);
-        if (endIdx === -1) {
-          // 标记尚未完整 — 暂存（连同标记头部）
-          pendingBuffer = combined.slice(earliestStart);
-          return;
-        }
-
-        // 完整标记！解析 JSON 内容并触发 CUSTOM 事件
-        const jsonStr = afterMarker.slice(0, endIdx).trim();
-        combined = afterMarker.slice(endIdx + END_MARKER.length);
-
-        try {
-          const parsed = JSON.parse(jsonStr);
-          if (matchedMarker === "<<<SUGGESTION:") {
-            // LLM 给出的建议是具体的（已写明改什么），点击直接执行，confirm=false
-            const suggestions = (Array.isArray(parsed) ? parsed : [parsed]).map((s: any) => ({ confirm: false, ...s }));
-            hadSuggestionMarker = true;
-            observer.next({ type: EventType.CUSTOM, name: "suggestion", value: suggestions } as BaseEvent);
-          } else if (matchedMarker === "<<<GEN_PREVIEW:") {
-            observer.next({ type: EventType.CUSTOM, name: "gen_preview", value: { ...parsed, type: "generation_preview", status: "pending" } } as BaseEvent);
-          } else if (matchedMarker === "<<<CHARACTER_PICKER:") {
-            observer.next({ type: EventType.CUSTOM, name: "character_picker", value: { ...parsed, type: "character_picker" } } as BaseEvent);
-          }
-        } catch (e) {
-          // JSON 解析失败 — 把标记内容作为普通文本输出（降级处理）
-          console.warn("[TauriAgent] failed to parse marker JSON:", jsonStr, e);
-          flushText(`[${matchedMarker}${jsonStr}${END_MARKER}]`);
-        }
-      }
     };
 
     const processChunk = (chunk: string) => {
@@ -454,8 +362,8 @@ export class TauriAgent extends AbstractAgent {
           const delta = data.choices?.[0]?.delta;
           if (!delta) continue;
           if (delta.content) {
-            // 通过标记拦截器处理，而非直接转发
-            processTextDelta(delta.content);
+            // 直接转发文本（人机交互改用 client-defined tools，不再需要标记拦截）
+            flushText(delta.content);
           }
           if (delta.reasoning_content && llmConfig.reasoningEnabled !== false) {
             assistantReasoning += delta.reasoning_content;
@@ -511,93 +419,6 @@ export class TauriAgent extends AbstractAgent {
         observer.next({ type: EventType.CUSTOM, name: "token_usage", value: tokenUsage } as BaseEvent);
       }
       return;
-    }
-
-    // ── 流结束后刷新残留的 pendingBuffer（不完整标记的尾部文本）──
-    // LLM 经常输出 <<<SUGGESTION:[...] 但忘记加结尾 >>>，这里做容错：
-    // 如果 pendingBuffer 含未闭合的标记头，尝试找到 JSON 并补全解析。
-    if (pendingBuffer) {
-      for (const marker of MARKERS) {
-        const markerIdx = pendingBuffer.indexOf(marker);
-        if (markerIdx === -1) continue;
-        // 找到标记头 — 取标记头之后的内容，去掉可能的 >>>
-        let jsonPart = pendingBuffer.slice(markerIdx + marker.length);
-        // 去掉结尾不完整的 >>>
-        jsonPart = jsonPart.replace(/>>>?\s*$/, "").trim();
-        // 尝试找到完整的 JSON 数组/对象
-        const lastBrace = jsonPart.lastIndexOf("}");
-        if (lastBrace !== -1) {
-          // 截取到最后一个 } 再加 ]
-          const candidate = jsonPart.slice(0, lastBrace + 1) + "]";
-          try {
-            const parsed = JSON.parse(candidate);
-            if (marker === "<<<SUGGESTION:") {
-              const suggestions = (Array.isArray(parsed) ? parsed : [parsed]).map((s: any) => ({ confirm: false, ...s }));
-              hadSuggestionMarker = true;
-              observer.next({ type: EventType.CUSTOM, name: "suggestion", value: suggestions } as BaseEvent);
-              // 标记前的文字正常输出
-              if (markerIdx > 0) flushText(pendingBuffer.slice(0, markerIdx));
-              pendingBuffer = "";
-              break;
-            }
-          } catch {
-            // JSON 不合法，继续降级处理
-          }
-        }
-      }
-    }
-    if (pendingBuffer) {
-      flushText(pendingBuffer);
-      pendingBuffer = "";
-    }
-
-    // ── 自动注入 suggestion（兜底）──
-    // LLM 在 medium reasoning 下几乎从不输出 <<<SUGGESTION:>>> 标记，
-    // 所以这里作为主要建议来源——根据当前 prompt 内容动态生成有针对性的建议。
-    // _lastGenImageRound 在下方 tool 执行循环里，仅当 generate_image 真正返回图片（非 pending）时才设置。
-    if (toolCalls.length === 0 && assistantContent && this._lastGenImageRound !== undefined && this._lastGenImageRound === round - 1) {
-      if (!hadSuggestionMarker) {
-        // 从最近的 tool 结果里提取 prompt_id，读 DB 获取当前 prompt 内容
-        let currentPrompt = "";
-        let currentWidth = 832, currentHeight = 1216;
-        try {
-          // 从 input.messages 里找最近的 generate_image 调用，提取 prompt_id
-          for (let mi = input.messages.length - 1; mi >= 0; mi--) {
-            const m = input.messages[mi] as any;
-            if (m.role === "assistant" && m.toolCalls) {
-              for (const tc of m.toolCalls) {
-                if (tc.function?.name === "generate_image") {
-                  const args = JSON.parse(tc.function.arguments || "{}");
-                  if (args.prompt_id) {
-                    const dbP = await invoke("get_prompt", { id: args.prompt_id }) as any;
-                    currentPrompt = (dbP?.positivePrompt || "").toLowerCase();
-                    currentWidth = dbP?.width || 832;
-                    currentHeight = dbP?.height || 1216;
-                  }
-                }
-              }
-            }
-          }
-        } catch {}
-
-        // 根据当前尺寸决定横竖版切换建议
-        const isLandscape = currentWidth > currentHeight;
-
-        const suggestions = [
-          // 重新生成（confirm:false，明确无歧义，直接执行）
-          { title: "🔄 重新抽", message: "用相同参数重新生成一张", confirm: false },
-          // 推荐维度（confirm:true，点击后让 LLM 针对当前画面推荐具体方案让用户选）
-          { title: "推荐场景", message: "推荐场景", confirm: true },
-          { title: "推荐姿势", message: "推荐姿势", confirm: true },
-          { title: "推荐服装", message: "推荐服装", confirm: true },
-          { title: "推荐表情", message: "推荐表情", confirm: true },
-          { title: "推荐玩法", message: "推荐玩法", confirm: true },
-          // 横竖版切换（confirm:false，明确操作）
-          { title: isLandscape ? "📱 竖版" : "🖥️ 横版", message: isLandscape ? "改成竖版 832×1216 重新生成" : "改成横版 1216×832 重新生成", confirm: false },
-        ];
-        observer.next({ type: EventType.CUSTOM, name: "suggestion", value: suggestions } as BaseEvent);
-      }
-      this._lastGenImageRound = undefined;
     }
 
     // ── Token 使用量通过 CUSTOM 事件发射 ──
@@ -659,95 +480,84 @@ export class TauriAgent extends AbstractAgent {
           resultStr = JSON.stringify({ error: "Invalid JSON arguments" });
         }
 
-        // ── refine 模式拦截：用户点了模糊建议（换姿势/换场景等），要求 LLM 先推荐具体方案。
-        // 如果 LLM 试图直接生成图片或修改 prompt，拦截它，提醒只输出建议标记。
-        if (!resultStr && input.messages.length > 0) {
-          const lastUserMsg = [...input.messages].reverse().find((m: any) => m.role === "user");
-          const userContent = (lastUserMsg as any)?.content || "";
-          if (typeof userContent === "string" && userContent.startsWith("【系统指令】")) {
-            const blocked = ["generate_image", "generate_video_from_image", "update_prompt_content", "update_prompt_settings", "create_prompt"];
-            if (blocked.includes(call.function.name)) {
-              resultStr = JSON.stringify({
-                error: "用户正在请求你推荐方案，不要执行任何操作。请直接用 <<<SUGGESTION:[...]]>>> 标记输出 4 个具体方案，不要调用任何工具。"
-              });
-              toolResults.push({ id: call.id, content: resultStr });
-              observer.next({
-                type: EventType.TOOL_CALL_RESULT,
-                messageId,
-                toolCallId: call.id,
-                content: resultStr,
-                role: "tool",
-              } as BaseEvent);
-              continue;
+        // ── Client-defined tools 拦截 ──
+        // 这 3 个工具不执行 executeTool，而是发 CUSTOM 事件触发前端 UI，
+        // 用户交互后结果通过新消息返回给 AI。
+        if (!resultStr) {
+          if (call.function.name === "select_characters") {
+            // 角色/画师选择器
+            observer.next({
+              type: EventType.CUSTOM,
+              name: "character_picker",
+              value: {
+                type: "character_picker",
+                kind: parsedArgs.kind === "artist" ? "artist" : "character",
+                series: parsedArgs.series || null,
+              },
+            } as BaseEvent);
+            resultStr = JSON.stringify({ status: "pending", message: "已弹出角色选择器，等待用户选择。" });
+            toolResults.push({ id: call.id, content: resultStr });
+            observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
+            continue;
+          }
+
+          if (call.function.name === "confirm_generation") {
+            // 生图参数确认 — 从 DB 补全参数（LLM 可能只传 prompt_id）
+            let dbPrompt: any = null;
+            if (parsedArgs.prompt_id) {
+              try {
+                dbPrompt = await invoke("get_prompt", { id: parsedArgs.prompt_id });
+              } catch {}
             }
+            let loraConfigs: any[] | undefined;
+            if (Array.isArray(parsedArgs.loras)) {
+              loraConfigs = parsedArgs.loras;
+            } else if (dbPrompt?.loraConfigs) {
+              try {
+                const parsed = typeof dbPrompt.loraConfigs === "string"
+                  ? JSON.parse(dbPrompt.loraConfigs)
+                  : dbPrompt.loraConfigs;
+                loraConfigs = Array.isArray(parsed) ? parsed : undefined;
+              } catch {}
+            }
+            const previewValue = {
+              type: "generation_preview",
+              previewId: `preview_${call.id}`,
+              prompt: parsedArgs.prompt || dbPrompt?.positivePrompt || "",
+              negativePrompt: parsedArgs.negative_prompt || dbPrompt?.negativePrompt,
+              artistPrompt: parsedArgs.artist_prompt || dbPrompt?.artistPrompt,
+              model: parsedArgs.model || dbPrompt?.baseModel,
+              width: parsedArgs.width || dbPrompt?.width,
+              height: parsedArgs.height || dbPrompt?.height,
+              steps: parsedArgs.steps || dbPrompt?.steps,
+              cfgScale: parsedArgs.cfg_scale || dbPrompt?.cfgScale,
+              sampler: parsedArgs.sampler || dbPrompt?.samplerName || dbPrompt?.sampler,
+              scheduler: parsedArgs.scheduler || dbPrompt?.scheduler,
+              loras: loraConfigs,
+              promptId: parsedArgs.prompt_id,
+              status: "pending" as const,
+            };
+            observer.next({ type: EventType.CUSTOM, name: "gen_preview", value: previewValue } as BaseEvent);
+            resultStr = JSON.stringify({ status: "pending", message: "已弹出参数预览，等待用户确认后执行生成。" });
+            toolResults.push({ id: call.id, content: resultStr });
+            observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
+            continue;
           }
-        }
 
-        // ── 专注模式拦截：generate_image 调用前弹出预览卡片让用户确认 ──
-        // 不依赖 LLM 输出标记 — 在工具执行层强制拦截，100% 可靠。
-        // skipNextPreview 标记：用户已确认预览，直接执行不拦截（执行后重置）。
-        if (!resultStr && call.function.name === "generate_image" && agentSettings.focusMode && !this.skipNextPreview) {
-          // LLM 经常只传 prompt_id 不传 positive_prompt — 从数据库补全真实参数
-          let dbPrompt: any = null;
-          if (parsedArgs.prompt_id) {
-            try {
-              dbPrompt = await invoke("get_prompt", { id: parsedArgs.prompt_id });
-            } catch {}
+          if (call.function.name === "show_suggestions") {
+            // 推荐方案 — 立即完成（用户点击建议时走新消息，不是 tool result）
+            const suggestions = (parsedArgs.suggestions || []).map((s: any) => ({ confirm: false, ...s }));
+            if (suggestions.length === 0) {
+              // AI 传了空参数 — 返回错误提示，要求重新调用并带上 suggestions 数组
+              resultStr = JSON.stringify({ status: "error", message: "show_suggestions 需要至少 1 个 suggestion。请带上 suggestions 参数重新调用，例如：show_suggestions(suggestions=[{title:\"浴室\",message:\"...\"}])" });
+            } else {
+              observer.next({ type: EventType.CUSTOM, name: "suggestion", value: suggestions } as BaseEvent);
+              resultStr = JSON.stringify({ status: "shown", message: "已向用户展示建议按钮。" });
+            }
+            toolResults.push({ id: call.id, content: resultStr });
+            observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
+            continue;
           }
-          // loraConfigs 在 DB 里存的是 JSON 字符串，需解析成数组给预览组件
-          let loraConfigs: any[] | undefined;
-          if (Array.isArray(parsedArgs.lora_configs)) {
-            loraConfigs = parsedArgs.lora_configs;
-          } else if (dbPrompt?.loraConfigs) {
-            try {
-              const parsed = typeof dbPrompt.loraConfigs === "string"
-                ? JSON.parse(dbPrompt.loraConfigs)
-                : dbPrompt.loraConfigs;
-              loraConfigs = Array.isArray(parsed) ? parsed : undefined;
-            } catch {}
-          }
-          const previewValue = {
-            type: "generation_preview",
-            previewId: `preview_${call.id}`,
-            prompt: parsedArgs.positive_prompt || dbPrompt?.positivePrompt || "",
-            negativePrompt: parsedArgs.negative_prompt || dbPrompt?.negativePrompt,
-            artistPrompt: parsedArgs.artist_prompt || dbPrompt?.artistPrompt,
-            model: parsedArgs.base_model || dbPrompt?.baseModel,
-            width: parsedArgs.width || dbPrompt?.width,
-            height: parsedArgs.height || dbPrompt?.height,
-            steps: parsedArgs.steps || dbPrompt?.steps,
-            cfgScale: parsedArgs.cfg_scale || dbPrompt?.cfgScale,
-            sampler: parsedArgs.sampler_name || dbPrompt?.sampler,
-            scheduler: parsedArgs.scheduler || dbPrompt?.scheduler,
-            loras: loraConfigs,
-            promptId: parsedArgs.prompt_id,
-            status: "pending" as const,
-          };
-          observer.next({ type: EventType.CUSTOM, name: "gen_preview", value: previewValue } as BaseEvent);
-          // 返回占位结果告诉 LLM 等待用户确认
-          resultStr = JSON.stringify({ status: "pending", message: "已弹出生成预览，等待用户确认参数后执行。" });
-          toolResults.push({ id: call.id, content: resultStr });
-          observer.next({
-            type: EventType.TOOL_CALL_RESULT,
-            messageId,
-            toolCallId: call.id,
-            content: resultStr,
-            role: "tool",
-          } as BaseEvent);
-          continue;
-        }
-
-        // ── 用户已确认预览（skipNextPreview=true）：LLM 会重新调 generate_image，
-        // 但它仍带着原始的 base_model/lora_configs 等参数 — 这些是用户在预览界面
-        // 编辑之前的旧值。如果让它们覆盖 DB（DB 里已是用户编辑后的新值），
-        // 用户在预览里的修改就白费了。
-        // 修复：此时剥掉 LLM 传的所有参数，只留 prompt_id + batch_count，
-        // 强制 executeTool 从 DB 读取用户确认后的真实参数。
-        if (call.function.name === "generate_image" && this.skipNextPreview) {
-          parsedArgs = {
-            prompt_id: parsedArgs.prompt_id,
-            ...(parsedArgs.batch_count != null ? { batch_count: parsedArgs.batch_count } : {}),
-          };
         }
 
         if (!resultStr) {
@@ -764,40 +574,7 @@ export class TauriAgent extends AbstractAgent {
           }
         }
 
-        // ── 角色搜索结果自动触发 character_picker 选择器 ──
-        // 不依赖 LLM 输出标记 — 工具执行后自动检测返回的是角色/画师列表
-        // 发 kind + series 信号：Modal 内部用 series 预选作品筛选，显示 LLM 搜出的那批角色
-        // （本地重新拉，数据完整、图片 URL 正确）。用户仍可清掉筛选浏览全部。
-        // ⚠️ 只有搜索有结果时才弹框 — 空结果说明角色不在本地图鉴，LLM 会走 MCP/知识兜底，
-        // 弹一个空的框没意义，反而干扰用户。
-        if (call.function.name === "search_characters_in_series" || call.function.name === "search_artists") {
-          let hasResults = false;
-          try {
-            const parsed = JSON.parse(resultStr);
-            hasResults = Array.isArray(parsed) && parsed.length > 0;
-          } catch {}
-          if (hasResults) {
-            const isArtist = call.function.name === "search_artists";
-            const series = !isArtist ? (parsedArgs.series as string | undefined) : undefined;
-            observer.next({
-              type: EventType.CUSTOM,
-              name: "character_picker",
-              value: { type: "character_picker", kind: isArtist ? "artist" : "character", series },
-            } as BaseEvent);
-          }
-        }
-
         toolResults.push({ id: call.id, content: resultStr });
-
-        // generate_image 执行完毕后重置 skipNextPreview
-        if (call.function.name === "generate_image") {
-          this.skipNextPreview = false;
-          // 仅当真正生成完成（非 pending 拦截）时记录轮次，供下一轮纯文本回复的 suggestion 兜底用。
-          // focusMode 拦截返回的 pending 结果不算，否则会在"预览已弹出"的文字轮提前触发 fallback。
-          if (!resultStr.includes('"status":"pending"')) {
-            this._lastGenImageRound = round;
-          }
-        }
 
         // 发射 TOOL_CALL_RESULT
         observer.next({
