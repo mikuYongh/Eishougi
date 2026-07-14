@@ -459,6 +459,38 @@ export class TauriAgent extends AbstractAgent {
     }
 
     // ── 流结束后刷新残留的 pendingBuffer（不完整标记的尾部文本）──
+    // LLM 经常输出 <<<SUGGESTION:[...] 但忘记加结尾 >>>，这里做容错：
+    // 如果 pendingBuffer 含未闭合的标记头，尝试找到 JSON 并补全解析。
+    if (pendingBuffer) {
+      for (const marker of MARKERS) {
+        const markerIdx = pendingBuffer.indexOf(marker);
+        if (markerIdx === -1) continue;
+        // 找到标记头 — 取标记头之后的内容，去掉可能的 >>>
+        let jsonPart = pendingBuffer.slice(markerIdx + marker.length);
+        // 去掉结尾不完整的 >>>
+        jsonPart = jsonPart.replace(/>>>?\s*$/, "").trim();
+        // 尝试找到完整的 JSON 数组/对象
+        const lastBrace = jsonPart.lastIndexOf("}");
+        if (lastBrace !== -1) {
+          // 截取到最后一个 } 再加 ]
+          const candidate = jsonPart.slice(0, lastBrace + 1) + "]";
+          try {
+            const parsed = JSON.parse(candidate);
+            if (marker === "<<<SUGGESTION:") {
+              const suggestions = (Array.isArray(parsed) ? parsed : [parsed]).map((s: any) => ({ confirm: false, ...s }));
+              hadSuggestionMarker = true;
+              observer.next({ type: EventType.CUSTOM, name: "suggestion", value: suggestions } as BaseEvent);
+              // 标记前的文字正常输出
+              if (markerIdx > 0) flushText(pendingBuffer.slice(0, markerIdx));
+              pendingBuffer = "";
+              break;
+            }
+          } catch {
+            // JSON 不合法，继续降级处理
+          }
+        }
+      }
+    }
     if (pendingBuffer) {
       flushText(pendingBuffer);
       pendingBuffer = "";
@@ -499,11 +531,12 @@ export class TauriAgent extends AbstractAgent {
         const suggestions = [
           // 重新生成（confirm:false，明确无歧义，直接执行）
           { title: "🔄 重新抽", message: "用相同参数重新生成一张", confirm: false },
-          // 笼统维度（confirm:true，点击后让 LLM 展开成具体选项让用户选）
-          { title: "换姿势", message: "换一个姿势重新生成这张图", confirm: true },
-          { title: "换场景", message: "换一个场景重新生成这张图", confirm: true },
-          { title: "换服装", message: "换一套服装重新生成这张图", confirm: true },
-          { title: "换表情", message: "换一个表情重新生成这张图", confirm: true },
+          // 推荐维度（confirm:true，点击后让 LLM 针对当前画面推荐具体方案让用户选）
+          { title: "推荐场景", message: "推荐场景", confirm: true },
+          { title: "推荐姿势", message: "推荐姿势", confirm: true },
+          { title: "推荐服装", message: "推荐服装", confirm: true },
+          { title: "推荐表情", message: "推荐表情", confirm: true },
+          { title: "推荐玩法", message: "推荐玩法", confirm: true },
           // 横竖版切换（confirm:false，明确操作）
           { title: isLandscape ? "📱 竖版" : "🖥️ 横版", message: isLandscape ? "改成竖版 832×1216 重新生成" : "改成横版 1216×832 重新生成", confirm: false },
         ];
@@ -680,14 +713,23 @@ export class TauriAgent extends AbstractAgent {
         // 不依赖 LLM 输出标记 — 工具执行后自动检测返回的是角色/画师列表
         // 发 kind + series 信号：Modal 内部用 series 预选作品筛选，显示 LLM 搜出的那批角色
         // （本地重新拉，数据完整、图片 URL 正确）。用户仍可清掉筛选浏览全部。
+        // ⚠️ 只有搜索有结果时才弹框 — 空结果说明角色不在本地图鉴，LLM 会走 MCP/知识兜底，
+        // 弹一个空的框没意义，反而干扰用户。
         if (call.function.name === "search_characters_in_series" || call.function.name === "search_artists") {
-          const isArtist = call.function.name === "search_artists";
-          const series = !isArtist ? (parsedArgs.series as string | undefined) : undefined;
-          observer.next({
-            type: EventType.CUSTOM,
-            name: "character_picker",
-            value: { type: "character_picker", kind: isArtist ? "artist" : "character", series },
-          } as BaseEvent);
+          let hasResults = false;
+          try {
+            const parsed = JSON.parse(resultStr);
+            hasResults = Array.isArray(parsed) && parsed.length > 0;
+          } catch {}
+          if (hasResults) {
+            const isArtist = call.function.name === "search_artists";
+            const series = !isArtist ? (parsedArgs.series as string | undefined) : undefined;
+            observer.next({
+              type: EventType.CUSTOM,
+              name: "character_picker",
+              value: { type: "character_picker", kind: isArtist ? "artist" : "character", series },
+            } as BaseEvent);
+          }
         }
 
         toolResults.push({ id: call.id, content: resultStr });
