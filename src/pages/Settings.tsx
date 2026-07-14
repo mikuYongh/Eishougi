@@ -100,6 +100,10 @@ export function Settings() {
       });
       setFetchedModels(models);
       toast.success(`获取到 ${models.length} 个模型`);
+      // 如果当前没选模型，或选的模型不在列表里，自动选第一个
+      if (models.length > 0 && !models.includes(settings.llm.model)) {
+        updateSettings({ llm: { ...settings.llm, model: models[0] } });
+      }
     } catch (e: any) {
       toast.error(`获取模型列表失败: ${e?.message || e}`);
       console.error("Failed to fetch LLM models:", e);
