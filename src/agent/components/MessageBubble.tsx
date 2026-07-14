@@ -187,7 +187,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onAction }: { ms
           <ToolCallCard key={tc.id} name={tc.function.name} args={tc.function.arguments} />
         ))}
         {hasContent && (
-          <div className="bg-[var(--glass-bg)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl p-4">
+          <div className="bg-[var(--glass-bg)] rounded-2xl rounded-tl-sm border border-[var(--glass-border)] backdrop-blur-xl p-4 overflow-hidden">
             <MarkdownContent content={msg.content} />
           </div>
         )}

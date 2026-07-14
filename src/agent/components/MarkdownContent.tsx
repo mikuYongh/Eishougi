@@ -36,7 +36,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content }: { cont
       remarkPlugins={[remarkGfm]}
       urlTransform={(url) => url}
       components={{
-        p: ({ node, ...props }) => <div className="mb-2 last:mb-0 leading-relaxed" {...props} />,
+        p: ({ node, ...props }) => <div className="mb-2 last:mb-0 leading-relaxed break-words" {...props} />,
         strong: ({ node, ...props }) => <strong className="text-[var(--accent-1)] font-bold" {...props} />,
         a: ({ node, href, children, ...props }) => {
           if (typeof href === "string") {
@@ -52,12 +52,13 @@ export const MarkdownContent = memo(function MarkdownContent({ content }: { cont
               );
             }
           }
-          return <a className="text-[var(--accent-2)] underline hover:text-[var(--accent-1)] transition-colors" target="_blank" href={href} {...props}>{children}</a>;
+          return <a className="text-[var(--accent-2)] underline hover:text-[var(--accent-1)] transition-colors break-all" target="_blank" href={href} {...props}>{children}</a>;
         },
         code: ({ node, inline, className, children, ...props }: any) =>
           inline
-            ? <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--accent-1)]/20 text-[var(--accent-1)] font-mono text-[12px]" {...props}>{children}</code>
+            ? <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--accent-1)]/20 text-[var(--accent-1)] font-mono text-[12px] break-all" {...props}>{children}</code>
             : <pre className="p-3 rounded-xl bg-[var(--bg-layer-1)] border border-[var(--glass-border)] overflow-x-auto text-[12px] font-mono text-[var(--text-secondary)] mt-2 mb-2 custom-scrollbar"><code {...props}>{children}</code></pre>,
+        table: ({ node, ...props }) => <div className="overflow-x-auto my-2 custom-scrollbar"><table className="text-[12px] border-collapse" {...props} /></div>,
         ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
         ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
         h1: ({ node, ...props }) => <h1 className="text-lg font-bold text-[var(--text-primary)] mt-4 mb-2" {...props} />,
