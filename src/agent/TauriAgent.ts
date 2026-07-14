@@ -220,27 +220,53 @@ export class TauriAgent extends AbstractAgent {
     const isVideo = (p: string) => VIDEO_EXTS.has((p.split("?")[0].split(".").pop() || "").toLowerCase());
 
     const totalMsgs = input.messages.length;
+    // 图片只在最近 3 条消息保留
     const IMAGE_CUTOFF = totalMsgs - 3;
+    // 上下文裁剪：最近 N 条消息保留完整内容，更早的 tool 结果做截断。
+    // 原理：search_characters 等工具可能返回几千字符的 JSON，多轮对话后这些历史结果
+    // 反复发给 API 导致 token 暴涨。只保留最近几轮的完整 tool 结果，更早的截断到 200 字符摘要。
+    const FULL_CONTENT_CUTOFF = totalMsgs - 8;
+    const TOOL_RESULT_MAX_CHARS = 200;
 
     const apiMessages: any[] = [{ role: "system", content: systemPrompt }];
 
     for (let idx = 0; idx < input.messages.length; idx++) {
       const msg = input.messages[idx] as any;
+      const isOld = idx < FULL_CONTENT_CUTOFF;
+
       // AG-UI Message → OpenAI message
       if (msg.role === "tool") {
+        let toolContent = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content);
+        // 旧 tool 结果截断 — 保留开头摘要，丢弃冗长的历史 JSON
+        if (isOld && toolContent.length > TOOL_RESULT_MAX_CHARS) {
+          toolContent = toolContent.substring(0, TOOL_RESULT_MAX_CHARS) + "... [truncated]";
+        }
         apiMessages.push({
           role: "tool",
           tool_call_id: msg.toolCallId || msg.tool_call_id || "",
-          content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content),
+          content: toolContent,
         });
       } else if (msg.role === "assistant" && msg.toolCalls && msg.toolCalls.length > 0) {
         const m: any = { role: "assistant" };
-        if (msg.content) m.content = msg.content;
+        // 旧 assistant 消息如果只有 tool_calls 没有实际文本，跳过 content（减少噪音）
+        if (msg.content && msg.content.trim()) m.content = msg.content;
         m.tool_calls = msg.toolCalls.map((tc: any) => ({
           id: tc.id,
           type: "function",
           function: { name: tc.function?.name || tc.toolName || "", arguments: tc.function?.arguments || JSON.stringify(tc.args || {}) },
         }));
+        // 旧的 tool_calls 参数也可以截断（arguments 可能很长）
+        if (isOld) {
+          m.tool_calls = m.tool_calls.map((tc: any) => ({
+            ...tc,
+            function: {
+              ...tc.function,
+              arguments: tc.function.arguments.length > 200
+                ? tc.function.arguments.substring(0, 200) + "... [truncated]"
+                : tc.function.arguments,
+            },
+          }));
+        }
         apiMessages.push(m);
       } else {
         // 检查是否有图片附件 — 需要转成 OpenAI vision 多模态格式
