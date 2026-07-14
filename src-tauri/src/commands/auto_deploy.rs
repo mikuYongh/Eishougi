@@ -355,7 +355,7 @@ pub async fn call_llm_proxy(
     on_chunk: tauri::ipc::Channel<String>,
 ) -> Result<(), String> {
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
+        .connect_timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("Client build failed: {}", e))?;
 
@@ -408,6 +408,19 @@ pub async fn call_llm_proxy(
     }
 
     let resp = resp.ok_or_else(|| last_err.unwrap_or_else(|| "LLM proxy: all attempts failed".to_string()))?;
+
+    // 检查响应类型 — 某些 API 在出错时返回非流式 JSON 而非 SSE，
+    // 直接用 bytes_stream 读取会报 "error decoding response body"
+    let content_type = resp.headers().get("content-type").and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+    if !content_type.contains("text/event-stream") && !content_type.contains("stream") {
+        // 非 SSE 响应 — 可能是 API 错误（如不支持 image_url 的 400 错误）
+        let body_text = resp.text().await.map_err(|e| format!("Failed to read response: {}", e))?;
+        let snippet = if body_text.len() > 500 { &body_text[..500] } else { &body_text };
+        // 把响应体作为单行 SSE 发回前端，让前端的错误处理逻辑接管
+        let _ = on_chunk.send(format!("data: {}", snippet));
+        let _ = on_chunk.send("data: [DONE]".to_string());
+        return Ok(());
+    }
 
     let mut stream = resp.bytes_stream();
     let mut buffer = String::new();
