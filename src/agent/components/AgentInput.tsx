@@ -2,7 +2,7 @@
  * AgentInput — 输入栏：文本输入 + 文件上传 + 快速预设 + Token 环 + 发送/停止
  */
 import { useState, useRef, useCallback } from "react";
-import { Send, Square, ImagePlus, Paperclip, History, FileText, X, Focus, User, Palette } from "lucide-react";
+import { Send, Square, Paperclip, History, FileText, X, Focus, User, Palette } from "lucide-react";
 import { invoke, Channel } from "@tauri-apps/api/core";
 import type { ChatAttachment, TokenUsage } from "../types";
 import { QUICK_PRESETS, type QuickPreset } from "../types";
@@ -64,32 +64,23 @@ export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHis
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(",")[1];
-      try {
-        const path = await invoke<string>("save_base64_image", { base64, filename: file.name });
-        setSelectedImages((prev) => [...prev, { path, previewUrl: dataUrl }]);
-      } catch (err) { console.error("Image upload failed:", err); }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isImage = file.type.startsWith("image/");
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(",")[1];
       try {
-        const path = await invoke<string>("save_base64_file", { base64Data: dataUrl, originalName: file.name });
-        setSelectedFiles((prev) => [...prev, { path, name: file.name, mime: file.type, isImage: false }]);
+        if (isImage) {
+          // 图片：走 save_base64_image，存到路径 + 预览
+          const path = await invoke<string>("save_base64_image", { base64Data: dataUrl });
+          setSelectedImages((prev) => [...prev, { path, previewUrl: dataUrl }]);
+        } else {
+          // 非图片文件：走 save_base64_file
+          const path = await invoke<string>("save_base64_file", { base64Data: dataUrl, originalName: file.name });
+          setSelectedFiles((prev) => [...prev, { path, name: file.name, mime: file.type, isImage: false }]);
+        }
       } catch (err) { console.error("File upload failed:", err); }
     };
     reader.readAsDataURL(file);
@@ -215,14 +206,8 @@ export function AgentInput({ onSend, onStop, isGenerating, tokenUsage, onOpenHis
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3h7v7H3z"/><path d="M14 3h7v7h-7z"/><path d="M14 14h7v7h-7z"/><path d="M3 14h7v7H3z"/></svg>
           </button>
 
-          {/* 图片上传 */}
-          <label className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--accent-1)] transition-all cursor-pointer">
-            <ImagePlus size={14} />
-            <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-          </label>
-
-          {/* 文件上传 */}
-          <label className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--accent-1)] transition-all cursor-pointer">
+          {/* 文件上传（图片自动检测，有预览；其他文件显示文件名标签） */}
+          <label className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--accent-1)] transition-all cursor-pointer" title="上传图片或文件">
             <Paperclip size={14} />
             <input type="file" onChange={handleFileUpload} className="hidden" />
           </label>
