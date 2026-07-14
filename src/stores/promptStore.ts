@@ -11,7 +11,6 @@ export interface PromptProject {
   id: string;
   title: string;
   description: string;
-  coverImage?: string;
   positivePrompt: string;
   negativePrompt: string;
   artistPrompt: string;
