@@ -326,8 +326,9 @@ export function useTauriAgent() {
       }
       // 刚 addMessage 的这条 user 消息：store 里 content 只有用户文字，
       // 但 LLM 需要含文件内容的 llmContent — 用 id 匹配替换
+      // 同时带上 images 字段，供 TauriAgent 转成 OpenAI vision 多模态格式
       if (m.id === userMsgId) {
-        return { id: m.id, role: "user" as const, content: llmContent } as Message;
+        return { id: m.id, role: "user" as const, content: llmContent, images: imagePaths.length > 0 ? imagePaths : undefined } as Message;
       }
       return { id: m.id, role: m.role as any, content: m.content || "" } as Message;
     });

@@ -140,6 +140,8 @@ export class TauriAgent extends AbstractAgent {
   public skipNextPreview = false;
   // 记录 generate_image 完成的轮次，用于下一轮自动注入 suggestion
   public _lastGenImageRound: number | undefined;
+  // 图片路径 → data URL 缓存，避免同一轮 / 跨轮重复读取文件
+  private _imageCache = new Map<string, string>();
 
   constructor(config: TauriAgentConfig) {
     super({
@@ -241,7 +243,34 @@ export class TauriAgent extends AbstractAgent {
         }));
         apiMessages.push(m);
       } else {
-        apiMessages.push({ role: msg.role, content: msg.content || "" });
+        // 检查是否有图片附件 — 需要转成 OpenAI vision 多模态格式
+        const images: string[] = msg.images || [];
+        const imagePaths = (idx >= IMAGE_CUTOFF) ? images.filter((p: string) => !isVideo(p)) : [];
+
+        if (imagePaths.length > 0) {
+          // 构建 OpenAI vision content parts: text + image_url[]
+          const contentParts: any[] = [];
+          if (msg.content) contentParts.push({ type: "text", text: msg.content });
+          for (const imgPath of imagePaths) {
+            try {
+              let dataUrl = imgPath;
+              if (!imgPath.startsWith("data:")) {
+                const cached = this._imageCache.get(imgPath);
+                if (cached) {
+                  dataUrl = cached;
+                } else {
+                  dataUrl = await invoke<string>("read_image_base64", { path: imgPath });
+                  if (dataUrl && dataUrl.startsWith("data:")) this._imageCache.set(imgPath, dataUrl);
+                }
+              }
+              contentParts.push({ type: "image_url", image_url: { url: dataUrl } });
+            } catch { /* skip broken image */ }
+          }
+          if (contentParts.length === 0) contentParts.push({ type: "text", text: msg.content || "" });
+          apiMessages.push({ role: msg.role, content: contentParts });
+        } else {
+          apiMessages.push({ role: msg.role, content: msg.content || "" });
+        }
       }
     }
 
