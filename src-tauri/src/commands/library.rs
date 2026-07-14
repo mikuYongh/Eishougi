@@ -30,9 +30,21 @@ pub async fn search_characters(
 
     if let Some(s) = series {
         if !s.trim().is_empty() {
-            query.push_str(" AND (series = ? OR series_zh = ?)");
-            args.push(s.clone());
-            args.push(s);
+            // 标点不敏感匹配：去掉 : ：_ - 空格等分隔符后 LIKE
+            // 这样 LLM 传 "Honkai: Star Rail" / "崩坏：星穹铁道" / "star_rail" 都能命中
+            let normalized: String = s.chars()
+                .filter(|c| !matches!(c, ':' | '：' | '_' | '-' | ' ' | '　' | '.' | '!'))
+                .collect();
+            let pattern = format!("%{}%", normalized);
+            // 对每列也用 REPLACE 链去掉分隔符再 LIKE
+            let norm_expr = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({}, ':', ''), '：', ''), '_', ''), '-', ''), ' ', ''), '　', ''), '.', '')";
+            let series_norm = norm_expr.replace("{}", "series");
+            let series_zh_norm = norm_expr.replace("{}", "series_zh");
+            let copyright_norm = norm_expr.replace("{}", "copyright");
+            query.push_str(&format!(" AND ({} LIKE ? OR {} LIKE ? OR {} LIKE ?)", series_norm, series_zh_norm, copyright_norm));
+            args.push(pattern.clone());
+            args.push(pattern.clone());
+            args.push(pattern);
         }
     }
 
