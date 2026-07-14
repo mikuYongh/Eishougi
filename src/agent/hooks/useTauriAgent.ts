@@ -58,6 +58,12 @@ export function getToolDefinitions(): ToolDef[] {
     { type: "function", function: { name: "add_favorite_artist", description: "Add favorite artist.", parameters: { type: "object", properties: { artist_tag: { type: "string" }, source: { type: "string", enum: ["gallery", "lora", "custom", "unknown"] }, display_name: { type: "string" }, trigger: { type: "string" }, example_image: { type: "string" }, notes: { type: "string" } }, required: ["artist_tag"] } } },
     { type: "function", function: { name: "update_favorite_artist", description: "Update favorite artist.", parameters: { type: "object", properties: { id: { type: "string" }, display_name: { type: "string" }, trigger: { type: "string" }, example_image: { type: "string" }, notes: { type: "string" } }, required: ["id"] } } },
     { type: "function", function: { name: "remove_favorite_artist", description: "Remove favorite artist.", parameters: { type: "object", properties: { id: { type: "string" }, artist_tag: { type: "string" } } } } },
+    // ── 人机交互工具（client-defined tools）──
+    // 这些工具由 AI 主动调用来触发前端 UI 交互。前端拦截这些调用，
+    // 弹出对应的选择器/预览/建议 UI，用户交互后结果通过新消息返回给 AI。
+    { type: "function", function: { name: "select_characters", description: "Open the character/artist library picker for the user to select from the local database of 36,000+ characters or 15,000+ artists. Use this when the user needs to choose specific characters or artists from search results. The picker supports multi-select, search, and series filtering.", parameters: { type: "object", properties: { kind: { type: "string", enum: ["character", "artist"], description: "Whether to show the character picker or artist picker" }, series: { type: "string", description: "Optional series/copyright filter to pre-select (e.g. 'genshin_impact', 'wuthering_waves')" } }, required: ["kind"] } } },
+    { type: "function", function: { name: "confirm_generation", description: "Show a generation preview card for the user to review and edit image generation parameters before executing. Use this in focus mode before calling generate_image, or whenever you want the user to confirm/edit the generation settings (model, size, steps, CFG, LoRA, prompts).", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The prompt project ID to generate from" }, prompt: { type: "string" }, negative_prompt: { type: "string" }, artist_prompt: { type: "string" }, model: { type: "string" }, width: { type: "number" }, height: { type: "number" }, steps: { type: "number" }, cfg_scale: { type: "number" }, sampler: { type: "string" }, scheduler: { type: "string" }, loras: { type: "array", items: { type: "object", properties: { name: { type: "string" }, strength: { type: "number" }, enabled: { type: "boolean" } } } } }, required: ["prompt_id"] } } },
+    { type: "function", function: { name: "show_suggestions", description: "Display a set of clickable suggestion buttons to the user. Each suggestion has a title (short Chinese name) and a message (full modification instruction with Danbooru tags). The user clicks one to apply it. Use this when you want to offer the user multiple differentiated options (e.g. different poses, scenes, outfits, expressions).", parameters: { type: "object", properties: { suggestions: { type: "array", items: { type: "object", properties: { title: { type: "string", description: "Short Chinese name (2-5 chars)" }, message: { type: "string", description: "Full modification instruction with Danbooru English tags, e.g. 'Change scene to bathroom, add tiles, shower, wet_skin and regenerate'" } }, required: ["title", "message"] } } }, required: ["suggestions"] } } },
   ];
 }
 
@@ -166,31 +172,29 @@ export function useTauriAgent() {
       + "\n2. 如果 search_tags 不可用或报错，最多再试 1 次 search_characters_in_series 用英文/日文原名"
       + "\n3. 都搜不到 → 用你自己的 Danbooru 知识推断角色 tag，创建 prompt 生成，告诉用户'用了推断的 tag，不准请纠正'"
       + "\n⚠️ 绝对不要因为搜不到角色就卡住问用户——先用自己的知识生成，让用户看结果再说。"
-      + "\n\n## 人机交互标记（重要）"
-      + "\n你可以在回复文本中输出特殊标记来触发富 UI 交互。标记不会显示给用户，而是被前端拦截并渲染为交互卡片。"
-      + "\n标记格式：<<<MARKER_NAME:JSON>>>"
+      + "\n\n## 人机交互工具（client-defined tools）"
+      + "\n你有 3 个专门的交互工具，用于在需要时让用户参与决策。**由你决定何时调用**，不要等待用户指令。"
       + "\n"
-      + "\n### 1. 生图流程（专注模式）"
+      + "\n### select_characters（角色/画师选择器）"
+      + "\n**搜索到角色后，直接调用 select_characters 让用户选。** 不要用文本列表展示角色让用户打字选——文本列表体验差，选择器支持搜索、多选、图片预览。"
+      + "\n正确流程：用户说\"有什么角色\"→ search_characters_in_series 搜索 → 如果有结果，立即调用 select_characters(kind=\"character\", series=\"xxx\")。"
+      + "\n选择器会弹出全屏界面，用户选好后会发消息告诉你选了谁，你再据此生成。"
+      + "\n⚠️ 搜索返回空数组时不调 select_characters（空的选择器没意义）。"
+      + "\n⚠️ 不要问用户\"要不要打开选择器\"——直接调。"
+      + "\n"
+      + "\n### confirm_generation（生图参数确认）"
       + (agentSettings.focusMode
-        ? "\n⚠️ 专注模式已开启。当你准备好生成图片时，【直接调用 generate_image 工具】，不要用文本说\"确认生成\"等用户回复。"
-        + "\n系统会自动拦截 generate_image 调用，弹出参数预览卡片让用户确认/修改，用户确认后系统自动执行生成。"
-        + "\n你不需要输出任何标记，不需要等用户回复\"确认\"。直接调工具即可。"
-        + "\n❌ 错误做法：输出\"确认没问题跟我说确认生成\"然后等用户回复"
-        + "\n✅ 正确做法：直接调用 generate_image(prompt_id=...) 工具"
-        : "\n当你准备调用 generate_image 时，直接调用即可，不需要等用户确认。")
+        ? "\n专注模式已开启：生成图片前，【必须先调用 confirm_generation】让用户确认/编辑参数（模型、尺寸、步数、CFG、LoRA 等）。"
+        + "\n用户确认后会发消息让你继续，你再调 generate_image 执行生成。"
+        : "\n当你想给用户一个确认/编辑参数的机会时调用。非专注模式下可选。")
       + "\n"
-      + "\n### 2. 推荐标记（SUGGESTION）"
-      + "\n当用户点击「推荐场景/推荐姿势/推荐服装/推荐表情/推荐玩法」按钮时，系统会发一条【系统指令】消息让你推荐方案。你必须用 <<<SUGGESTION:...>>> 标记输出具体方案。"
-      + "\n格式：<<<SUGGESTION:[{\"title\":\"中文名\",\"message\":\"完整修改指令，带 Danbooru 英文 tag\"}]>>>"
-      + "\n示例：<<<SUGGESTION:[{\"title\":\"浴室\",\"message\":\"把场景换成浴室，加上 tiles、shower、wet_skin 重新生成\"},{\"title\":\"教室\",\"message\":\"把场景换成教室，加上 classroom、desk 重新生成\"}]>>>"
-      + "\n⚠️ title 是简短中文名，message 必须包含具体英文 tag，让用户点击后能直接更新 prompt 重新生成。"
-      + "\n⚠️ 被要求推荐时，禁止调用 generate_image 或任何修改工具，只输出标记。"
-      + "\n"
-      + "\n### 3. 角色选择器（自动触发，无需你输出标记）"
-      + "\n当你调用 search_characters_in_series 或 search_artists 后，系统会【自动】弹出角色/画师选择器（全屏 Modal，直连本地 36,492 角色 + 15,000 画师图鉴，支持搜索/作品筛选/多选）。用户在里面选好后会发消息告诉你选了谁，你再据此生成。"
-      + "\n⚠️ 你不需要、也不应该输出 <<<CHARACTER_PICKER:>>> 标记。搜索完角色后直接用文字总结结果即可，选择器会自动出现。"
-      + "\n"
-      + "\n⚠️ 标记（<<<SUGGESTION:>>>）必须在一行内完整输出，不要跨行。JSON 必须合法。标记外的文本正常显示。";
+      + "\n### show_suggestions（推荐方案）"
+      + "\n当你想给用户展示多个可选的修改方案时调用（如推荐不同姿势/场景/服装/表情/玩法）。"
+      + "\n⚠️ **每次 generate_image 成功生成图片后，必须调用 show_suggestions 展示后续建议。** 这是标准流程：生图 → 展示图片 → 调 show_suggestions 给出修改方向。"
+      + "\n建议内容：4 个不同维度的修改方案（如换场景、换姿势、换服装、换表情），每个 title 简短中文名（2-5字），message 完整修改指令含 Danbooru 英文 tag。"
+      + "\n用户点击其中一个后会发消息应用该方案。"
+      + "\n示例：show_suggestions(suggestions=[{title:\"浴室\",message:\"把场景换成浴室，加上 tiles, shower, wet_skin 重新生成\"}, ...])"
+      + "\n⚠️ 调用 show_suggestions 时不要同时调用 generate_image 或其他修改工具。";
   }, [agentSettings.systemPrompt, agentSettings.focusMode]);
 
   // 保持 ref 指向最新的 buildSystemPrompt
@@ -498,15 +502,13 @@ export function useTauriAgent() {
 
   // ── 审批操作 ──
   // approvePreview: 用户确认预览后，把用户编辑过的参数先持久化到 DB，
-  // 再发消息让 LLM 调 generate_image（只传 prompt_id，执行时从 DB 读到最新值）。
-  // 设置 skipNextPreview 让 TauriAgent 跳过下一次 generate_image 的预览拦截。
+  // 再发消息让 LLM 直接执行 generate_image（只传 prompt_id，从 DB 读到最新值）。
   const approvePreview = useCallback(async (editedPreview?: GenerationPreviewAttachment, userNote?: string) => {
     const preview = editedPreview || activePreview;
     if (!preview) return;
     setActivePreview(null);
 
-    // 用户在预览界面编辑过参数（editing=true 时 GenerationPreview 会传 draft）→
-    // 必须先把改动写回 DB，否则 LLM 后续 generate_image({prompt_id}) 只会读到旧值。
+    // 用户在预览界面编辑过参数 → 先写回 DB，否则 LLM 后续 generate_image 只会读到旧值
     if (editedPreview && preview.promptId) {
       try {
         const current = await invoke("get_prompt", { id: preview.promptId }) as any;
@@ -535,17 +537,13 @@ export function useTauriAgent() {
       }
     }
 
-    // 设置跳过标记 — 下次 generate_image 直接执行，不再弹预览
-    const agent = getOrCreateAgent();
-    agent.skipNextPreview = true;
-
-    // 构建用户消息发给 LLM
-    let msg = "已确认生成预览，请直接调用 generate_image 执行生成。";
+    // 发消息让 LLM 直接执行 generate_image（不再弹预览）
+    let msg = "已确认参数，请直接调用 generate_image 执行生成。";
     if (userNote) {
       msg += `\n用户额外需求：${userNote}`;
     }
     sendMessage(msg);
-  }, [activePreview, getOrCreateAgent, sendMessage]);
+  }, [activePreview, sendMessage]);
 
   const rejectPreview = useCallback(() => {
     setActivePreview(null);
@@ -577,44 +575,32 @@ export function useTauriAgent() {
     setCharacterModal(null);
   }, []);
 
-  // refineSuggestion: 推荐维度（如"推荐场景"）点击 → 让 LLM 针对当前画面推荐
-  // 一组具体方案（带 Danbooru tag）。LLM 必须用 <<<SUGGESTION:...>>> 标记输出，
-  // 不能直接生成图片。用户再点选其中一个，走预览确认再生成。
+  // refineSuggestion: 用户点击模糊建议（如"推荐场景"）→ 让 AI 推荐具体方案。
+  // AI 会调用 show_suggestions 工具展示具体选项，用户再点选其中一个执行。
   const refineSuggestion = useCallback((sug: Suggestion) => {
-    // 特殊操作：换一批 / 返回
+    // 特殊操作：返回
     if (sug.message === "__refine_back") {
       setSuggestions([]);
       return;
     }
+    // 换一批
     if (sug.message?.startsWith("__refine_again:")) {
       const dim = sug.message.replace("__refine_again:", "");
       refineDimRef.current = dim;
       setSuggestions([]);
       sendMessage(
-        `【系统指令】用户对上一批${dim}推荐不满意，请重新推荐 4 个完全不同的${dim}方案，不要和之前的重复。\n` +
-        `要求：title 简短中文名（2-5字），message 必须包含具体的 Danbooru 英文 tag。\n` +
-        `先说一句话介绍，然后用标记输出：\n` +
-        `<<<SUGGESTION:[{"title":"示例","message":"把${dim}改成 XXX，加上 tag1, tag2 重新生成"}]>>>\n` +
-        `禁止调用任何工具。禁止生成图片。`,
+        `用户对上一批${dim}推荐不满意，请重新推荐 4 个完全不同的${dim}方案。调用 show_suggestions 展示，不要直接生成图片。`,
         undefined,
         { displayText: `再推荐${dim}` }
       );
       return;
     }
     setSuggestions([]);
-    // "推荐场景" → "场景"，"推荐姿势" → "姿势"
+    // "推荐场景" → "场景"
     const dim = sug.title.replace(/^推荐/, "").replace(/^[^\u4e00-\u9fa5a-z]+/i, "").trim();
     refineDimRef.current = dim;
     sendMessage(
-      `【系统指令】用户想让你推荐${dim}方案。\n` +
-      `请基于当前画面的角色和内容，推荐 4 个不同的${dim}方案。\n` +
-      `要求：\n` +
-      `- title：简短中文名（2-5字）\n` +
-      `- message：完整的修改指令，必须包含具体的 Danbooru 英文 tag，让用户点击后可以直接更新 prompt 重新生成\n` +
-      `- 每个方案要有画面感和差异化，不要重复\n\n` +
-      `先说一句话介绍你的推荐，然后在最后用标记输出方案：\n` +
-      `<<<SUGGESTION:[{"title":"示例名","message":"把${dim}改成 XXX，加上 tag1, tag2 重新生成"}]>>>\n` +
-      `禁止调用任何工具。禁止生成图片。`,
+      `用户想让你推荐${dim}方案。请基于当前画面推荐 4 个不同的${dim}方案，调用 show_suggestions 工具展示给用户。不要直接生成图片。`,
       undefined,
       { displayText: `推荐${dim}` }
     );
