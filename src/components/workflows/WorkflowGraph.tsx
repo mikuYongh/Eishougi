@@ -35,10 +35,12 @@ function WorkflowGraphInner({ workflow, report }: WorkflowGraphProps) {
   const rootViewportRef = useRef<{ scale: number; offset: [number, number] } | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("准备中...");
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenMode, setFullscreenMode] = useState<"native" | "fallback" | null>(null);
   const [activeSubgraph, setActiveSubgraph] = useState<SubgraphDefinition | null>(null);
   const [loraNodeId, setLoraNodeId] = useState<number | null>(null);
   const [loraRevision, setLoraRevision] = useState(0);
+
+  const isFullscreen = fullscreenMode !== null;
 
   const workflowObject = useMemo(() => parseWorkflow(workflow), [workflow]);
 
@@ -168,12 +170,46 @@ function WorkflowGraphInner({ workflow, report }: WorkflowGraphProps) {
   }, [isFullscreen]);
 
   useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (document.fullscreenElement === wrapperRef.current) {
+        setFullscreenMode("native");
+      } else if (fullscreenMode === "native") {
+        setFullscreenMode(null);
+      }
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, [fullscreenMode]);
+
+  useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsFullscreen(false);
+      if (event.key === "Escape" && fullscreenMode === "fallback") setFullscreenMode(null);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [fullscreenMode]);
+
+  const toggleFullscreen = async () => {
+    if (document.fullscreenElement === wrapperRef.current) {
+      await document.exitFullscreen();
+      return;
+    }
+    if (fullscreenMode === "fallback") {
+      setFullscreenMode(null);
+      return;
+    }
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    if (wrapper.requestFullscreen) {
+      try {
+        await wrapper.requestFullscreen();
+        return;
+      } catch (error) {
+        console.warn("[WorkflowGraph] native fullscreen unavailable, using fallback", error);
+      }
+    }
+    setFullscreenMode("fallback");
+  };
 
   const leaveSubgraph = () => {
     setActiveSubgraph(null);
@@ -220,7 +256,10 @@ function WorkflowGraphInner({ workflow, report }: WorkflowGraphProps) {
       {loading && <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#202020]"><Loader2 size={28} className="animate-spin text-[var(--accent-1)]" /><span className="text-[11px] text-[var(--text-muted)]">{loadingMessage}</span></div>}
       {activeSubgraph && <div className="absolute top-3 left-3 z-20 flex items-center gap-2 rounded-lg border border-[var(--glass-border)] bg-[var(--bg-layer-1)]/90 px-2 py-1.5 text-[11px] text-[var(--text-primary)]"><button onClick={leaveSubgraph} className="flex items-center gap-1 cursor-pointer"><ChevronLeft size={14} />返回根画布</button><span className="text-[var(--text-muted)]">/ {activeSubgraph.name || "Subgraph"}</span></div>}
       <canvas ref={canvasRef} className="block h-full w-full" />
-      <button onClick={(event) => { event.preventDefault(); event.stopPropagation(); setIsFullscreen((value) => !value); }} className="absolute top-3 right-3 z-20 flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--glass-border)] bg-[var(--bg-layer-1)]/80 text-[var(--text-secondary)] cursor-pointer" title={isFullscreen ? "退出全屏 (ESC)" : "全屏预览"}>{isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button>
+       <button onClick={(event) => { event.preventDefault(); event.stopPropagation(); void toggleFullscreen(); }} className="absolute top-3 right-3 z-20 flex h-8 items-center gap-1.5 rounded-lg border border-[var(--glass-border)] bg-[var(--bg-layer-1)]/90 px-2.5 text-[11px] text-[var(--text-primary)] shadow-lg cursor-pointer" title={isFullscreen ? "退出全屏 (ESC)" : "全屏预览"}>
+         {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+         <span>{isFullscreen ? "退出全屏" : "全屏"}</span>
+       </button>
       <LoraPickerModal isOpen={loraNodeId !== null} onClose={() => setLoraNodeId(null)} selectedLoras={selectedLoras} onToggle={toggleLora} />
     </div>
   );
