@@ -16,7 +16,6 @@ const MAX_MESSAGES_PER_SESSION = 200;
 
 export interface AgentSettings {
   systemPrompt: string;
-  reasoningEffort: 'low' | 'medium' | 'high';
   /**
    * Agent 执行模式分档，借鉴 LPF 的 Effort 级别。
    * - low:    流水线模式。不让弱模型做多轮 tool calling 决策——
@@ -119,8 +118,8 @@ generate_image 工具会**阻塞到生成完成**并返回图片 URL。**不要*
 - 用户描述修改/生成某个已打开的项目时，必须用 update_prompt_content / update_prompt_settings 操作**那个**项目，不要新建。仅当用户明确说"新建创作"或当前无活跃项目时才用 create_prompt。
 
 ## 自定义样式与画师库
-- get_custom_styles / add_custom_style / update_custom_style / delete_custom_style：管理用户的样式与画师库。
-- 用户要管理样式时直接用这些工具。
+- favorite_characters / favorite_artists 系列工具用于管理用户的角色/画师收藏夹。
+- 用户要管理样式时直接用 favorite 相关工具。
 
 ## 收藏管理（关键 — 防止误用）
 favorite_characters / favorite_artists 系列工具仅用于**用户明确说"收藏"**某个角色或画师时。
@@ -141,7 +140,6 @@ export const useAgentStore = create<AgentStore>()(
       activeSessionId: null,
       settings: {
         systemPrompt: defaultSystemPrompt,
-        reasoningEffort: 'medium',
         effort: 'medium',
         maxRounds: 8,
         focusMode: false,
@@ -276,7 +274,7 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: 'prompt-muse-agent',
-      version: 13,
+      version: 14,
       // 每个 session 最多保留 MAX_MESSAGES_PER_SESSION 条消息，超出按时间裁剪。
       // 原因：messages 含完整工具结果与图片路径，长 session 会让 localStorage
       // 超过 quota 静默失败 → 整个 store 写不进，用户感觉历史丢失。
@@ -361,6 +359,12 @@ export const useAgentStore = create<AgentStore>()(
         }
         if (version < 13) {
           // v13: suggestion title 不加 emoji + gen_preview 流程改为直接调工具
+          if (persistedState.settings) {
+            persistedState.settings.systemPrompt = defaultSystemPrompt;
+          }
+        }
+        if (version < 14) {
+          // v14: 移除提示词中不存在的 custom_styles 工具引用 + 人机交互改用 client-defined tools
           if (persistedState.settings) {
             persistedState.settings.systemPrompt = defaultSystemPrompt;
           }

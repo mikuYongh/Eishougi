@@ -13,12 +13,12 @@ export interface AppSettings {
   comfyDir: string;
   autoSave: boolean;
   llm: {
-    provider: 'openai' | 'anthropic' | 'ollama' | 'agnes';
+    provider: 'openai' | 'ollama' | 'agnes';
     apiKey: string;
     apiUrl: string;
     model: string;
     temperature: number;
-    maxTokens: number;
+    maxTokens: number | undefined;
     // 思考模型开关 — 开启后 LLM 返回 reasoning_content（深度推理），消耗更多 token。默认开启。
     reasoningEnabled: boolean;
   };
@@ -69,7 +69,7 @@ interface SettingsState {
 
 const defaultSettings: AppSettings = {
   comfyUrl: import.meta.env.VITE_COMFY_URL || 'http://127.0.0.1:8188',
-  videoComfyUrl: 'http://127.0.0.1:8188',
+  videoComfyUrl: import.meta.env.VITE_VIDEO_COMFY_URL || import.meta.env.VITE_COMFY_URL || 'http://127.0.0.1:8188',
   comfyDir: import.meta.env.VITE_COMFY_DIR || 'C:\\ComfyUI',
   autoSave: true,
   llm: {
@@ -82,7 +82,7 @@ const defaultSettings: AppSettings = {
     apiUrl: import.meta.env.VITE_LLM_API_URL || 'https://apihub.agnes-ai.com/v1',
     model: import.meta.env.VITE_LLM_MODEL || 'agnes-2.0-flash',
     temperature: 0.7,
-    maxTokens: 8192,
+    maxTokens: undefined as number | undefined,
     reasoningEnabled: true,
   },
   slimToolsMode: false,

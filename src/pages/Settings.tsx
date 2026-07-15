@@ -724,9 +724,10 @@ export function Settings() {
                           } else if (provider === 'openai') {
                             updates.apiUrl = 'https://api.openai.com/v1';
                             updates.model = 'gpt-4o';
-                          } else if (provider === 'anthropic') {
-                            updates.apiUrl = 'https://api.anthropic.com/v1';
-                            updates.model = 'claude-3-5-sonnet-20240620';
+                          }
+                          // 切换到 ollama 时提示用户可能不需要 API Key
+                          if (provider === 'ollama' && settings.llm.apiKey) {
+                            // 本地 Ollama 通常不需要 key，但保留不自动清除（避免误删远程 ollama 代理的 key）
                           }
                           updateSettings({
                             llm: { ...settings.llm, ...updates }
@@ -735,7 +736,6 @@ export function Settings() {
                         options={[
                           { label: "Agnes AI", value: "agnes" },
                           { label: "OpenAI Compatible", value: "openai" },
-                          { label: "Anthropic Claude", value: "anthropic" },
                           { label: "Ollama (Local)", value: "ollama" }
                         ]}
                         accentColor="pink"
@@ -836,9 +836,15 @@ export function Settings() {
                         max="2.0"
                         step="0.1"
                         value={settings.llm.temperature ?? 0.7}
-                        onChange={(e) => updateSettings({
-                          llm: { ...settings.llm, temperature: Number(e.target.value) }
-                        })}
+                        onChange={(e) => {
+                          // 校验：clamp 到 0.0-2.0，NaN 防御
+                          let val = Number(e.target.value);
+                          if (isNaN(val)) val = 0.7;
+                          val = Math.max(0, Math.min(2, val));
+                          updateSettings({
+                            llm: { ...settings.llm, temperature: val }
+                          });
+                        }}
                         className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer border border-[var(--glass-border)] outline-none"
                         style={{ accentColor: "var(--accent-1)" }}
                       />
@@ -848,19 +854,29 @@ export function Settings() {
                       </div>
                     </div>
 
-                    {/* Max Tokens */}
+                    {/* Max Tokens — 留空=不传该参数，让模型用默认值（与 NextChat/Open WebUI 一致） */}
                     <div>
                       <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">最大生成 Token (Max Tokens)</label>
                       <input
                         type="number"
                         min="1"
-                        max="32768"
-                        value={settings.llm.maxTokens ?? 4096}
-                        onChange={(e) => updateSettings({
-                          llm: { ...settings.llm, maxTokens: Number(e.target.value) }
-                        })}
+                        value={settings.llm.maxTokens ?? ""}
+                        placeholder="留空=模型默认"
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === "") {
+                            // 留空 → 设为 undefined，不传 max_tokens
+                            updateSettings({ llm: { ...settings.llm, maxTokens: undefined as any } });
+                          } else {
+                            let val = Number(raw);
+                            if (isNaN(val) || val < 1) val = 1;
+                            val = Math.round(val);
+                            updateSettings({ llm: { ...settings.llm, maxTokens: val } });
+                          }
+                        }}
                         className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
                       />
+                      <p className="text-[10px] text-[var(--text-muted)] mt-1">留空则使用模型默认值，不限制上限</p>
                     </div>
                   </div>
 
