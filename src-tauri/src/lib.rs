@@ -330,6 +330,7 @@ pub fn run() {
             commands::auto_deploy::check_file_exists,
             commands::logging::write_log,
             commands::auto_deploy::call_llm_proxy,
+            commands::auto_deploy::cancel_llm_run,
             commands::fetch_llm_models,
             commands::prompts::create_prompt,
             commands::prompts::get_prompt,

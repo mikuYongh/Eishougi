@@ -90,6 +90,7 @@ pub async fn install_custom_node(
 // ========== check_comfyui_status ==========
 #[tauri::command]
 pub async fn check_comfyui_status(url: Option<String>) -> Result<serde_json::Value, String> {
+    // 保留 127.0.0.1:8188 作为最终兜底（前端正常流程都会传入 settings.comfyUrl）
     let u = url.unwrap_or_else(|| "http://127.0.0.1:8188".to_string());
     match reqwest::get(format!("{}/system_stats", &u)).await {
         Ok(resp) => {
@@ -347,28 +348,91 @@ pub async fn download_model_file(
 }
 
 // ========== call_llm_proxy (HTTP proxy for webview CORS bypass) ==========
+/// `run_id` — 唯一标识本次请求。前端 stop 时调用 cancel_llm_run(run_id) 设置取消标志。
+/// 后端在流读取循环中检查该标志，收到取消立即中断，避免"用户点了停止但 token 继续烧"。
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
+static CANCEL_FLAGS: OnceLock<std::sync::Mutex<HashMap<String, bool>>> = OnceLock::new();
+
+fn get_cancel_flags() -> &'static std::sync::Mutex<HashMap<String, bool>> {
+    CANCEL_FLAGS.get_or_init(|| std::sync::Mutex::new(HashMap::new()))
+}
+
+#[tauri::command]
+pub async fn cancel_llm_run(run_id: String) -> Result<(), String> {
+    let mut flags = get_cancel_flags().lock().map_err(|e| e.to_string())?;
+    flags.insert(run_id, true);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn call_llm_proxy(
     api_url: String,
     api_key: String,
     body_json: String,
     on_chunk: tauri::ipc::Channel<String>,
+    run_id: Option<String>,
 ) -> Result<(), String> {
+    log::info!("[LLM Proxy] body_json length: {} chars / {} bytes", body_json.len(), body_json.len());
+
+    // 发送前校验 body_json 是否为合法 JSON — 如果不合法，精确定位错误位置
+    if let Err(e) = serde_json::from_str::<serde_json::Value>(&body_json) {
+        // 提取错误位置（serde_json 错误包含 byte offset）
+        let err_str = e.to_string();
+        log::error!("[LLM Proxy] body_json is INVALID JSON: {}", err_str);
+        // 打印错误位置附近的内容（字符形式，便于排查）
+        // serde_json 错误格式: "invalid type: ... at line X column Y (char Z)"
+        // 或者 "invalid escaped character in string: ... at line X column Y"
+        // 尝试提取 char 位置
+        if let Some(pos) = err_str.rfind("char ") {
+            let pos_str = &err_str[pos+5..].trim_end_matches(')');
+            if let Ok(byte_pos) = pos_str.parse::<usize>() {
+                let start = byte_pos.saturating_sub(50);
+                let end = std::cmp::min(byte_pos + 50, body_json.len());
+                log::error!("[LLM Proxy] Invalid JSON at byte {}. Context: {:?}", byte_pos, &body_json[start..end]);
+                log::error!("[LLM Proxy] Char at error pos: {:?} (bytes: {:?})", &body_json[byte_pos..std::cmp::min(byte_pos+10, body_json.len())], &body_json.as_bytes()[byte_pos..std::cmp::min(byte_pos+10, body_json.len())]);
+            }
+        } else {
+            // 没有 char 位置信息，打印 line/column
+            let preview = if body_json.len() > 300 { &body_json[..300] } else { &body_json };
+            log::error!("[LLM Proxy] body start: {:?}", preview);
+        }
+    }
+
     let client = reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("Client build failed: {}", e))?;
+
+    // 注册取消标志（如果提供了 run_id）
+    let rid = run_id.unwrap_or_default();
+    if !rid.is_empty() {
+        let mut flags = get_cancel_flags().lock().map_err(|e| e.to_string())?;
+        flags.insert(rid.clone(), false);
+    }
+    let is_cancelled = || -> bool {
+        if rid.is_empty() { return false; }
+        let flags = get_cancel_flags().lock();
+        match flags {
+            Ok(f) => *f.get(&rid).unwrap_or(&false),
+            Err(_) => false,
+        }
+    };
 
     const MAX_ATTEMPTS: usize = 3;
     let mut last_err: Option<String> = None;
     let mut resp: Option<reqwest::Response> = None;
 
     for attempt in 1..=MAX_ATTEMPTS {
+        let body_bytes = body_json.clone().into_bytes();
+        let body_len = body_bytes.len();
         let send_result = client
             .post(&api_url)
             .header("Content-Type", "application/json")
             .header("Authorization", format!("Bearer {}", api_key))
-            .body(body_json.clone())
+            .header("Content-Length", body_len.to_string())
+            .body(body_bytes)
             .send()
             .await;
 
@@ -383,6 +447,11 @@ pub async fn call_llm_proxy(
                 } else if status >= 400 {
                     let body_text = r.text().await.unwrap_or_default();
                     let snippet = if body_text.len() > 300 { &body_text[..300] } else { &body_text };
+                    log::error!("[LLM Proxy] HTTP {} error. Sent body: {} chars. Response: {}", status, body_json.len(), snippet);
+                    // 打印 body 中可能出问题的位置（invalid escaped character 通常在 byte 200 附近）
+                    let preview_start = if body_json.len() > 250 { 150 } else { 0 };
+                    let preview_end = std::cmp::min(preview_start + 200, body_json.len());
+                    log::error!("[LLM Proxy] body around pos 200: bytes[{}..{}] = {:?}", preview_start, preview_end, &body_json.as_bytes()[preview_start..preview_end]);
                     return Err(format!("API {} HTTP {}: {}", api_url, status, snippet));
                 } else {
                     resp = Some(r);
@@ -425,6 +494,11 @@ pub async fn call_llm_proxy(
     let mut stream = resp.bytes_stream();
     let mut buffer = String::new();
     while let Some(chunk) = stream.next().await {
+        // 用户点了停止 → 立即中断流读取，不再消耗后续 token
+        if is_cancelled() {
+            log::info!("[LLM Proxy] cancelled by user (run_id={}), aborting stream", rid);
+            break;
+        }
         let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
         buffer.push_str(&String::from_utf8_lossy(&chunk));
         while let Some(nl) = buffer.find('\n') {
@@ -437,6 +511,12 @@ pub async fn call_llm_proxy(
         let _ = on_chunk.send(buffer);
     }
     let _ = on_chunk.send("data: [DONE]".to_string());
+    // 清理取消标志
+    if !rid.is_empty() {
+        if let Ok(mut flags) = get_cancel_flags().lock() {
+            flags.remove(&rid);
+        }
+    }
     Ok(())
 }
 

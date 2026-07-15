@@ -132,6 +132,13 @@ fn sanitize_filename(name: &str) -> String {
 
 #[tauri::command]
 pub async fn read_image_base64(path: String) -> Result<String, String> {
+    // 安全检查：限制文件大小（20MB），防止超大文件阻塞 IPC + 产生巨大 base64 字符串
+    const MAX_IMAGE_SIZE: u64 = 20 * 1024 * 1024; // 20 MB
+    let metadata = std::fs::metadata(&path).map_err(|e| format!("无法读取文件信息: {}", e))?;
+    if metadata.len() > MAX_IMAGE_SIZE {
+        return Err(format!("图片过大 ({:.1}MB)，上限 20MB", metadata.len() as f64 / 1048576.0));
+    }
+
     let data = fs::read(&path).map_err(|e| e.to_string())?;
     let b64 = general_purpose::STANDARD.encode(&data);
 
