@@ -135,7 +135,7 @@
       "steps": 30,
       "cfg": 5,
       "sampler_name": "euler_ancestral",
-      "scheduler": "beta",
+      "scheduler": "beta57",
       "start_at_step": 0,
       "end_at_step": 10000,
       "return_with_leftover_noise": "disable",
@@ -159,6 +159,24 @@
     "class_type": "KSamplerAdvanced",
     "_meta": {
       "title": "K采样器（高级）"
+    }
+  },
+  "66": {
+    "inputs": {
+      "model_path": "Minthy/ToriiGate-0.5",
+      "device": "cuda",
+      "dtype": "bfloat16",
+      "max_pixels_mp": 1,
+      "keep_model_alive": false,
+      "max_new_tokens": "randomize",
+      "temperature": "randomize",
+      "decoding": "randomize",
+      "show_generation_progress": "randomize",
+      "seed": "randomize"
+    },
+    "class_type": "ToriiGate_Captioner",
+    "_meta": {
+      "title": "ToriiGate Captioner"
     }
   }
 }
