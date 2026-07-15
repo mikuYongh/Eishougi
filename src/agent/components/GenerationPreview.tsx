@@ -82,8 +82,7 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
   );
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="生成参数确认">
-      <div className="w-full max-w-[520px] mx-3 flex flex-col rounded-2xl overflow-hidden border border-[var(--accent-1)]/25 bg-[var(--bg-layer-1)]/95 backdrop-blur-xl shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.1)] animate-in fade-in zoom-in-95 duration-300 max-h-[min(82vh,680px)]">
+    <div className="mx-3 my-2 flex flex-col rounded-2xl overflow-hidden border border-[var(--accent-1)]/25 bg-[var(--bg-layer-1)]/80 backdrop-blur-xl shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.1)] animate-in fade-in zoom-in-95 duration-300 max-h-[min(70vh,520px)]">
       {/* 顶部光带 */}
       <div className="h-[2px] flex-shrink-0 bg-gradient-to-r from-transparent via-[var(--accent-1)]/60 to-transparent" />
 
@@ -392,7 +391,6 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
           <RefreshCw size={11} />
           {submitting ? "处理中..." : "确认生成"}
         </button>
-      </div>
       </div>
     </div>
   );
