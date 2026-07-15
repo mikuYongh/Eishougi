@@ -28,6 +28,7 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<GenerationPreviewAttachment>(preview);
   const [userNote, setUserNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const { checkpoints, loras, fetchModels, isLoading: modelsLoading, isError: modelsError } = useModelStore();
 
@@ -81,7 +82,8 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
   );
 
   return (
-    <div className="mx-3 my-2 flex flex-col rounded-2xl overflow-hidden border border-[var(--accent-1)]/25 bg-[var(--bg-layer-1)]/80 backdrop-blur-xl shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.1)] animate-in fade-in zoom-in-95 duration-300 max-h-[min(70vh,520px)]">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="生成参数确认">
+      <div className="w-full max-w-[520px] mx-3 flex flex-col rounded-2xl overflow-hidden border border-[var(--accent-1)]/25 bg-[var(--bg-layer-1)]/95 backdrop-blur-xl shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.1)] animate-in fade-in zoom-in-95 duration-300 max-h-[min(82vh,680px)]">
       {/* 顶部光带 */}
       <div className="h-[2px] flex-shrink-0 bg-gradient-to-r from-transparent via-[var(--accent-1)]/60 to-transparent" />
 
@@ -370,20 +372,27 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
           {editing ? "完成编辑" : "修改参数"}
         </button>
         <button
-          onClick={onReject}
+          onClick={() => { if (!submitting) onReject(); }}
+          disabled={submitting}
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 text-[10px] font-medium transition-all cursor-pointer"
         >
           <X size={11} />
           取消
         </button>
         <button
-          onClick={() => onApprove(editing ? draft : undefined, userNote.trim() || undefined)}
+          onClick={async () => {
+            if (submitting) return;
+            setSubmitting(true);
+            await onApprove(editing ? draft : undefined, userNote.trim() || undefined);
+          }}
+          disabled={submitting}
           className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold transition-all cursor-pointer active:scale-95 ml-auto"
           style={{ background: "linear-gradient(135deg, var(--accent-1), var(--accent-2))", boxShadow: "0 0 15px rgba(var(--accent-1-rgb),0.3)" }}
         >
           <RefreshCw size={11} />
-          确认生成
+          {submitting ? "处理中..." : "确认生成"}
         </button>
+      </div>
       </div>
     </div>
   );

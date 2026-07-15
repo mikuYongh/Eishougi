@@ -15,7 +15,7 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { invoke, Channel } from "@tauri-apps/api/core";
 import { executeTool } from "../lib/agentToolExecutors";
 import { buildOutputSpec, type PromptSyntax } from "../lib/agentPrompts";
-import type { ChatMessage, TokenUsage } from "./types";
+import type { ChatMessage, GenerationPreviewAttachment, TokenUsage } from "./types";
 
 // ── Tauri webview fetch polyfill (Android CORS 绕过) ──
 const smartFetch = async (input: string, init?: RequestInit) => {
@@ -141,9 +141,10 @@ export class TauriAgent extends AbstractAgent {
   private static readonly IMAGE_CACHE_MAX = 8;
   // 当前活跃请求的取消通道 — detachActiveRun() 时调用 cancel 命令通知 Rust 中断流
   private _cancelRunId: string | null = null;
-  // 专注模式：用户确认预览后设为 true，下次 generate_image 直接执行不拦截。
-  // approvePreview 设置，generate_image 执行完毕后重置。
-  public skipNextPreview = false;
+  private pendingPreview: {
+    previewId: string;
+    resolve: (approved: boolean) => void;
+  } | null = null;
 
   constructor(config: TauriAgentConfig) {
     super({
@@ -151,6 +152,14 @@ export class TauriAgent extends AbstractAgent {
       description: "Eishougi in-process agent",
     });
     this.config = config;
+  }
+
+  public resolveGenerationPreview(previewId: string, approved: boolean): boolean {
+    if (!this.pendingPreview || this.pendingPreview.previewId !== previewId) return false;
+    const pending = this.pendingPreview;
+    this.pendingPreview = null;
+    pending.resolve(approved);
+    return true;
   }
 
   /**
@@ -190,6 +199,7 @@ export class TauriAgent extends AbstractAgent {
       return () => {
         aborted = true;
         clearTimeout(timer);
+        this.resolvePendingPreview(false);
         // 通知 Rust 后端中断流式读取，避免"用户停了但 token 继续烧"
         if (this._cancelRunId) {
           invoke("cancel_llm_run", { runId: this._cancelRunId }).catch(() => {});
@@ -197,6 +207,13 @@ export class TauriAgent extends AbstractAgent {
         }
       };
     });
+  }
+
+  private resolvePendingPreview(approved: boolean) {
+    if (!this.pendingPreview) return;
+    const pending = this.pendingPreview;
+    this.pendingPreview = null;
+    pending.resolve(approved);
   }
 
   /**
@@ -601,8 +618,7 @@ export class TauriAgent extends AbstractAgent {
 
         // ── 专注模式拦截：generate_image 调用前弹出预览卡片让用户确认 ──
         // 不依赖 LLM 传参 — 在工具执行层强制拦截，从 DB 读取项目真实参数。
-        // skipNextPreview 标记：用户已确认预览，直接执行不拦截（执行后重置）。
-        if (!resultStr && call.function.name === "generate_image" && agentSettings.focusMode && !this.skipNextPreview) {
+        if (!resultStr && call.function.name === "generate_image" && agentSettings.focusMode) {
           let dbPrompt: any = null;
           if (parsedArgs.prompt_id) {
             try {
@@ -636,16 +652,16 @@ export class TauriAgent extends AbstractAgent {
             status: "pending" as const,
           };
           observer.next({ type: EventType.CUSTOM, name: "gen_preview", value: previewValue } as BaseEvent);
-          resultStr = JSON.stringify({ status: "pending", message: "已弹出生成预览，等待用户确认参数后执行。" });
-          toolResults.push({ id: call.id, content: resultStr });
-          observer.next({ type: EventType.TOOL_CALL_END, toolCallId: call.id } as BaseEvent);
-          observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
-          continue;
-        }
-
-        // ── 用户已确认预览（skipNextPreview=true）：剥掉 LLM 传的所有参数，
-        // 只留 prompt_id + batch_count，强制从 DB 读取用户确认后的真实参数。
-        if (call.function.name === "generate_image" && this.skipNextPreview) {
+          const approved = await new Promise<boolean>((resolve) => {
+            this.pendingPreview = { previewId: previewValue.previewId, resolve };
+          });
+          if (!approved || isAborted()) {
+            resultStr = JSON.stringify({ status: "rejected", message: "用户取消了本次生成。" });
+            toolResults.push({ id: call.id, content: resultStr });
+            observer.next({ type: EventType.TOOL_CALL_END, toolCallId: call.id } as BaseEvent);
+            observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
+            continue;
+          }
           parsedArgs = {
             prompt_id: parsedArgs.prompt_id,
             ...(parsedArgs.batch_count != null ? { batch_count: parsedArgs.batch_count } : {}),
@@ -667,11 +683,6 @@ export class TauriAgent extends AbstractAgent {
         }
 
         toolResults.push({ id: call.id, content: resultStr });
-
-        // generate_image 执行完毕后重置 skipNextPreview
-        if (call.function.name === "generate_image" && this.skipNextPreview) {
-          this.skipNextPreview = false;
-        }
 
         // generate_image 成功后自动注入固定维度建议按钮（兜底）
         // 用结构化判断而非字符串匹配，避免误判

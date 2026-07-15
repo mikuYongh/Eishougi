@@ -1,8 +1,10 @@
 import { Toaster, toast } from 'sonner';
+import { createPortal } from 'react-dom';
 
 export function ToastProvider() {
-  return (
-    <Toaster 
+  return createPortal(
+    <Toaster
+      className="!z-[10000]"
       position="top-center"
       offset={80}
       expand={false}
@@ -22,7 +24,7 @@ export function ToastProvider() {
           icon: 'text-[var(--text-primary)]'
         }
       }}
-    />
+    />, document.body
   );
 }
 

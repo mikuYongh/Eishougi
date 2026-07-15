@@ -60,6 +60,10 @@ export function AgentPanel() {
     setTempMcpServers(JSON.parse(JSON.stringify(servers)));
   }, [agentSettings, viewMode]);
 
+  useEffect(() => {
+    if (activePreview) setIsExpanded(true);
+  }, [activePreview]);
+
   const handleSaveSettings = () => {
     updateSettings({
       systemPrompt: tempSystemPrompt,

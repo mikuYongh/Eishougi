@@ -12,7 +12,7 @@ interface ModelStore {
   isError: boolean;
   errorMsg: string;
   lastFetched: number;
-  fetchModels: (force?: boolean) => Promise<void>;
+  fetchModels: (force?: boolean, silent?: boolean) => Promise<void>;
 }
 
 export const useModelStore = create<ModelStore>((set, get) => ({
@@ -25,7 +25,7 @@ export const useModelStore = create<ModelStore>((set, get) => ({
   errorMsg: "",
   lastFetched: 0,
 
-  fetchModels: async (force = false) => {
+  fetchModels: async (force = false, silent = false) => {
     const { isLoading, lastFetched } = get();
     if (isLoading) return;
 
@@ -51,9 +51,9 @@ export const useModelStore = create<ModelStore>((set, get) => ({
         lastFetched: Date.now(),
       });
 
-      if (force) {
+      if (force && !silent) {
         toast.success(`模型列表刷新成功（${result.checkpoints.length} 模型 / ${result.loras.length} LoRA / ${result.vaes?.length || 0} VAE）`);
-      } else if (result.checkpoints.length === 0 && result.loras.length === 0) {
+      } else if (!silent && result.checkpoints.length === 0 && result.loras.length === 0) {
         toast.info("未发现模型，请确认 ComfyUI 已安装相应节点");
       }
       console.info(`[ComfyModel] fetchModels done ${elapsed}ms: ${result.checkpoints.length} checkpoints, ${result.loras.length} loras, ${result.vaes?.length || 0} vaes`);
