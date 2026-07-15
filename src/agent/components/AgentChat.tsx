@@ -15,6 +15,8 @@ interface AgentChatProps {
 
 export function AgentChat({ messages, onAction, isGenerating }: AgentChatProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const atBottomRef = useRef(true);
+  const previousMessageCountRef = useRef(messages.length);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   const renderMessage = useCallback((index: number) => {
@@ -39,10 +41,16 @@ export function AgentChat({ messages, onAction, isGenerating }: AgentChatProps) 
   // 这里用 scrollToIndex 确保发消息 / AI 回复时总是跳到底部。
   useEffect(() => {
     if (messages.length > 0 && virtuosoRef.current) {
-      const t = setTimeout(() => {
-        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: "end", behavior: "smooth" });
-      }, 50);
-      return () => clearTimeout(t);
+      const appendedUserMessage = messages.length > previousMessageCountRef.current
+        && messages[messages.length - 1]?.role === "user";
+      if (atBottomRef.current || appendedUserMessage) {
+        const t = setTimeout(() => {
+          virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: "end", behavior: "smooth" });
+        }, 50);
+        previousMessageCountRef.current = messages.length;
+        return () => clearTimeout(t);
+      }
+      previousMessageCountRef.current = messages.length;
     }
   }, [messages.length, isGenerating]);
 
@@ -106,9 +114,10 @@ export function AgentChat({ messages, onAction, isGenerating }: AgentChatProps) 
             </div>
           ),
         }}
-        atBottomStateChange={(atBottom) => {
-          setShowScrollBtn(!atBottom);
-        }}
+         atBottomStateChange={(atBottom) => {
+           atBottomRef.current = atBottom;
+           setShowScrollBtn(!atBottom);
+         }}
       />
 
       {/* 回到底部按钮 — 用户向上滚动时显示 */}

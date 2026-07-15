@@ -1,12 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ChatMessage } from '../agent/types';
+import type { ChatMessage, TokenUsage } from '../agent/types';
 
 export interface AgentSession {
   id: string;
   title: string;
   messages: ChatMessage[];
   updatedAt: number;
+  usage?: AgentUsageStats;
+}
+
+export interface AgentUsageStats extends TokenUsage {
+  runs: number;
+  lastRunAt: number;
 }
 
 // 每个 session 持久化时保留的最大消息数。超出按时间裁剪到最近 N 条。
@@ -46,6 +52,7 @@ interface AgentStore {
   // Actions
   toggleMobileAgent: (force?: boolean) => void;
   setIsGenerating: (generating: boolean) => void;
+  recordUsage: (sessionId: string, usage: TokenUsage) => void;
   createSession: () => string;
   switchSession: (id: string) => void;
   deleteSession: (id: string) => void;
@@ -54,6 +61,7 @@ interface AgentStore {
   // Messages
   addMessage: (message: ChatMessage) => void;
   setMessages: (messages: ChatMessage[]) => void;
+  setSessionMessages: (sessionId: string, messages: ChatMessage[]) => void;
   clearMessages: () => void;
   
   // Settings
@@ -133,6 +141,10 @@ favorite_characters / favorite_artists 系列工具仅用于**用户明确说"�
 
 当用户请求含糊（既可能是收藏也可能是生成）时，**先问一句**："你是想 (A) 收藏这些角色到收藏夹 还是 (B) 生成这些角色的新图片？" 不要默认走收藏路径。`;
 
+function createAgentId(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export const useAgentStore = create<AgentStore>()(
   persist(
     (set, get) => ({
@@ -152,8 +164,28 @@ export const useAgentStore = create<AgentStore>()(
       })),
       setIsGenerating: (generating) => set({ isGenerating: generating }),
 
+      recordUsage: (sessionId, usage) => {
+        set((state) => ({
+          sessions: state.sessions.map((session) => {
+            if (session.id !== sessionId) return session;
+            const previous = session.usage;
+            return {
+              ...session,
+              usage: {
+                promptTokens: (previous?.promptTokens || 0) + usage.promptTokens,
+                completionTokens: (previous?.completionTokens || 0) + usage.completionTokens,
+                totalTokens: (previous?.totalTokens || 0) + usage.totalTokens,
+                runs: (previous?.runs || 0) + 1,
+                lastRunAt: Date.now(),
+              },
+              updatedAt: Date.now(),
+            };
+          }),
+        }));
+      },
+
       createSession: () => {
-        const newId = 'session_' + Date.now();
+        const newId = createAgentId('session');
         const newSession: AgentSession = {
           id: newId,
           title: 'New Connection',
@@ -199,7 +231,7 @@ export const useAgentStore = create<AgentStore>()(
           
           if (!activeSessionId) {
             // Auto create session if none exists
-            const newId = 'session_' + Date.now();
+            const newId = createAgentId('session');
             let autoTitle = 'New Connection';
             
             // Auto generate title from first user message
@@ -253,6 +285,14 @@ export const useAgentStore = create<AgentStore>()(
             )
           };
         });
+      },
+
+      setSessionMessages: (sessionId, messages) => {
+        set((state) => ({
+          sessions: state.sessions.map((session) =>
+            session.id === sessionId ? { ...session, messages, updatedAt: Date.now() } : session,
+          ),
+        }));
       },
 
       clearMessages: () => {

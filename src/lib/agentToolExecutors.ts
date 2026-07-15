@@ -17,6 +17,18 @@ import { useModelStore } from '../stores/modelStore';
 import { comfyService } from '../services/comfyService';
 import type { ChatMessage } from '../agent/types';
 
+function normalizeToolResult(value: unknown): string {
+  if (typeof value === 'string') {
+    try {
+      JSON.parse(value);
+      return value;
+    } catch {
+      return JSON.stringify({ status: 'success', data: value });
+    }
+  }
+  return JSON.stringify(value ?? null);
+}
+
 export interface ToolResult {
   /** The serialised result string to feed back to the LLM. */
   resultStr: string;
@@ -614,7 +626,7 @@ export async function executeTool(
           const result = await invoke<string>('call_mcp_tool', {
             url: mcpUrl, name: fnName, arguments: parsedArgs
           });
-          resultStr = result;
+           resultStr = normalizeToolResult(result);
         } catch (mcpErr: any) {
           resultStr = JSON.stringify({ error: "MCP tool call failed: " + mcpErr.toString() });
         }

@@ -108,6 +108,7 @@ export function HistoryList({ onBack }: { onBack: () => void }) {
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-[9px] text-[var(--text-muted)]">{s.messages.length} 条消息</span>
+            {s.usage && <span className="text-[9px] text-[var(--text-muted)]">{s.usage.runs} 次运行 · {s.usage.totalTokens > 1000 ? `${(s.usage.totalTokens / 1000).toFixed(1)}k` : s.usage.totalTokens} tokens</span>}
             <span className="text-[9px] text-[var(--text-muted)]">{new Date(s.updatedAt).toLocaleDateString()}</span>
           </div>
         </div>

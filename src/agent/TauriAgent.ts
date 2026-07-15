@@ -230,7 +230,12 @@ export class TauriAgent extends AbstractAgent {
 
     const llmConfig = this.config.getLlmConfig();
     const agentSettings = this.config.getAgentSettings();
-    const effectiveMaxRounds = agentSettings.effort === "low" ? 1 : (agentSettings.maxRounds || 8);
+    const configuredMaxRounds = agentSettings.maxRounds;
+    const effectiveMaxRounds = agentSettings.effort === "low"
+      ? 1
+      : configuredMaxRounds === 0
+        ? 32
+        : Math.min(Math.max(configuredMaxRounds || 8, 1), 32);
     if (round >= effectiveMaxRounds) return;
 
     // ── 构建请求 ──
@@ -272,25 +277,13 @@ export class TauriAgent extends AbstractAgent {
         });
       } else if (msg.role === "assistant" && msg.toolCalls && msg.toolCalls.length > 0) {
         const m: any = { role: "assistant" };
-        // 旧 assistant 消息如果只有 tool_calls 没有实际文本，跳过 content（减少噪音）
+          // 旧 assistant 消息如果只有 tool_calls 没有实际文本，跳过 content（减少噪音）
         if (msg.content && msg.content.trim()) m.content = msg.content;
         m.tool_calls = msg.toolCalls.map((tc: any) => ({
           id: tc.id,
           type: "function",
           function: { name: tc.function?.name || tc.toolName || "", arguments: tc.function?.arguments || JSON.stringify(tc.args || {}) },
         }));
-        // 旧的 tool_calls 参数也可以截断（arguments 可能很长）
-        if (isOld) {
-          m.tool_calls = m.tool_calls.map((tc: any) => ({
-            ...tc,
-            function: {
-              ...tc.function,
-              arguments: tc.function.arguments.length > 200
-                ? tc.function.arguments.substring(0, 200) + "... [truncated]"
-                : tc.function.arguments,
-            },
-          }));
-        }
         apiMessages.push(m);
       } else {
         // 检查是否有图片附件 — 需要转成 OpenAI vision 多模态格式
@@ -491,14 +484,13 @@ export class TauriAgent extends AbstractAgent {
         friendly = `AI 处理失败：${raw.substring(0, 200)}`;
       }
       console.error("[TauriAgent] LLM proxy error:", raw);
-      observer.next({ type: EventType.TEXT_MESSAGE_CHUNK, messageId, role: "assistant", delta: friendly } as BaseEvent);
       // 发射 token usage（如果有）
       if (tokenUsage) {
         this.config.onTokenUsage?.(tokenUsage);
         observer.next({ type: EventType.CUSTOM, name: "token_usage", value: tokenUsage } as BaseEvent);
       }
       this._cancelRunId = null;
-      return;
+      throw new Error(friendly);
     }
 
     // ── Token 使用量通过 CUSTOM 事件发射 ──
@@ -541,6 +533,8 @@ export class TauriAgent extends AbstractAgent {
       // 注意：TOOL_CALL_END 在每个工具执行完毕后发射（而非提前批量发射），
       // 确保事件顺序为 START → ARGS → END → RESULT，避免 UI 看到"已结束但还没结果"。
 
+      toolCalls = toolCalls.filter((call: any) => call && call.id && call.function?.name);
+      if (toolCalls.length === 0) return;
       const currentMessages = this.config.getMessages();
 
       // 收集每个 tool call 的执行结果，用于递归时传给下一轮 LLM
@@ -690,7 +684,11 @@ export class TauriAgent extends AbstractAgent {
         if (call.function.name === "generate_image") {
           try {
             const parsed = JSON.parse(resultStr);
-            genSuccess = parsed.status !== "pending" && !parsed.error && !parsed.errors;
+            genSuccess = parsed.status === "completed"
+              && Array.isArray(parsed.images)
+              && parsed.images.length > 0
+              && !parsed.error
+              && !parsed.errors;
           } catch {
             genSuccess = true; // 非 JSON 结果视为成功
           }

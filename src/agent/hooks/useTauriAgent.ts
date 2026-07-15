@@ -85,7 +85,7 @@ function aguiMessageToChatMessage(m: Message): ChatMessage {
 }
 
 export function useTauriAgent() {
-  const { sessions, activeSessionId, addMessage, setMessages, settings: agentSettings, isGenerating, setIsGenerating } = useAgentStore();
+  const { sessions, activeSessionId, addMessage, setMessages, setSessionMessages, recordUsage, settings: agentSettings, isGenerating, setIsGenerating } = useAgentStore();
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const messages = activeSession?.messages || [];
 
@@ -106,6 +106,7 @@ export function useTauriAgent() {
   // 模型选择器状态：null=关闭；{open,kind,promptId}=打开
   const [modelModal, setModelModal] = useState<{ open: boolean; kind: "checkpoint" | "vae" | "lora"; promptId?: string | null } | null>(null);
   const tokenUsageRef = useRef<TokenUsage | null>(null);
+  const activeRunsRef = useRef(0);
   // 当前 refine 维度（用户点了"推荐xx"后设置），用于 LLM 输出标记后追加"换一批"等操作
   const refineDimRef = useRef<string | null>(null);
   const [tokenUsage, setTokenUsage] = useState<TokenUsage | null>(null);
@@ -309,6 +310,9 @@ export function useTauriAgent() {
       files: attachments.filter((a) => !a.isImage).length > 0 ? attachments.filter((a) => !a.isImage) : undefined,
     };
     addMessage(userChatMsg);
+    const runSessionId = useAgentStore.getState().activeSessionId;
+    if (!runSessionId) return;
+    activeRunsRef.current += 1;
 
     setIsGenerating(true);
     setSuggestions([]);
@@ -378,7 +382,7 @@ export function useTauriAgent() {
           renderScheduled = true;
           requestAnimationFrame(() => {
             renderScheduled = false;
-            syncAgentMessagesToStore(agent, setMessages, activeSessionId);
+            syncAgentMessagesToStore(agent, setSessionMessages, runSessionId);
           });
         }
       };
@@ -399,6 +403,7 @@ export function useTauriAgent() {
           // apply() 会在每个 TEXT_MESSAGE_CHUNK / TOOL_CALL 等事件后更新 agent.messages，
           // 然后调用 onMessagesChanged。我们用 requestAnimationFrame 节流避免每 token 全量重渲染。
           onMessagesChanged: () => {
+            if (useAgentStore.getState().activeSessionId !== runSessionId) return;
             scheduleSync();
           },
           // ── 工具结果：提取 images ──
@@ -424,17 +429,18 @@ export function useTauriAgent() {
                 { title: "推荐表情", message: "推荐表情", confirm: true },
                 { title: "推荐玩法", message: "推荐玩法", confirm: true },
               ];
+              const mergeSuggestions = (items: Suggestion[]) => {
+                const result: Suggestion[] = [];
+                for (const item of items) {
+                  if (!item?.title || result.some((existing) => existing.title === item.title)) continue;
+                  result.push(item);
+                  if (result.length >= 5) break;
+                }
+                return result;
+              };
               if (val?._auto) {
-                // generate_image 后兜底注入：只追加固定维度，不清空已有建议
-                // （AI 可能已经通过 show_suggestions 给了具体建议，不应被覆盖）
                 setSuggestions((prev) => {
-                  // 如果已有 AI 给的具体建议（非纯固定维度），只追加固定维度中尚未出现的
-                  if (prev.length > 0) {
-                    const existingTitles = new Set(prev.map((s) => s.title));
-                    const newDims = FIXED_DIMS.filter((d) => !existingTitles.has(d.title));
-                    return newDims.length > 0 ? [...prev, ...newDims] : prev;
-                  }
-                  return [...val.items];
+                  return mergeSuggestions([...prev, ...FIXED_DIMS.slice(0, 2)]);
                 });
               } else {
                 // AI 通过 show_suggestions 给的具体建议 + 追加固定维度
@@ -447,7 +453,7 @@ export function useTauriAgent() {
                   );
                   refineDimRef.current = null;
                 }
-                setSuggestions([...aiSuggestions, ...FIXED_DIMS]);
+                setSuggestions(mergeSuggestions([...aiSuggestions, ...FIXED_DIMS.slice(0, 2)]));
               }
             } else if (event.name === "gen_preview") {
               setActivePreview(event.value);
@@ -475,7 +481,7 @@ export function useTauriAgent() {
       );
 
       // 最终同步一次（确保 tool images 挂上）
-      syncAgentMessagesToStore(agent, setMessages, activeSessionId, toolImagesMap);
+      syncAgentMessagesToStore(agent, setSessionMessages, runSessionId, toolImagesMap);
     } catch (error: any) {
       console.error("[useTauriAgent] runAgent error:", error);
       const raw = error.message || String(error);
@@ -495,16 +501,16 @@ export function useTauriAgent() {
       }
       // 把错误信息追加到当前 store（不碰 agent.messages，避免和 apply 打架）
       const sess = useAgentStore.getState();
-      if (sess.activeSessionId) {
-        const current = sess.sessions.find((s) => s.id === sess.activeSessionId);
+        const current = sess.sessions.find((s) => s.id === runSessionId);
         if (current) {
-          setMessages([...current.messages, { id: `err_${Date.now()}`, role: "assistant", content: friendly }]);
+          setSessionMessages(runSessionId, [...current.messages, { id: `err_${Date.now()}`, role: "assistant", content: friendly }]);
         }
-      }
     } finally {
-      setIsGenerating(false);
+      if (tokenUsageRef.current) recordUsage(runSessionId, tokenUsageRef.current);
+      activeRunsRef.current = Math.max(0, activeRunsRef.current - 1);
+      setIsGenerating(activeRunsRef.current > 0);
     }
-  }, [activeSessionId, addMessage, setMessages, setIsGenerating, getOrCreateAgent, mcpTools]);
+  }, [activeSessionId, addMessage, setSessionMessages, recordUsage, setIsGenerating, getOrCreateAgent, mcpTools]);
 
   // ── 停止生成 ──
   const stopGenerating = useCallback(() => {
@@ -559,9 +565,7 @@ export function useTauriAgent() {
     setModelModal(null);
     refineDimRef.current = null;
     // 切会话时清空 agent 实例（释放 _imageCache 内存，避免旧会话图片缓存串扰新会话）
-    if (agentRef.current) {
-      agentRef.current = null;
-    }
+    // 后台运行不随会话视图切换取消；运行结果通过 runSessionId 写回原会话。
   }, [activeSessionId]);
 
   // ── 审批操作 ──
@@ -716,13 +720,13 @@ export function useTauriAgent() {
 // 而不是让它们作为独立消息渲染（MessageBubble 不处理 role:"reasoning" 独立渲染）。
 function syncAgentMessagesToStore(
   agent: TauriAgent,
-  setMessages: (msgs: ChatMessage[]) => void,
-  activeSessionId: string | null,
+  setSessionMessages: (sessionId: string, msgs: ChatMessage[]) => void,
+  sessionId: string | null,
   toolImagesMap?: Map<string, string[]>,
 ) {
-  if (!activeSessionId) return;
+  if (!sessionId) return;
   // 取 store 里现有的消息，用于保留 user 消息的 UI content（不含文件内容）
-  const existingMsgs = useAgentStore.getState().sessions.find((s) => s.id === activeSessionId)?.messages || [];
+  const existingMsgs = useAgentStore.getState().sessions.find((s) => s.id === sessionId)?.messages || [];
   const existingMap = new Map(existingMsgs.map((m) => [m.id, m]));
 
   const rawMsgs = agent.messages;
@@ -776,5 +780,5 @@ function syncAgentMessagesToStore(
     }
   }
 
-  setMessages(chatMsgs);
+  setSessionMessages(sessionId, chatMsgs);
 }
