@@ -81,11 +81,12 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
   );
 
   return (
-    <div className="mx-3 my-2 rounded-2xl overflow-hidden border border-[var(--accent-1)]/25 bg-[var(--bg-layer-1)]/80 backdrop-blur-xl shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.1)] animate-in fade-in zoom-in-95 duration-300">
+    <div className="mx-3 my-2 flex flex-col rounded-2xl overflow-hidden border border-[var(--accent-1)]/25 bg-[var(--bg-layer-1)]/80 backdrop-blur-xl shadow-[0_0_20px_rgba(var(--accent-1-rgb),0.1)] animate-in fade-in zoom-in-95 duration-300 max-h-[min(70vh,520px)]">
       {/* 顶部光带 */}
-      <div className="h-[2px] bg-gradient-to-r from-transparent via-[var(--accent-1)]/60 to-transparent" />
+      <div className="h-[2px] flex-shrink-0 bg-gradient-to-r from-transparent via-[var(--accent-1)]/60 to-transparent" />
 
-      <div className="p-3">
+      {/* 可滚动正文区 —— LoRA 多时这里滚动，操作按钮永远可见 */}
+      <div className="p-3 overflow-y-auto custom-scrollbar min-h-0">
         {/* 标题 */}
         <div className="flex items-center gap-2 mb-2">
           <div className="w-6 h-6 rounded-lg bg-[var(--accent-1)]/20 flex items-center justify-center">
@@ -344,7 +345,7 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
         )}
 
         {/* ── 向 AI 描述修改 ── */}
-        <div className="mb-2.5">
+        <div>
           <div className="flex items-center gap-1 mb-1">
             <MessageSquare size={10} className="text-[var(--text-muted)]" />
             <span className="text-[9px] text-[var(--text-muted)]">告诉 AI 你想怎么改（可选）</span>
@@ -357,32 +358,32 @@ export function GenerationPreview({ preview, onApprove, onReject }: GenerationPr
             className="w-full px-2 py-1.5 rounded-lg bg-[var(--bg-layer-0)]/60 border border-[var(--glass-border)] text-[10px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/40 placeholder:text-[var(--text-muted)]"
           />
         </div>
+      </div>
 
-        {/* 操作按钮 */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setEditing(!editing)}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[10px] font-medium transition-all cursor-pointer ${editing ? "bg-[var(--accent-1)]/15 border-[var(--accent-1)]/30 text-[var(--accent-1)]" : "bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)]"}`}
-          >
-            {editing ? <Check size={11} /> : <Edit3 size={11} />}
-            {editing ? "完成编辑" : "修改参数"}
-          </button>
-          <button
-            onClick={onReject}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 text-[10px] font-medium transition-all cursor-pointer"
-          >
-            <X size={11} />
-            取消
-          </button>
-          <button
-            onClick={() => onApprove(editing ? draft : undefined, userNote.trim() || undefined)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold transition-all cursor-pointer active:scale-95 ml-auto"
-            style={{ background: "linear-gradient(135deg, var(--accent-1), var(--accent-2))", boxShadow: "0 0 15px rgba(var(--accent-1-rgb),0.3)" }}
-          >
-            <RefreshCw size={11} />
-            确认生成
-          </button>
-        </div>
+      {/* 操作按钮 —— 固定底部，永远可见，不被 LoRA 列表挤出可视区 */}
+      <div className="flex items-center gap-1.5 px-3 py-2.5 border-t border-[var(--glass-border)] bg-[var(--bg-layer-1)]/60 flex-shrink-0">
+        <button
+          onClick={() => setEditing(!editing)}
+          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[10px] font-medium transition-all cursor-pointer ${editing ? "bg-[var(--accent-1)]/15 border-[var(--accent-1)]/30 text-[var(--accent-1)]" : "bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)]"}`}
+        >
+          {editing ? <Check size={11} /> : <Edit3 size={11} />}
+          {editing ? "完成编辑" : "修改参数"}
+        </button>
+        <button
+          onClick={onReject}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 text-[10px] font-medium transition-all cursor-pointer"
+        >
+          <X size={11} />
+          取消
+        </button>
+        <button
+          onClick={() => onApprove(editing ? draft : undefined, userNote.trim() || undefined)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-[10px] font-bold transition-all cursor-pointer active:scale-95 ml-auto"
+          style={{ background: "linear-gradient(135deg, var(--accent-1), var(--accent-2))", boxShadow: "0 0 15px rgba(var(--accent-1-rgb),0.3)" }}
+        >
+          <RefreshCw size={11} />
+          确认生成
+        </button>
       </div>
     </div>
   );

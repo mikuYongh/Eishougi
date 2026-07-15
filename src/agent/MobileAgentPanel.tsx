@@ -13,6 +13,7 @@ import { AgentInput } from "./components/AgentInput";
 import { SuggestionBar } from "./components/SuggestionBar";
 import { GenerationPreview } from "./components/GenerationPreview";
 import { CharacterLibraryModal } from "./components/CharacterLibraryModal";
+import { ModelPickerModal } from "./components/ModelPickerModal";
 
 export function MobileAgentPanel() {
   const { isMobileAgentOpen, toggleMobileAgent, createSession, settings: agentSettings, updateSettings } = useAgentStore();
@@ -33,6 +34,9 @@ export function MobileAgentPanel() {
     confirmCharacters,
     openCharacterLibrary,
     closeCharacterModal,
+    modelModal,
+    confirmModel,
+    closeModelModal,
     refineSuggestion,
   } = useTauriAgent();
 
@@ -113,6 +117,14 @@ export function MobileAgentPanel() {
             />
           )}
 
+          {modelModal?.open && (
+            <ModelPickerModal
+              kind={modelModal.kind}
+              onClose={closeModelModal}
+              onConfirm={(name) => confirmModel(name, modelModal.kind)}
+            />
+          )}
+
           {suggestions.length > 0 && (
             <SuggestionBar
               suggestions={suggestions}
@@ -147,7 +159,6 @@ export function MobileAgentPanel() {
 function MobileSettingsView({ onBack }: { onBack: () => void }) {
   const { settings: agentSettings, updateSettings } = useAgentStore();
   const [tempSystemPrompt, setTempSystemPrompt] = useState(agentSettings.systemPrompt);
-  const [tempReasoningEffort, setTempReasoningEffort] = useState(agentSettings.reasoningEffort || "medium");
   const [tempEffort, setTempEffort] = useState(agentSettings.effort);
   const [tempMaxRounds, setTempMaxRounds] = useState(agentSettings.maxRounds);
   const [tempMcpServers, setTempMcpServers] = useState<McpServerConfig[]>(() =>
@@ -157,7 +168,6 @@ function MobileSettingsView({ onBack }: { onBack: () => void }) {
   const handleSave = () => {
     updateSettings({
       systemPrompt: tempSystemPrompt,
-      reasoningEffort: tempReasoningEffort as any,
       effort: tempEffort,
       maxRounds: tempMaxRounds,
     });
@@ -187,28 +197,6 @@ function MobileSettingsView({ onBack }: { onBack: () => void }) {
           className="w-full h-40 bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-3 text-[11px] text-[var(--text-primary)] outline-none custom-scrollbar resize-none font-mono leading-relaxed"
           placeholder="输入系统提示词..."
         />
-      </div>
-
-      {/* Reasoning Effort */}
-      <div>
-        <label className="text-[11px] font-bold text-[var(--text-primary)] mb-1.5 flex items-center gap-1.5">
-          <Zap size={12} className="text-[var(--accent-1)]" /> 思考深度 (Reasoning Effort)
-        </label>
-        <div className="flex bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-1 gap-1">
-          {(["low", "medium", "high"] as const).map((effort) => (
-            <button
-              key={effort}
-              onClick={() => setTempReasoningEffort(effort)}
-              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                tempReasoningEffort === effort
-                  ? "bg-[var(--accent-1)] text-black shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.3)]"
-                  : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)]"
-              }`}
-            >
-              {effort.toUpperCase()}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Execution Mode */}

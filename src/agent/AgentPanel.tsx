@@ -44,7 +44,6 @@ export function AgentPanel() {
   } = useTauriAgent();
 
   const [tempSystemPrompt, setTempSystemPrompt] = useState(agentSettings.systemPrompt);
-  const [tempReasoningEffort, setTempReasoningEffort] = useState(agentSettings.reasoningEffort || "medium");
   const [tempEffort, setTempEffort] = useState(agentSettings.effort);
   const [tempMaxRounds, setTempMaxRounds] = useState(agentSettings.maxRounds);
 
@@ -55,7 +54,6 @@ export function AgentPanel() {
 
   useEffect(() => {
     setTempSystemPrompt(agentSettings.systemPrompt);
-    setTempReasoningEffort(agentSettings.reasoningEffort || "medium");
     setTempEffort(agentSettings.effort);
     setTempMaxRounds(agentSettings.maxRounds);
     const servers = useSettingsStore.getState().settings.mcpServers || [];
@@ -65,7 +63,6 @@ export function AgentPanel() {
   const handleSaveSettings = () => {
     updateSettings({
       systemPrompt: tempSystemPrompt,
-      reasoningEffort: tempReasoningEffort as any,
       effort: tempEffort,
       maxRounds: tempMaxRounds,
     });
@@ -257,28 +254,6 @@ export function AgentPanel() {
                     className="w-full h-40 bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-3 text-[11px] text-[var(--text-primary)] focus:border-[var(--accent-1)]/50 outline-none resize-none font-mono leading-relaxed custom-scrollbar"
                     placeholder="输入系统提示词..."
                   />
-                </div>
-
-                {/* Reasoning Effort */}
-                <div>
-                  <label className="text-[11px] font-bold text-[var(--text-primary)] mb-1.5 flex items-center gap-1.5">
-                    <Zap size={12} className="text-[var(--accent-1)]" /> 思考深度 (Reasoning Effort)
-                  </label>
-                  <div className="flex bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-1 gap-1">
-                    {(["low", "medium", "high"] as const).map((effort) => (
-                      <button
-                        key={effort}
-                        onClick={() => setTempReasoningEffort(effort)}
-                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                          tempReasoningEffort === effort
-                            ? "bg-[var(--accent-1)] text-black shadow-[0_0_10px_rgba(var(--accent-1-rgb),0.3)]"
-                            : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)]"
-                        }`}
-                      >
-                        {effort.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
                 {/* Execution Mode (Effort) */}

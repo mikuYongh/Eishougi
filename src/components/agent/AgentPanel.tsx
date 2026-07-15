@@ -72,7 +72,6 @@ export function AgentPanel() {
   useEffect(() => { resetTokenUsage(); }, [activeSessionId]);
   
   const [tempSystemPrompt, setTempSystemPrompt] = useState(settings.systemPrompt);
-  const [tempReasoningEffort, setTempReasoningEffort] = useState(settings.reasoningEffort || 'medium');
   const [tempEffort, setTempEffort] = useState<'low' | 'medium' | 'high'>(settings.effort || 'medium');
   const [tempMaxRounds, setTempMaxRounds] = useState<number>(settings.maxRounds || 8);
   const mcp = useSettingsStore.getState().settings.mcpServers || [];
@@ -165,7 +164,6 @@ export function AgentPanel() {
   const handleSaveSettings = () => {
     updateSettings({
       systemPrompt: tempSystemPrompt,
-      reasoningEffort: tempReasoningEffort,
       effort: tempEffort,
       maxRounds: tempMaxRounds,
     });
@@ -484,30 +482,7 @@ export function AgentPanel() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-[var(--text-primary)] mb-2 flex items-center gap-2">
-                    <Zap size={14} className="text-[var(--accent-1)]" />
-                    思考深度 (Reasoning Effort)
-                  </label>
-                  <p className="text-xs text-[var(--text-secondary)] mb-3 leading-relaxed">
-                    调整支持此参数的模型（如 o1, o3, DeepSeek-R1）的推理深度。较深推理可获得更好的提示词结构，但生成更慢。
-                  </p>
-                  <div className="flex bg-[var(--bg-layer-1)] border border-[var(--glass-border)] rounded-xl p-1 gap-1">
-                    {(['low', 'medium', 'high'] as const).map(effort => (
-                      <button
-                        key={effort}
-                        onClick={() => setTempReasoningEffort(effort)}
-                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                          tempReasoningEffort === effort
-                            ? 'bg-[var(--accent-1)] text-black shadow-[0_0_15px_rgba(var(--accent-1-rgb),0.4)]'
-                            : 'text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)]'
-                        }`}
-                      >
-                        {effort.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
 
                 <div>
                   <label className="block text-sm font-bold text-[var(--text-primary)] mb-2 flex items-center gap-2">

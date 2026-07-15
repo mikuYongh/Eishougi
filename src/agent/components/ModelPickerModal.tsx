@@ -42,7 +42,7 @@ export function ModelPickerModal({ kind, onClose, onConfirm }: ModelPickerModalP
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose}>
+    <div className="absolute inset-0 z-[200] flex items-center justify-center bg-[var(--bg-layer-0)]/70 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose}>
       <div
         className="w-full max-w-lg max-h-[80vh] flex flex-col bg-[var(--bg-layer-1)] border border-[var(--glass-border-active)] rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
