@@ -100,6 +100,10 @@ export function Settings() {
       });
       setFetchedModels(models);
       toast.success(`获取到 ${models.length} 个模型`);
+      // 如果当前没选模型，或选的模型不在列表里，自动选第一个
+      if (models.length > 0 && !models.includes(settings.llm.model)) {
+        updateSettings({ llm: { ...settings.llm, model: models[0] } });
+      }
     } catch (e: any) {
       toast.error(`获取模型列表失败: ${e?.message || e}`);
       console.error("Failed to fetch LLM models:", e);
@@ -720,9 +724,10 @@ export function Settings() {
                           } else if (provider === 'openai') {
                             updates.apiUrl = 'https://api.openai.com/v1';
                             updates.model = 'gpt-4o';
-                          } else if (provider === 'anthropic') {
-                            updates.apiUrl = 'https://api.anthropic.com/v1';
-                            updates.model = 'claude-3-5-sonnet-20240620';
+                          }
+                          // 切换到 ollama 时提示用户可能不需要 API Key
+                          if (provider === 'ollama' && settings.llm.apiKey) {
+                            // 本地 Ollama 通常不需要 key，但保留不自动清除（避免误删远程 ollama 代理的 key）
                           }
                           updateSettings({
                             llm: { ...settings.llm, ...updates }
@@ -731,7 +736,6 @@ export function Settings() {
                         options={[
                           { label: "Agnes AI", value: "agnes" },
                           { label: "OpenAI Compatible", value: "openai" },
-                          { label: "Anthropic Claude", value: "anthropic" },
                           { label: "Ollama (Local)", value: "ollama" }
                         ]}
                         accentColor="pink"
@@ -832,9 +836,15 @@ export function Settings() {
                         max="2.0"
                         step="0.1"
                         value={settings.llm.temperature ?? 0.7}
-                        onChange={(e) => updateSettings({
-                          llm: { ...settings.llm, temperature: Number(e.target.value) }
-                        })}
+                        onChange={(e) => {
+                          // 校验：clamp 到 0.0-2.0，NaN 防御
+                          let val = Number(e.target.value);
+                          if (isNaN(val)) val = 0.7;
+                          val = Math.max(0, Math.min(2, val));
+                          updateSettings({
+                            llm: { ...settings.llm, temperature: val }
+                          });
+                        }}
                         className="w-full h-2 bg-[var(--glass-bg)] rounded-lg appearance-none cursor-pointer border border-[var(--glass-border)] outline-none"
                         style={{ accentColor: "var(--accent-1)" }}
                       />
@@ -844,19 +854,45 @@ export function Settings() {
                       </div>
                     </div>
 
-                    {/* Max Tokens */}
+                    {/* Max Tokens — 留空=不传该参数，让模型用默认值（与 NextChat/Open WebUI 一致） */}
                     <div>
                       <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 block">最大生成 Token (Max Tokens)</label>
                       <input
                         type="number"
                         min="1"
-                        max="32768"
-                        value={settings.llm.maxTokens ?? 4096}
-                        onChange={(e) => updateSettings({
-                          llm: { ...settings.llm, maxTokens: Number(e.target.value) }
-                        })}
+                        value={settings.llm.maxTokens ?? ""}
+                        placeholder="留空=模型默认"
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === "") {
+                            // 留空 → 设为 undefined，不传 max_tokens
+                            updateSettings({ llm: { ...settings.llm, maxTokens: undefined as any } });
+                          } else {
+                            let val = Number(raw);
+                            if (isNaN(val) || val < 1) val = 1;
+                            val = Math.round(val);
+                            updateSettings({ llm: { ...settings.llm, maxTokens: val } });
+                          }
+                        }}
                         className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 transition-all font-mono"
                       />
+                      <p className="text-[10px] text-[var(--text-muted)] mt-1">留空则使用模型默认值，不限制上限</p>
+                    </div>
+                  </div>
+
+                  {/* Reasoning / Thinking Model Toggle */}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-sm font-bold text-[var(--text-primary)]">思考模型 (Reasoning)</h4>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1">开启后 AI 会进行深度推理再回答，质量更高但消耗更多 Token。关闭可大幅节省用量</p>
+                      </div>
+                      <button
+                        onClick={() => updateSettings({ llm: { ...settings.llm, reasoningEnabled: !settings.llm.reasoningEnabled } })}
+                        className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${settings.llm.reasoningEnabled ? 'bg-[var(--accent-1)]' : 'bg-[var(--bg-layer-2)] border border-[var(--glass-border)]'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all ${settings.llm.reasoningEnabled ? 'left-7' : 'left-1'}`} />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -876,7 +912,7 @@ export function Settings() {
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[var(--text-primary)]">数据导出与导入</h3>
-                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">导出全部数据（提示词、工作流、生成记录、设置等）为 JSON 文件，方便设备间迁移。</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">导出全部数据（创作、工作流、生成记录、设置等）为 JSON 文件，方便设备间迁移。</p>
                   </div>
                 </div>
 
@@ -925,10 +961,10 @@ export function Settings() {
                   <div className="text-xs text-[var(--text-secondary)] space-y-1 border-t border-[var(--glass-border)] pt-4">
                     <p className="font-bold text-[var(--text-primary)]">备份内容包括：</p>
                     <ul className="list-disc list-inside space-y-0.5 ml-2">
-                      <li>提示词项目（正面/负面提示词、模型配置、LoRA等）</li>
+                      <li>创作项目（正面/负面 prompt、模型配置、LoRA等）</li>
                       <li>工作流定义（ComfyUI JSON）</li>
                       <li>生成历史记录与示范图片（本地图片打包进备份）</li>
-                      <li>收藏提示词 / 自定义风格</li>
+                      <li>收藏创作 / 自定义风格</li>
                       <li>Agent 会话记录</li>
                       <li>应用设置（主题、LLM配置、壁纸等）</li>
                     </ul>

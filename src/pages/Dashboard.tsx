@@ -125,7 +125,7 @@ export function Dashboard() {
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer border transition-all duration-300 hover:scale-105 hover:bg-[var(--glass-bg-hover)] shadow-[0_4px_12px_rgba(0,0,0,0.1)] border-[var(--glass-border)] text-[var(--text-primary)] bg-[var(--glass-bg)]"
           >
             <FileText size={16} />
-            提示词管理
+            创作管理
           </button>
           <button
             onClick={() => navigate('/prompts/new')}
@@ -133,7 +133,7 @@ export function Dashboard() {
             style={{ background: "linear-gradient(135deg, var(--accent-1), var(--accent-2))", border: "1px solid var(--glass-border-active)" }}
           >
             <PenSquare size={16} />
-            新建提示词
+            新建创作
           </button>
         </div>
       </div>
@@ -141,8 +141,8 @@ export function Dashboard() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { icon: <FileText size={24} />, num: prompts.length, lbl: "提示词总数", onClick: () => navigate('/prompts') },
-          { icon: <Star size={24} />, num: favoriteCount, lbl: "收藏提示词", onClick: () => navigate('/prompts') },
+          { icon: <FileText size={24} />, num: prompts.length, lbl: "创作总数", onClick: () => navigate('/prompts') },
+          { icon: <Star size={24} />, num: favoriteCount, lbl: "收藏创作", onClick: () => navigate('/prompts') },
           { icon: <Zap size={24} />, num: workflows.length, lbl: "工作流数量", onClick: () => navigate('/workflows') },
           { icon: <Paintbrush size={24} />, num: totalGenerated, lbl: "总生成次数", onClick: () => navigate('/history') },
         ].map((s, i) => (
@@ -171,7 +171,7 @@ export function Dashboard() {
           <div className="flex items-center justify-between mb-4 border-b border-[var(--glass-border)] pb-2">
             <div className="text-[13px] font-bold flex items-center gap-2 text-[var(--text-primary)]">
               <Clock size={16} className="text-blue-400" />
-              最近提示词项目
+              最近创作项目
             </div>
             <button onClick={() => navigate('/prompts')} className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer flex items-center gap-1">
               查看全部 <ChevronRight size={12} />
@@ -181,7 +181,7 @@ export function Dashboard() {
             {recentPrompts.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-secondary)] py-8">
                 <FileText size={32} className="mb-2 opacity-50" />
-                <p className="text-[12px]">还没有提示词，快去创建吧</p>
+                <p className="text-[12px]">还没有创作，快去创建吧</p>
               </div>
             ) : recentPrompts.map((p) => (
               <div
@@ -190,8 +190,8 @@ export function Dashboard() {
                 onClick={() => navigate(`/prompts/${p.id}/edit`)}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  {p.coverImage ? (
-                    <img src={getImgSrc(p.coverImage)} className={`w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-[var(--glass-border)] transition-all duration-300 ${privacyMode ? 'blur-md hover:blur-none' : ''}`} />
+                  {p.instanceImages && p.instanceImages.length > 0 ? (
+                    <img src={getImgSrc(p.instanceImages[0])} className={`w-8 h-8 rounded-lg object-cover flex-shrink-0 border border-[var(--glass-border)] transition-all duration-300 ${privacyMode ? 'blur-md hover:blur-none' : ''}`} />
                   ) : (
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center border bg-[var(--accent-2)]/10 text-blue-400 border-[var(--accent-2)]/20 flex-shrink-0">
                       <FileText size={14} />
@@ -318,7 +318,7 @@ export function Dashboard() {
             {
               icon: <Rocket size={28} />,
               label: "立即生成",
-              desc: recentPrompts[0] ? `使用「${recentPrompts[0].title}」` : "选择一个提示词",
+              desc: recentPrompts[0] ? `使用「${recentPrompts[0].title}」` : "选择一个创作",
               onClick: () => recentPrompts[0] ? navigate(`/generate/${recentPrompts[0].id}`) : navigate('/prompts'),
               disabled: recentPrompts.length === 0
             },

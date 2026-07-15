@@ -131,7 +131,7 @@ export function WorkflowList() {
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
             工作流管理
           </h2>
-          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">配置并保存 ComfyUI JSON 渲染节点图，与提示词项目绑定</p>
+          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">配置并保存 ComfyUI JSON 渲染节点图，与创作项目绑定</p>
         </div>
         <div className="flex gap-3">
           <button onClick={handleImportClipboard} className="px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)]">

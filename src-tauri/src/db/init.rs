@@ -78,6 +78,15 @@ fn seed_default_workflows(conn: &Connection) {
             Ok(_) => log::info!("Seeded default text2img workflow"),
             Err(e) => log::error!("Failed to seed text2img workflow: {}", e),
         }
+    } else {
+        let json = include_str!("../../resources/default_workflows/text2img.json");
+        if let Err(e) = conn.execute(
+            "UPDATE workflows SET json_content = ?1, updated_at = ?2
+             WHERE id = 'seed_text2img_default' AND is_builtin = 1 AND is_default = 1",
+            rusqlite::params![json, now],
+        ) {
+            log::error!("Failed to refresh text2img workflow: {}", e);
+        }
     }
 
     let has_i2v: i64 = conn
@@ -97,6 +106,15 @@ fn seed_default_workflows(conn: &Connection) {
         match inserted {
             Ok(_) => log::info!("Seeded default img2video workflow"),
             Err(e) => log::error!("Failed to seed img2video workflow: {}", e),
+        }
+    } else {
+        let json = include_str!("../../resources/default_workflows/img2video.json");
+        if let Err(e) = conn.execute(
+            "UPDATE workflows SET json_content = ?1, updated_at = ?2
+             WHERE id = 'seed_img2video_default' AND is_builtin = 1 AND is_default = 1",
+            rusqlite::params![json, now],
+        ) {
+            log::error!("Failed to refresh img2video workflow: {}", e);
         }
     }
 }

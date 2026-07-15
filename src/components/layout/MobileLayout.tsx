@@ -2,7 +2,7 @@ import React from "react";
 import { MobileTopBar } from "./MobileTopBar";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { CompletionToast } from "../ui/CompletionToast";
-import { MobileAgentModal } from "../agent/MobileAgentModal";
+import { MobileAgentPanel } from "../../agent/MobileAgentPanel";
 
 interface MobileLayoutProps {
   children: React.ReactNode;
@@ -21,7 +21,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
       </div>
 
       <MobileBottomNav />
-      <MobileAgentModal />
+      <MobileAgentPanel />
     </div>
   );
 }

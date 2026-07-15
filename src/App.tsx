@@ -7,7 +7,6 @@ import { Sidebar } from "./components/layout/Sidebar";
 import { BottomNav } from "./components/layout/BottomNav";
 import { TopBar } from "./components/layout/TopBar";
 import { StatusBar } from "./components/layout/StatusBar";
-import { AgentPanel } from "./components/agent/AgentPanel";
 import { CompletionToast } from "./components/ui/CompletionToast";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 

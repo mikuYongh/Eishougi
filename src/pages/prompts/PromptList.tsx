@@ -158,9 +158,9 @@ export function PromptList() {
       <div className="flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 gap-4">
         <div className="hidden md:block">
           <h2 className="text-2xl font-bold text-[var(--text-primary)] drop-shadow-md">
-            提示词项目管理
+            创作项目管理
           </h2>
-          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">管理生成配置项目，包含提示词、底模、LoRA及全部参数</p>
+          <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">管理生成配置项目，包含创作、底模、LoRA及全部参数</p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-start md:justify-end">
           <button 
@@ -266,8 +266,8 @@ export function PromptList() {
               <div key={p.id} className="glass-panel rounded-xl flex flex-col group border border-[var(--glass-border)] hover:border-blue-400/30 transition-all hover:shadow-[0_8px_30px_rgba(66,165,245,0.1)] overflow-hidden">
                 
                 <div className="h-28 w-full relative overflow-hidden flex-shrink-0 bg-[var(--glass-bg)] border-b border-[var(--glass-border)]">
-                  {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) ? (
-                    <img src={getImgSrc(p.coverImage || p.instanceImages?.[0])} alt={p.title} className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
+                  {(p.instanceImages && p.instanceImages.length > 0) ? (
+                    <img src={getImgSrc(p.instanceImages?.[0])} alt={p.title} className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
                   ) : (
                     <div className="absolute inset-0 bg-gradient-to-br from-[var(--bg-layer-0)] to-[var(--glass-border)] flex flex-col items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
                       <div className="w-10 h-10 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.2)] mb-2">
@@ -295,12 +295,12 @@ export function PromptList() {
                       onClick={async (e) => {
                         e.stopPropagation();
                         try {
-                          const yes = await confirm("确定要删除该提示词项目吗？");
+                          const yes = await confirm("确定要删除该创作项目吗？");
                           if (yes) {
                             removePrompt(p.id);
                           }
                         } catch (err) {
-                          if (window.confirm("确定要删除该提示词项目吗？")) {
+                          if (window.confirm("确定要删除该创作项目吗？")) {
                             removePrompt(p.id);
                           }
                         }
@@ -374,8 +374,8 @@ export function PromptList() {
                 <div className="flex items-center gap-4 w-full md:w-auto flex-1 min-w-0">
                 {/* Square Thumbnail */}
                 <div className="w-16 h-16 rounded-lg overflow-hidden bg-[var(--glass-bg)] flex-shrink-0 relative border border-[var(--glass-border)] group-hover:border-blue-400/30 transition-all">
-                  {(p.coverImage || (p.instanceImages && p.instanceImages.length > 0)) ? (
-                    <img src={getImgSrc(p.coverImage || p.instanceImages?.[0])} className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} alt="cover"/>
+                  {(p.instanceImages && p.instanceImages.length > 0) ? (
+                    <img src={getImgSrc(p.instanceImages?.[0])} className={`w-full h-full object-cover group-hover:scale-110 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} alt="cover"/>
                   ) : (
                     <div className="absolute inset-0 bg-gradient-to-br from-[var(--bg-layer-0)] to-[var(--bg-layer-1)] flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
                       <Sparkles size={20} className="text-[var(--accent-1)] opacity-50 group-hover:opacity-100 group-hover:animate-pulse transition-all" />
@@ -421,7 +421,7 @@ export function PromptList() {
                   </button>
                   <button 
                     onClick={() => {
-                      if (confirm("确定要删除该提示词项目吗？")) {
+                      if (confirm("确定要删除该创作项目吗？")) {
                         removePrompt(p.id);
                       }
                     }}

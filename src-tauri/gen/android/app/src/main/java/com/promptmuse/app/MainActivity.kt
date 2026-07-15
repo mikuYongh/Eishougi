@@ -54,18 +54,25 @@ class MainActivity : TauriActivity() {
                           put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
                       }
                       val resolver = context.contentResolver
-                      val collection = android.provider.MediaStore.Images.Media.getContentUri(android.os.MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                      val uri = resolver.insert(collection, contentValues)
-                      if (uri != null) {
-                          resolver.openOutputStream(uri)?.use { outputStream ->
-                              sourceFile.inputStream().use { inputStream ->
-                                  inputStream.copyTo(outputStream)
-                              }
-                          }
-                          contentValues.clear()
-                          contentValues.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
-                          resolver.update(uri, contentValues, null, null)
-                          return "Pictures/$safeFolder/" + fileName
+                      val collection = android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                       val uri = resolver.insert(collection, contentValues)
+                       if (uri != null) {
+                           try {
+                             val outputStream = resolver.openOutputStream(uri)
+                               ?: throw Exception("MediaStore output stream is unavailable")
+                             outputStream.use { stream ->
+                               sourceFile.inputStream().use { inputStream ->
+                                   inputStream.copyTo(stream)
+                               }
+                             }
+                             contentValues.clear()
+                             contentValues.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                             resolver.update(uri, contentValues, null, null)
+                             return "Pictures/$safeFolder/" + fileName
+                           } catch (writeError: Exception) {
+                             resolver.delete(uri, null, null)
+                             throw writeError
+                           }
                       } else {
                           throw Exception("MediaStore insert returned null. Possible permissions issue or file already exists.")
                       }

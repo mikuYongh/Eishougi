@@ -117,7 +117,7 @@ export const aiService = {
       
       const textToAnalyze = [project.title, project.positivePrompt].filter(Boolean).join("\n");
       if (!textToAnalyze.trim()) {
-        if (onLog) onLog(`跳过空提示词项目: ${project.title || project.id}`);
+        if (onLog) onLog(`跳过空创作项目: ${project.title || project.id}`);
         continue;
       }
       

@@ -34,12 +34,170 @@ export interface ComfyProgress {
   node: string;
 }
 
+function isUiWorkflow(workflow: any): boolean {
+  return Boolean(workflow && Array.isArray(workflow.nodes));
+}
+
+function forEachUiNode(workflow: any, callback: (node: any) => void) {
+  (workflow.nodes || []).forEach(callback);
+  const subgraphs = workflow.definitions?.subgraphs;
+  const definitions = Array.isArray(subgraphs) ? subgraphs : Object.values(subgraphs || {});
+  definitions.forEach((definition: any) => (definition.nodes || []).forEach(callback));
+}
+
+function getUiWidgetIndex(node: any, inputName: string): number | null {
+  const inputs = Array.isArray(node.inputs) ? node.inputs : [];
+  const widgets = Array.isArray(node.widgets_values) ? node.widgets_values : [];
+  let index = 0;
+  for (const input of inputs) {
+    if (!input.widget) continue;
+    if (input.name === inputName) return index < widgets.length ? index : null;
+    index += 1;
+    if (/seed/i.test(input.name || "") && widgets[index] !== undefined) {
+      if (inputName === "control_after_generate") return index;
+      index += 1;
+    }
+  }
+  return null;
+}
+
+function setUiWidget(node: any, inputName: string, value: any): boolean {
+  const index = getUiWidgetIndex(node, inputName);
+  if (index === null) return false;
+  node.widgets_values[index] = value;
+  return true;
+}
+
+function getUiWidget(node: any, inputName: string): any {
+  const index = getUiWidgetIndex(node, inputName);
+  return index === null ? undefined : node.widgets_values?.[index];
+}
+
+function injectUiWorkflow(workflow: any, project: any): any {
+  const loraConfigs = Array.isArray(project.loraConfigs) ? project.loraConfigs : [];
+  const seed = Number(project.seed);
+  const finalSeed = Number.isFinite(seed) && seed >= 0 ? seed : Math.floor(Math.random() * 1_000_000_000);
+  const positive = project.artistPrompt ? `${project.positivePrompt || ""}, ${project.artistPrompt}` : project.positivePrompt;
+
+  forEachUiNode(workflow, (node) => {
+    const type = node.type || "";
+    const title = String(node.title || "");
+    if (!Array.isArray(node.widgets_values)) node.widgets_values = [];
+
+    if (type === "LoadImage" && project.imageFilename) setUiWidget(node, "image", project.imageFilename);
+    if (type === "Simple String" || type === "SimpleString") {
+      if (positive !== undefined) setUiWidget(node, "string", positive);
+    }
+    if (type === "CLIPTextEncode") {
+      if (/positive/i.test(title) && positive !== undefined) setUiWidget(node, "text", positive);
+      if (/negative/i.test(title) && project.negativePrompt !== undefined) setUiWidget(node, "text", project.negativePrompt);
+    }
+
+    if (type.includes("KSampler")) {
+      if (project.steps > 0) setUiWidget(node, "steps", project.steps);
+      if (project.cfgScale > 0) setUiWidget(node, "cfg", project.cfgScale);
+      if (project.sampler) setUiWidget(node, "sampler_name", project.sampler);
+      if (project.scheduler) setUiWidget(node, "scheduler", project.scheduler);
+      if (project.seed !== undefined) {
+        setUiWidget(node, "seed", finalSeed);
+        setUiWidget(node, "noise_seed", finalSeed);
+      }
+    }
+
+    if (type === "UNETLoader" || type === "CheckpointLoaderSimple" || type === "CheckpointLoader" || type === "ImageOnlyCheckpointLoader") {
+      if (project.baseModel) {
+        setUiWidget(node, "unet_name", project.baseModel);
+        setUiWidget(node, "ckpt_name", project.baseModel);
+      }
+    }
+    if (type === "VAELoader" && project.vaeModel && project.vaeModel !== "auto") setUiWidget(node, "vae_name", project.vaeModel);
+
+    if (type === "SDXLEmptyLatentSizePicker+") {
+      const resolution = project.resolution || (project.width && project.height ? `${project.width}x${project.height}` : undefined);
+      if (resolution) setUiWidget(node, "resolution", resolution);
+      if (project.width > 0) {
+        setUiWidget(node, "width_override", project.width);
+        setUiWidget(node, "empty_latent_width", project.width);
+      }
+      if (project.height > 0) {
+        setUiWidget(node, "height_override", project.height);
+        setUiWidget(node, "empty_latent_height", project.height);
+      }
+    } else if (type.includes("EmptyLatent") || type.includes("LatentVideo")) {
+      if (project.width > 0) setUiWidget(node, "width", project.width);
+      if (project.height > 0) setUiWidget(node, "height", project.height);
+      if (project.duration > 0) {
+        setUiWidget(node, "length", project.duration);
+        setUiWidget(node, "duration", project.duration);
+      }
+    }
+
+    if (type === "PrimitiveInt") {
+      const lowerTitle = title.toLowerCase();
+      if (lowerTitle.includes("width") && project.width > 0) setUiWidget(node, "value", project.width);
+      if (lowerTitle.includes("height") && project.height > 0) setUiWidget(node, "value", project.height);
+      if ((lowerTitle.includes("frame") || lowerTitle.includes("fps")) && project.fps > 0) setUiWidget(node, "value", project.fps);
+      if (lowerTitle.includes("duration") && project.duration > 0) setUiWidget(node, "value", project.duration);
+    }
+
+    if (type === "Power Lora Loader (rgthree)") {
+      const slots = node.widgets_values.filter((value: any) => value && typeof value === "object" && !value.type);
+      slots.forEach((slot: any) => {
+        const config = loraConfigs.find((item: any) => item.name === slot.lora);
+        if (config) {
+          slot.on = config.enabled !== false;
+          slot.strength = config.strength;
+        } else if (slot.lora) {
+          slot.on = false;
+        }
+      });
+      loraConfigs.filter((item: any) => item.name).forEach((config: any) => {
+        if (slots.some((slot: any) => slot.lora === config.name)) return;
+        const index = node.widgets_values.findIndex((value: any) => !value || (typeof value === "object" && !value.type && !value.lora));
+        if (index >= 0) node.widgets_values[index] = { lora: config.name, strength: config.strength, strengthTwo: config.strength, on: config.enabled !== false };
+      });
+    }
+  });
+  return workflow;
+}
+
+function uiWorkflowToApi(workflow: any): any {
+  const linkMap = new Map<number, any[]>();
+  (workflow.links || []).forEach((link: any[]) => linkMap.set(link[0], link));
+  const result: Record<string, any> = {};
+  (workflow.nodes || []).forEach((node: any) => {
+    if (!node?.type || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(node.type)) return;
+    const inputs: Record<string, any> = {};
+    (node.inputs || []).forEach((input: any) => {
+      if (!input.name) return;
+      if (input.widget) {
+        const value = getUiWidget(node, input.name);
+        if (value !== undefined && !(value && typeof value === "object")) inputs[input.name] = value;
+      } else if (input.link != null) {
+        const link = linkMap.get(input.link);
+        if (link) inputs[input.name] = [String(link[1]), link[2] || 0];
+      }
+    });
+    if (node.type === "Power Lora Loader (rgthree)") {
+      (node.widgets_values || []).forEach((value: any, index: number) => {
+        if (value && typeof value === "object" && !value.type) inputs[`lora_${index + 1}`] = value;
+      });
+    }
+    result[String(node.id)] = { inputs, class_type: node.type, _meta: { title: node.title || node.type } };
+  });
+  return result;
+}
+
 export class ComfyService {
   private clientId: string;
   private ws: WebSocket | null = null;
 
   constructor() {
     this.clientId = Math.random().toString(36).substring(2, 15);
+  }
+
+  toApiPrompt(workflow: any): any {
+    return isUiWorkflow(workflow) ? uiWorkflowToApi(workflow) : workflow;
   }
 
   connect(
@@ -255,9 +413,21 @@ export class ComfyService {
   ) {
     const finalJson = JSON.parse(JSON.stringify(workflow));
 
+    if (isUiWorkflow(finalJson)) {
+      return injectUiWorkflow(finalJson, {
+        imageFilename,
+        positivePrompt: prompt,
+        fps,
+        duration,
+        width,
+        height,
+        baseModel,
+      });
+    }
+
     for (const key in finalJson) {
       const node = finalJson[key];
-      if (!node.inputs) continue;
+         if (!node?.inputs || typeof node.class_type !== "string") continue;
 
       const classType = node.class_type;
       const title = node._meta?.title || '';
@@ -332,67 +502,159 @@ export class ComfyService {
     };
 
     try {
-      const workflow = JSON.parse(workflowStr);
-      for (const key in workflow) {
-        const node = workflow[key];
-        if (!node.inputs) continue;
+      const raw = JSON.parse(workflowStr);
 
-        // Check for SDXLEmptyLatentSizePicker+
-        if (node.class_type === "SDXLEmptyLatentSizePicker+") {
+      // 归一化：UI 格式（nodes 数组）→ 统一用 type + widgets_values 提取
+      // API 格式（扁平对象）→ 用 class_type + inputs 提取
+      const isUiFormat = Array.isArray(raw.nodes);
+
+      // 辅助：从 UI 格式节点的 widgets_values 里按 object_info 的 input 顺序提取字段值
+      // 返回 { fieldName: value } 映射
+      const extractWidgetValues = (node: any): Record<string, any> => {
+        const wv = node.widgets_values;
+        if (!Array.isArray(wv)) return {};
+        // UI 格式的 widgets_values 是按 widget 定义顺序排列的数组
+        // 我们不知道精确的字段名，但可以通过 object_info 推断
+        // 这里用一个简单策略：把非对象值按顺序映射到 _w0, _w1...
+        // 对象值（如 lora slot）单独处理
+        const result: Record<string, any> = {};
+        wv.forEach((v, i) => {
+          if (v !== null && typeof v === "object") {
+            // lora slot 或 header，保留原始对象
+            result[`_obj_${i}`] = v;
+          } else {
+            result[`_w${i}`] = v;
+          }
+        });
+        return result;
+      };
+
+      // 收集所有节点，统一为 { classType, title, inputs, widgets } 结构
+      const nodes: Array<{ classType: string; title: string; inputs: Record<string, any>; widgetObjs: any[] }> = [];
+
+      if (isUiFormat) {
+        forEachUiNode(raw, (n) => {
+          const classType = n.type || "";
+          const wv = n.widgets_values || [];
+          // 收集 widgets_values 里的对象（lora slots 等）
+          const widgetObjs = wv.filter((v: any) => v !== null && typeof v === "object");
+          const inputs: Record<string, any> = {};
+          if (Array.isArray(n.inputs)) {
+            n.inputs.forEach((inp: any) => {
+              if (!inp.name) return;
+              if (inp.widget) inputs[inp.name] = getUiWidget(n, inp.name);
+              else if (inp.link != null) inputs[inp.name] = inp.link;
+            });
+          }
+          nodes.push({ classType, title: n.title || classType, inputs, widgetObjs });
+        });
+      } else {
+        // API 格式
+        for (const key in raw) {
+          const node = raw[key];
+          if (!node || !node.class_type) continue;
+          nodes.push({
+            classType: node.class_type,
+            title: node._meta?.title || node.class_type,
+            inputs: node.inputs || {},
+            widgetObjs: [],
+          });
+        }
+      }
+
+      for (const node of nodes) {
+        const ct = node.classType;
+        const inp = node.inputs;
+
+        // SDXLEmptyLatentSizePicker+
+        if (ct === "SDXLEmptyLatentSizePicker+") {
           result.hasSizePicker = true;
+          if (inp.resolution) result.width = parseInt(String(inp.resolution).split("x")[0]) || result.width;
+          if (inp.resolution) result.height = parseInt(String(inp.resolution).split("x")[1]) || result.height;
+          // API 格式
+          if (typeof inp.resolution === "string") {
+            const m = inp.resolution.match(/(\d+)\s*x\s*(\d+)/);
+            if (m) { result.width = parseInt(m[1]); result.height = parseInt(m[2]); }
+          }
         }
 
-        // Check for models
-        if (node.class_type === "UNETLoader" || node.class_type === "CheckpointLoaderSimple") {
-          const modelVal = node.inputs.unet_name || node.inputs.ckpt_name;
-          if (modelVal) result.baseModel = modelVal;
+        // Models
+        if (ct === "UNETLoader" || ct === "CheckpointLoaderSimple" || ct === "CheckpointLoader") {
+          // API 格式
+          const modelVal = inp.unet_name || inp.ckpt_name;
+          if (modelVal && typeof modelVal === "string") result.baseModel = modelVal;
         }
-        if (node.class_type === "VAELoader") {
-          if (node.inputs.vae_name) result.vaeModel = node.inputs.vae_name;
-        }
-
-        // Check for KSampler parameters
-        if (node.class_type.includes("KSampler")) {
-          if (node.inputs.sampler_name) result.samplerName = node.inputs.sampler_name;
-          if (node.inputs.scheduler) result.scheduler = node.inputs.scheduler;
-          if (typeof node.inputs.steps === 'number') result.steps = node.inputs.steps;
-          if (typeof node.inputs.cfg === 'number') result.cfgScale = node.inputs.cfg;
+        if (ct === "VAELoader") {
+          if (inp.vae_name && typeof inp.vae_name === "string") result.vaeModel = inp.vae_name;
         }
 
-        // Check for Resolution
-        if (node.class_type.includes("EmptyLatent") || node.class_type.includes("SizePicker") || node.class_type.includes("Latent")) {
-          if (typeof node.inputs.empty_latent_width === 'number') result.width = node.inputs.empty_latent_width;
-          else if (typeof node.inputs.width === 'number') result.width = node.inputs.width;
-          
-          if (typeof node.inputs.empty_latent_height === 'number') result.height = node.inputs.empty_latent_height;
-          else if (typeof node.inputs.height === 'number') result.height = node.inputs.height;
+        // KSampler
+        if (ct.includes("KSampler")) {
+          // API 格式
+          if (inp.sampler_name) result.samplerName = inp.sampler_name;
+          if (inp.scheduler) result.scheduler = inp.scheduler;
+          if (typeof inp.steps === "number") result.steps = inp.steps;
+          if (typeof inp.cfg === "number") result.cfgScale = inp.cfg;
+          if (!result.samplerName && inp.sampler_name) result.samplerName = inp.sampler_name;
+          if (!result.scheduler && inp.scheduler) result.scheduler = inp.scheduler;
+          if (!result.steps && inp.steps !== undefined) result.steps = parseInt(inp.steps);
+          if (!result.cfgScale && inp.cfg !== undefined) result.cfgScale = parseFloat(inp.cfg);
         }
 
-        // Check for LoRAs in Power Lora Loader (rgthree)
-        if (node.class_type === "Power Lora Loader (rgthree)") {
-          for (const key of Object.keys(node.inputs)) {
+        // Resolution (非 SizePicker 的 EmptyLatent 等)
+        if (ct.includes("EmptyLatent") || (ct.includes("Latent") && !ct.includes("SizePicker"))) {
+          if (typeof inp.empty_latent_width === "number") result.width = inp.empty_latent_width;
+          else if (typeof inp.width === "number") result.width = inp.width;
+          if (typeof inp.empty_latent_height === "number") result.height = inp.empty_latent_height;
+          else if (typeof inp.height === "number") result.height = inp.height;
+        }
+
+        // Power Lora Loader (rgthree) — UI 格式的 lora 数据在 widgets_values 的对象里
+        if (ct === "Power Lora Loader (rgthree)") {
+          // API 格式: lora_1, lora_2... 在 inputs 里
+          for (const key of Object.keys(inp)) {
             if (key.startsWith("lora_")) {
-              const loraSlot = node.inputs[key];
-              if (loraSlot && loraSlot.lora && loraSlot.lora !== "None") {
+              const slot = inp[key];
+              if (slot && slot.lora && slot.lora !== "None") {
                 result.loras.push({
-                  name: loraSlot.lora,
-                  strength: typeof loraSlot.strength === 'number' ? loraSlot.strength : 1.0,
-                  enabled: typeof loraSlot.on === 'boolean' ? loraSlot.on : true
+                  name: slot.lora,
+                  strength: typeof slot.strength === "number" ? slot.strength : 1.0,
+                  enabled: typeof slot.on === "boolean" ? slot.on : true,
                 });
               }
             }
           }
-        }
-        // General LoraLoader
-        if (node.class_type === "LoraLoader") {
-          if (node.inputs.lora_name) {
-            const str = typeof node.inputs.strength_model === 'number' ? node.inputs.strength_model : 1.0;
-            result.loras.push({
-              name: node.inputs.lora_name,
-              strength: str,
-              enabled: str !== 0
-            });
+          // UI 格式: lora 数据在 widgetObjs 里 ({on, lora, strength, strengthTwo})
+          for (const obj of node.widgetObjs) {
+            if (obj.type === "PowerLoraLoaderHeaderWidget") continue;
+            if (obj.lora && obj.lora !== "None") {
+              result.loras.push({
+                name: obj.lora,
+                strength: typeof obj.strength === "number" ? obj.strength : 1.0,
+                enabled: typeof obj.on === "boolean" ? obj.on : true,
+              });
+            }
           }
+        }
+
+        // General LoraLoader / LoraLoaderModelOnly
+        if (ct === "LoraLoader" || ct === "LoraLoaderModelOnly") {
+          // API 格式
+          if (inp.lora_name && typeof inp.lora_name === "string") {
+            const str = typeof inp.strength_model === "number" ? inp.strength_model : 1.0;
+            result.loras.push({ name: inp.lora_name, strength: str, enabled: str !== 0 });
+          }
+          if (inp.lora_name && typeof inp.lora_name === "string" && inp.lora_name.endsWith(".safetensors")) {
+            const str = typeof inp.strength_model === "number" ? inp.strength_model : 1.0;
+            result.loras.push({ name: inp.lora_name, strength: str, enabled: str !== 0 });
+          }
+        }
+
+        if (ct === "PrimitiveInt" && inp.value !== undefined) {
+          const lowerTitle = node.title.toLowerCase();
+          const value = Number(inp.value);
+          if (lowerTitle.includes("width") && Number.isFinite(value)) result.width = value;
+          if (lowerTitle.includes("height") && Number.isFinite(value)) result.height = value;
         }
       }
     } catch (e) {
@@ -427,6 +689,10 @@ export class ComfyService {
     try {
       const workflow = JSON.parse(workflowStr);
 
+      if (isUiWorkflow(workflow)) {
+        return injectUiWorkflow(workflow, project);
+      }
+
       let loraConfigs = project.loraConfigs;
       if (typeof loraConfigs === 'string') {
         try {
@@ -447,7 +713,7 @@ export class ComfyService {
 
       for (const key in workflow) {
         const node = workflow[key];
-        if (!node.inputs) continue;
+        if (!node?.inputs || typeof node.class_type !== "string") continue;
 
         // 1. KSampler / KSamplerAdvanced
         if (node.class_type.includes("KSampler")) {

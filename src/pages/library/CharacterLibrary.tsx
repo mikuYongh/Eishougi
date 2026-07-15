@@ -216,7 +216,7 @@ export function CharacterLibrary() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div className="hidden md:block">
             <h1 className="text-2xl font-bold text-[var(--text-primary)]">角色图鉴</h1>
-            <p className="text-[var(--text-secondary)] text-sm">海量角色库，支持一键加入提示词</p>
+            <p className="text-[var(--text-secondary)] text-sm">海量角色库，支持一键加入创作</p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">

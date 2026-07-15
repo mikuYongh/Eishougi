@@ -17,11 +17,11 @@ import {
 /* ====== Navigation ====== */
 export const NAV_ITEMS: { id: NavId; label: string; icon: React.ReactNode; path: string }[] = [
   { id: "dashboard",  label: "仪表板",     icon: <LayoutDashboard size={18} />, path: "/" },
-  { id: "prompts",    label: "提示词管理", icon: <PenSquare size={18} />, path: "/prompts" },
+  { id: "prompts",    label: "创作管理", icon: <PenSquare size={18} />, path: "/prompts" },
   { id: "workflows",  label: "工作流管理", icon: <Zap size={18} />, path: "/workflows" },
   { id: "generate",   label: "生成",       icon: <Paintbrush size={18} />, path: "/generate" },
   { id: "video",      label: "图生视频",   icon: <Video size={18} />, path: "/video" },
-  { id: "tagger",     label: "图片反推",   icon: <Search size={18} />, path: "/tagger" },
+  // { id: "tagger",     label: "图片反推",   icon: <Search size={18} />, path: "/tagger" }, // 反推入口暂不开放，待后续改造
   { id: "characters", label: "角色图鉴",   icon: <Users size={18} />, path: "/characters" },
   { id: "artists",    label: "风格画师",   icon: <ImageIcon size={18} />, path: "/artists" },
   { id: "history",    label: "生成历史",   icon: <History size={18} />, path: "/history" },

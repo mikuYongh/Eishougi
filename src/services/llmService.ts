@@ -2,13 +2,12 @@ import { useSettingsStore } from "../stores/settingsStore";
 
 export class LLMService {
   private baseUrl = "https://apihub.agnes-ai.com/v1";
-  private apiKey = import.meta.env.VITE_AGNES_API_KEY || "";
   private model = "agnes-2.0-flash";
 
   async tagImage(imageBase64: string): Promise<{ tag: string, confidence: number }[]> {
     const { llm } = useSettingsStore.getState().settings;
     const currentApiUrl = llm.apiUrl || this.baseUrl;
-    const currentApiKey = llm.apiKey || this.apiKey;
+    const currentApiKey = llm.apiKey;
     const currentModel = llm.model || this.model;
     const currentTemperature = llm.temperature !== undefined ? llm.temperature : 0.1;
 

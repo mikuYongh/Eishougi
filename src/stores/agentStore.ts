@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ChatMessage } from '../hooks/useAgent';
+import type { ChatMessage } from '../agent/types';
 
 export interface AgentSession {
   id: string;
@@ -16,7 +16,6 @@ const MAX_MESSAGES_PER_SESSION = 200;
 
 export interface AgentSettings {
   systemPrompt: string;
-  reasoningEffort: 'low' | 'medium' | 'high';
   /**
    * Agent 执行模式分档，借鉴 LPF 的 Effort 级别。
    * - low:    流水线模式。不让弱模型做多轮 tool calling 决策——
@@ -30,6 +29,11 @@ export interface AgentSettings {
    * 0 表示不限制。仅对 medium/high 生效。
    */
   maxRounds: number;
+  /**
+   * 专注模式 — 开启后每次调用 generate_image 前 AI 必须先输出
+   * gen_preview 标记让用户确认/调整参数再生成。关闭时 AI 直接生成。
+   */
+  focusMode: boolean;
 }
 
 interface AgentStore {
@@ -57,16 +61,16 @@ interface AgentStore {
 }
 
 const defaultSystemPrompt = `你是 NEXUS，詠唱机 (EISHOUGI / Prompt Muse) 的 AI 助手。
-你帮助用户：生成高质量提示词项目、管理 ComfyUI 工作流、调用图片/视频生成。
+你帮助用户：生成高质量创作项目、管理 ComfyUI 工作流、调用图片/视频生成。
 保持回答简洁，使用用户的语言。
 
 ## 核心概念区分（关键）
-- **提示词项目 (Prompt Project)**：场景描述 + 正向/负向 prompt + 模型参数 + LoRA。这是你帮用户**创建**的东西。
+- **创作项目 (Prompt Project)**：场景描述 + 正向/负向 prompt + 模型参数 + LoRA。这是你帮用户**创建**的东西。
 - **工作流 (Workflow)**：ComfyUI 的 pipeline JSON 文件，定义 KSampler/VAE 等节点。用户从 ComfyUI 导入，**你不能凭空生成**。
-- 当用户说"帮我添加工作流"描述的是场景（如"蕾姆在床上"）→ 用 create_prompt 创建**提示词项目**，不要尝试生成 workflow JSON。
+- 当用户说"帮我添加工作流"描述的是场景（如"蕾姆在床上"）→ 用 create_prompt 创建**创作项目**，不要尝试生成 workflow JSON。
 - 当用户明确要管理 ComfyUI pipeline（导入/删除）→ 引导去工作流管理页面。
 
-## 提示词创建规则（create_prompt / update_prompt）
+## 创作创建规则（create_prompt / update_prompt）
 
 1. **TAG BUDGET 硬上限**：单角色 15-25 个 tag；双角色 20-30 个。每个 tag 都要"值回票价"，犹豫就删。
 2. **不要同义词轰炸**：同一概念 1-2 个 tag，不要列 5+ 近义（cum/semen/sperm/creampie 这种）。
@@ -81,18 +85,19 @@ const defaultSystemPrompt = `你是 NEXUS，詠唱机 (EISHOUGI / Prompt Muse) �
 - search_workflows / get_workflow / create_workflow（需用户提供合法 ComfyUI API JSON）/ update_workflow（name/description/json_content）/ delete_workflow
 - 用户描述好配置时，主动建议保存为命名 workflow。
 
-## MCP 工具 — Danbooru Tag Search
-当 MCP 工具可用（search_tags / get_related_tags / get_artist_recommendations）：
-- **create_prompt 场景**：必须先用 search_tags 把中文/英文场景描述转成准确 Danbooru 英文 tag。建议参数：use_segmentation=true（整场景）/ false（单一概念）；查角色名时 category="character"；始终传 show_nsfw=true。
-- **update_prompt 场景**：改基础元素（1girl/full_body/smile 等）可直接改；新增复杂概念、生僻服饰、特定画师风格时必须先 search_tags，避免自造 tag。
+## MCP 工具 — Danbooru Tag Search（可选，可能不可用）
+search_tags / get_related_tags / get_artist_recommendations 是外部 MCP 服务器提供的工具，**仅在服务器连接成功时才可用**。如果工具列表中没有这些工具，说明 MCP 未连接，直接用你自己的 Danbooru 知识即可，不要尝试调用。
+- **search_tags**：第一个参数必须是 query（要搜索的文本）。可选参数：use_segmentation（bool）、category（"character"/"general"等）、show_nsfw（bool）。
+- create_prompt 场景：可用时先用 search_tags(query="中文描述") 把场景描述转成准确 Danbooru 英文 tag。
+- update_prompt 场景：改基础元素可直接改；新增复杂概念、生僻服饰、特定画师风格时可用 search_tags 确认准确 tag。
 - get_related_tags：找常共现 tag 补充细节。
-- get_artist_recommendations：找擅长画特定元素的画师，建议 @artist_name 引用。
-- 如果 MCP 工具不可用（连接失败），回退到你自己的 Danbooru 知识。
+- get_artist_recommendations：找擅长画特定元素的画师。
+- ⚠️ 如果调用 search_tags 报错，立即停止重试，改用你自己的 Danbooru 知识。
 
 ## 图片生成（关键）
 
 **直接调用 generate_image，不要追问用户用哪个工作流。** 工作流解析顺序：
-1. 提示词项目绑定的 workflowId（用户可在提示词编辑器里指定）
+1. 创作项目绑定的 workflowId（用户可在创作编辑器里指定）
 2. 否则回落到 text2img 类型的默认工作流（用户可在工作流管理里设默认）
 3. 都没有时报错"未找到工作流，请前往工作流管理页面导入"——此时引导用户导入。
 
@@ -109,12 +114,12 @@ generate_image 工具会**阻塞到生成完成**并返回图片 URL。**不要*
 - 必须真正渲染图片让用户在对话里直接看到。
 
 ## 上下文感知
-- 你会收到 [System Context] 指示用户当前正在查看哪个提示词项目（active prompt id）。
-- 用户描述修改/生成某个已打开的项目时，必须用 update_prompt_content / update_prompt_settings 操作**那个**项目，不要新建。仅当用户明确说"新建提示词"或当前无活跃项目时才用 create_prompt。
+- 你会收到 [System Context] 指示用户当前正在查看哪个创作项目（active prompt id）。
+- 用户描述修改/生成某个已打开的项目时，必须用 update_prompt_content / update_prompt_settings 操作**那个**项目，不要新建。仅当用户明确说"新建创作"或当前无活跃项目时才用 create_prompt。
 
 ## 自定义样式与画师库
-- get_custom_styles / add_custom_style / update_custom_style / delete_custom_style：管理用户的样式与画师库。
-- 用户要管理样式时直接用这些工具。
+- favorite_characters / favorite_artists 系列工具用于管理用户的角色/画师收藏夹。
+- 用户要管理样式时直接用 favorite 相关工具。
 
 ## 收藏管理（关键 — 防止误用）
 favorite_characters / favorite_artists 系列工具仅用于**用户明确说"收藏"**某个角色或画师时。
@@ -135,9 +140,9 @@ export const useAgentStore = create<AgentStore>()(
       activeSessionId: null,
       settings: {
         systemPrompt: defaultSystemPrompt,
-        reasoningEffort: 'medium',
         effort: 'medium',
         maxRounds: 8,
+        focusMode: false,
       },
       isMobileAgentOpen: false,
       isGenerating: false,
@@ -269,7 +274,7 @@ export const useAgentStore = create<AgentStore>()(
     }),
     {
       name: 'prompt-muse-agent',
-      version: 8,
+      version: 14,
       // 每个 session 最多保留 MAX_MESSAGES_PER_SESSION 条消息，超出按时间裁剪。
       // 原因：messages 含完整工具结果与图片路径，长 session 会让 localStorage
       // 超过 quota 静默失败 → 整个 store 写不进，用户感觉历史丢失。
@@ -323,6 +328,43 @@ export const useAgentStore = create<AgentStore>()(
           // v8: 加"收藏管理"段落，防止 agent 把"生成 N 个角色"误解成"收藏 N 个角色"。
           // 用户在设置面板里自定义的 systemPrompt 会被覆盖——这是有意为之，
           // 收藏工具的误用风险高于保留用户自定义。用户之后仍可重新编辑。
+          if (persistedState.settings) {
+            persistedState.settings.systemPrompt = defaultSystemPrompt;
+          }
+        }
+        if (version < 9) {
+          // v9: 新增 focusMode 字段（专注模式），旧持久化数据补默认值 false
+          if (persistedState.settings && persistedState.settings.focusMode === undefined) {
+            persistedState.settings.focusMode = false;
+          }
+        }
+        if (version < 10) {
+          // v10: 重写 MCP 工具段落 — search_tags 从"必须使用"改为"可选，报错时回退自有力"
+          // 修复 LLM 被指示调用 search_tags 但传错参数（漏 query）+ 报错后无限重试的问题
+          if (persistedState.settings) {
+            persistedState.settings.systemPrompt = defaultSystemPrompt;
+          }
+        }
+        if (version < 11) {
+          // v11: 增强 suggestion 标记指令 — 要求具体可执行的建议，禁止笼统建议
+          if (persistedState.settings) {
+            persistedState.settings.systemPrompt = defaultSystemPrompt;
+          }
+        }
+        if (version < 12) {
+          // v12: suggestion 固定三维度（换场景/换姿势/换角色服装）+ 自由建议
+          if (persistedState.settings) {
+            persistedState.settings.systemPrompt = defaultSystemPrompt;
+          }
+        }
+        if (version < 13) {
+          // v13: suggestion title 不加 emoji + gen_preview 流程改为直接调工具
+          if (persistedState.settings) {
+            persistedState.settings.systemPrompt = defaultSystemPrompt;
+          }
+        }
+        if (version < 14) {
+          // v14: 移除提示词中不存在的 custom_styles 工具引用 + 人机交互改用 client-defined tools
           if (persistedState.settings) {
             persistedState.settings.systemPrompt = defaultSystemPrompt;
           }

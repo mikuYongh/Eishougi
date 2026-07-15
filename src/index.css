@@ -130,22 +130,22 @@ body {
     box-shadow: 0 8px 30px rgba(0,0,0,0.2);
     border-color: var(--accent-1);
   }
+}
 
-  /* Custom Scrollbar for precise control */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: var(--glass-border-active);
-    border-radius: 20px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: var(--accent-1);
-  }
+/* Custom Scrollbar for precise control — 全局生效，不限于 .glass-panel 内 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--glass-border-active);
+  border-radius: 20px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent-1);
 }
 
 .light-mode .glass-panel {

@@ -6,7 +6,7 @@ export function MobileTopBar() {
   
   // Simple mapping to get a nice title
   let title = "詠唱机";
-  if (location.pathname.startsWith('/prompts')) title = "提示词";
+  if (location.pathname.startsWith('/prompts')) title = "创作";
   if (location.pathname.startsWith('/generate')) title = "生成";
   if (location.pathname.startsWith('/history')) title = "生成历史";
   if (location.pathname.startsWith('/vault')) title = "典藏库";
