@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { ArrowLeft, Save, UploadCloud, FileJson, Layers, Sliders, Cpu, Plus, Trash2, Maximize2, RefreshCw, Download, Code2 } from "lucide-react";
+import { ArrowLeft, Save, UploadCloud, FileJson, Layers, Sliders, Cpu, Plus, Trash2, Maximize2, RefreshCw, Download, Code2, ShieldCheck, GitBranch } from "lucide-react";
 import { useWorkflowStore, type WorkflowProject, type WorkflowType } from "../../stores/workflowStore";
 import { useModelStore } from "../../stores/modelStore";
 import { SAMPLER_OPTIONS, SCHEDULER_OPTIONS } from "../../lib/workflowOptions";
@@ -18,6 +18,10 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { comfyService } from "../../services/comfyService";
 import { getImgSrc } from "../../utils/imageUtils";
 import { toast } from "sonner";
+import { WorkflowGraph } from "../../components/workflows/WorkflowGraph";
+import { ValidationReport } from "../../components/workflows/ValidationReport";
+import { validateWorkflow, fetchComfyuiInventory, type ValidationReport as ValidationReportData, type NodeIssue } from "../../services/comfyValidator";
+import { inferWorkflowType } from "../../services/workflowCapabilities";
 
 const SDXL_RESOLUTIONS = [
   { label: "1024x1024 (1:1 方幅)", value: "1024x1024" },
@@ -59,6 +63,9 @@ export function WorkflowEdit() {
 
   const [isLoraPickerOpen, setIsLoraPickerOpen] = useState(false);
   const [showJsonEditor, setShowJsonEditor] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
+  const [validationReport, setValidationReport] = useState<ValidationReportData | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
 
   const handleExportJson = () => {
     if (!workflow.jsonContent) return;
@@ -132,6 +139,57 @@ export function WorkflowEdit() {
     };
     input.click();
   };
+
+  const handleValidate = async () => {
+    if (!workflow.jsonContent?.trim()) {
+      toast.warning("请先导入工作流 JSON");
+      return;
+    }
+    setIsValidating(true);
+    try {
+      const wfObj = JSON.parse(workflow.jsonContent);
+       const inferredType = inferWorkflowType(wfObj);
+       const wfType = workflow.type === "text2img" && inferredType !== "text2img"
+         ? inferredType
+         : (workflow.type || inferredType);
+      // 先刷新 ComfyUI 清单（节点 + 模型列表），force=true 确保每次校验都拿到最新
+      await fetchComfyuiInventory(undefined, true);
+      const report = await validateWorkflow(wfObj, wfType);
+      setValidationReport(report);
+      setShowGraph(true); // 校验后自动展开画布
+      if (report.status === "valid") {
+        toast.success("工作流校验通过！");
+      } else if (report.status === "offline") {
+        toast.info("ComfyUI 未连接，仅完成本地检查");
+      } else if (report.issues.length > 0) {
+        toast.warning(`发现 ${report.issues.length} 个问题`);
+      }
+    } catch (e) {
+      console.error("[WorkflowEdit] validation failed:", e);
+      toast.error(`校验失败：${String(e).substring(0, 200)}`);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleFixIssue = useCallback((issue: NodeIssue) => {
+    if (!issue.suggestedValue || !issue.nodeId || !workflow.jsonContent) return;
+    try {
+      const wfObj = JSON.parse(workflow.jsonContent);
+      const node = wfObj[issue.nodeId];
+      if (node && node.inputs && issue.inputKey) {
+        node.inputs[issue.inputKey] = issue.suggestedValue;
+        const updated = JSON.stringify(wfObj, null, 2);
+        updateField("jsonContent", updated);
+        toast.success(`已修正：${issue.inputKey} → ${issue.suggestedValue.slice(0, 30)}`);
+        // 修正后自动重新校验
+        setTimeout(() => handleValidate(), 300);
+      }
+    } catch (e) {
+      console.error("[WorkflowEdit] fix failed:", e);
+      toast.error("修正失败");
+    }
+  }, [workflow.jsonContent]);
 
   const handleSave = async () => {
     if (!workflow.name?.trim()) {
@@ -308,6 +366,27 @@ export function WorkflowEdit() {
             </h3>
             <div className="flex items-center gap-2">
               <button
+                onClick={handleValidate}
+                disabled={isValidating || !workflow.jsonContent}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold transition-all cursor-pointer border disabled:opacity-50 disabled:cursor-wait"
+                style={
+                  validationReport?.status === "valid"
+                    ? { background: "rgba(16,185,129,0.15)", borderColor: "rgba(16,185,129,0.3)", color: "rgb(74,222,128)" }
+                    : { background: "rgba(var(--accent-1-rgb),0.15)", borderColor: "rgba(var(--accent-1-rgb),0.3)", color: "var(--accent-1)" }
+                }
+                title="校验工作流兼容性"
+              >
+                <ShieldCheck size={14} />
+                校验
+              </button>
+              <button
+                onClick={() => setShowGraph(!showGraph)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-bold transition-colors cursor-pointer border ${showGraph ? "bg-[var(--accent-1)]/20 border-[var(--accent-1)]/40 text-[var(--accent-1)]" : "bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}
+                title="可视化预览工作流节点图"
+              >
+                <GitBranch size={14} /> 预览
+              </button>
+              <button
                 onClick={() => fetchModels(true)}
                 className="flex items-center justify-center w-8 h-8 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-lg text-[var(--text-primary)] transition-colors cursor-pointer"
                 title="刷新模型列表"
@@ -336,6 +415,38 @@ export function WorkflowEdit() {
               </button>
             </div>
           </div>
+
+          {/* ── 可视化预览 + 校验报告区 ── */}
+          {workflow.jsonContent && showGraph && (
+            <div className="flex flex-col gap-3 p-4 border-b border-[var(--glass-border)] animate-in fade-in slide-in-from-top-2 duration-300 flex-shrink-0">
+              {/* litegraph 画布 */}
+              <div className="h-[300px] flex-shrink-0">
+                <WorkflowGraph
+                  workflow={workflow.jsonContent}
+                  report={validationReport}
+                />
+              </div>
+              {/* 校验报告面板 */}
+              <ValidationReport
+                report={validationReport}
+                isValidating={isValidating}
+                onRevalidate={handleValidate}
+                onFixIssue={handleFixIssue}
+              />
+            </div>
+          )}
+
+          {/* 校验报告（画布未展开时单独显示） */}
+          {workflow.jsonContent && !showGraph && validationReport && (
+            <div className="p-4 border-b border-[var(--glass-border)]">
+              <ValidationReport
+                report={validationReport}
+                isValidating={isValidating}
+                onRevalidate={handleValidate}
+                onFixIssue={handleFixIssue}
+              />
+            </div>
+          )}
 
           {!workflow.jsonContent ? (
             <div className="flex-1 flex flex-col items-center justify-center p-10 text-center">

@@ -566,8 +566,8 @@ export function useTauriAgent() {
 
   // ── 审批操作 ──
   // approvePreview: 用户确认预览后，把用户编辑过的参数先持久化到 DB，
-  // 再发消息让 LLM 直接执行 generate_image（只传 prompt_id，从 DB 读到最新值）。
-  const approvePreview = useCallback(async (editedPreview?: GenerationPreviewAttachment, userNote?: string) => {
+  // 再唤醒当前等待中的 generate_image 工具调用。
+  const approvePreview = useCallback(async (editedPreview?: GenerationPreviewAttachment) => {
     const preview = editedPreview || activePreview;
     if (!preview) return;
     setActivePreview(null);
@@ -601,21 +601,19 @@ export function useTauriAgent() {
       }
     }
 
-    // 设置 skipNextPreview 标记 — 下次 generate_image 直接执行不再拦截弹预览
     const agent = getOrCreateAgent();
-    agent.skipNextPreview = true;
-
-    // 发消息让 LLM 直接执行 generate_image（不再弹预览）
-    let msg = "已确认参数，请直接调用 generate_image 执行生成。";
-    if (userNote) {
-      msg += `\n用户额外需求：${userNote}`;
+    const resumed = agent.resolveGenerationPreview(preview.previewId, true);
+    if (!resumed) {
+      console.warn("[approvePreview] 预览请求已结束，未发送重复确认请求", preview.previewId);
     }
-    sendMessage(msg);
-  }, [activePreview, sendMessage, getOrCreateAgent]);
+  }, [activePreview, getOrCreateAgent]);
 
   const rejectPreview = useCallback(() => {
+    if (activePreview) {
+      getOrCreateAgent().resolveGenerationPreview(activePreview.previewId, false);
+    }
     setActivePreview(null);
-  }, []);
+  }, [activePreview, getOrCreateAgent]);
 
   // ── 角色/画师选择（多选）──
   // confirmCharacters: Modal 确认后把选中项作为用户消息发给 LLM

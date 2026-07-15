@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, ImageIcon, Sparkles } from "lucide-react";
 import { useQueueStore, type CompletionNotification } from "../../stores/queueStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -71,13 +72,13 @@ export function CompletionToast() {
 
   if (notifications.length === 0) return null;
 
-  return (
+  return createPortal(
     <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] md:bottom-10 left-4 right-4 md:right-auto md:left-48 z-50 flex flex-col-reverse gap-2 pointer-events-none max-h-[80vh] overflow-hidden">
       {notifications.map((item) => (
         <div key={item.id} className="pointer-events-auto">
           <ToastItem item={item} />
         </div>
       ))}
-    </div>
+    </div>, document.body
   );
 }

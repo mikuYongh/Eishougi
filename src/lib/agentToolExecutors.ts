@@ -339,7 +339,7 @@ export async function executeTool(
       res = { status: "success", message: "后台批量打标已启动，将自动为所有创作生成标签" };
 
     } else if (fnName === 'list_local_models') {
-      await useModelStore.getState().fetchModels(true);
+      await useModelStore.getState().fetchModels(true, true);
       const { checkpoints, loras } = useModelStore.getState();
       res = { checkpoints, loras };
 

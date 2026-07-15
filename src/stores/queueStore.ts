@@ -274,7 +274,7 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         }
 
         for (let i = 0; i < batchCount; i++) {
-          const injectedWf = await comfyService.injectParameters(wfString, project);
+          const injectedWf = comfyService.toApiPrompt(await comfyService.injectParameters(wfString, project));
           if (!injectedWf) throw new Error("Failed to construct workflow JSON");
 
           const res = await invoke<any>('queue_prompt_and_track', {
@@ -377,7 +377,7 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           throw new Error("Cannot find workflow");
         }
 
-        const injectedWf = comfyService.injectVideoParameters(
+        const injectedWf = comfyService.toApiPrompt(comfyService.injectVideoParameters(
           JSON.parse(wfString),
           imageFilename,
           prompt,
@@ -386,7 +386,7 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           width,
           height,
           baseModel
-        );
+        ));
 
         const res = await invoke<any>('queue_prompt_and_track', {
           prompt: injectedWf,
