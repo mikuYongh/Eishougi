@@ -21,50 +21,49 @@ import type { ChatMessage, ChatAttachment, TokenUsage, Suggestion, GenerationPre
 // ── Tool schema definitions ──
 export function getToolDefinitions(): ToolDef[] {
   return [
-    { type: "function", function: { name: "search_prompts", description: "Search for prompts by tags, keywords, or filters.", parameters: { type: "object", properties: { tags: { type: "array", items: { type: "string" } }, limit: { type: "number" } } } } },
-    { type: "function", function: { name: "get_prompt", description: "Get a specific prompt by ID.", parameters: { type: "object", properties: { prompt_id: { type: "string" } }, required: ["prompt_id"] } } },
-    { type: "function", function: { name: "create_prompt", description: "Create a new prompt project. CHARACTER PROTECTION: For named characters, use ONLY the character name tag.", parameters: { type: "object", properties: { title: { type: "string" }, content: { type: "string" }, negative_prompt: { type: "string" }, artist_prompt: { type: "string" }, prompt_syntax: { type: "string", enum: ["danbooru", "natural", "xml"] }, tags: { type: "array", items: { type: "string" } }, instance_images: { type: "array", items: { type: "string" } }, base_model: { type: "string" }, vae_model: { type: "string" }, lora_configs: { type: "array", items: { type: "object", properties: { name: { type: "string" }, strength: { type: "number" }, enabled: { type: "boolean" } }, required: ["name", "strength", "enabled"] } }, width: { type: "number" }, height: { type: "number" }, steps: { type: "number" }, cfg_scale: { type: "number" }, seed: { type: "string" }, sampler_name: { type: "string" }, scheduler: { type: "string" }, workflow_id: { type: "string" } }, required: ["content"] } } },
-    { type: "function", function: { name: "update_prompt_content", description: "Update the textual content of an existing project.", parameters: { type: "object", properties: { prompt_id: { type: "string" }, title: { type: "string" }, positive_prompt: { type: "string" }, negative_prompt: { type: "string" }, artist_prompt: { type: "string" }, prompt_syntax: { type: "string", enum: ["danbooru", "natural", "xml"] }, tags: { type: "array", items: { type: "string" } } }, required: ["prompt_id"] } } },
-    { type: "function", function: { name: "update_prompt_settings", description: "Update configuration settings of an existing project.", parameters: { type: "object", properties: { prompt_id: { type: "string" }, base_model: { type: "string" }, vae_model: { type: "string" }, lora_configs: { type: "array", items: { type: "object", properties: { name: { type: "string" }, strength: { type: "number" }, enabled: { type: "boolean" } }, required: ["name", "strength", "enabled"] } }, width: { type: "number" }, height: { type: "number" }, steps: { type: "number" }, cfg_scale: { type: "number" }, seed: { type: "string" }, sampler_name: { type: "string" }, scheduler: { type: "string" }, workflow_id: { type: "string" } }, required: ["prompt_id"] } } },
-    { type: "function", function: { name: "delete_prompt", description: "Delete an existing prompt.", parameters: { type: "object", properties: { prompt_id: { type: "string" } }, required: ["prompt_id"] } } },
-    { type: "function", function: { name: "generate_image", description: "Generate an image. WAITS for completion and returns image paths.", parameters: { type: "object", properties: { prompt_id: { type: "string" }, batch_count: { type: "number" }, base_model: { type: "string" }, vae_model: { type: "string" }, lora_configs: { type: "array", items: { type: "object", properties: { name: { type: "string" }, strength: { type: "number" }, enabled: { type: "boolean" } }, required: ["name", "strength", "enabled"] } }, width: { type: "number" }, height: { type: "number" }, steps: { type: "number" }, cfg_scale: { type: "number" }, seed: { type: "string" }, sampler_name: { type: "string" }, scheduler: { type: "string" }, positive_prompt: { type: "string" }, negative_prompt: { type: "string" }, artist_prompt: { type: "string" }, workflow_id: { type: "string" } }, required: ["prompt_id"] } } },
-    { type: "function", function: { name: "generate_video_from_image", description: "Generate a video from an image. Source image taken from most recent image.", parameters: { type: "object", properties: { prompt: { type: "string" }, duration: { type: "number" }, fps: { type: "number" }, base_model: { type: "string" }, workflow_id: { type: "string" } }, required: ["prompt"] } } },
+    { type: "function", function: { name: "search_prompts", description: "Search for prompts by tags, keywords, or filters.", parameters: { type: "object", properties: { tags: { type: "array", items: { type: "string" }, description: "Tag list to filter by" }, limit: { type: "number", description: "Max results (default 20)" } } } } },
+    { type: "function", function: { name: "get_prompt", description: "Get a specific prompt by ID.", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The prompt project ID (e.g. p_xxx)" } }, required: ["prompt_id"] } } },
+    { type: "function", function: { name: "create_prompt", description: "Create a new prompt project. CHARACTER PROTECTION: For named characters, use ONLY the character name tag.", parameters: { type: "object", properties: { title: { type: "string", description: "Project title" }, content: { type: "string", description: "Positive prompt text (Danbooru tags)" }, negative_prompt: { type: "string", description: "Negative prompt" }, artist_prompt: { type: "string", description: "Artist style tags" }, prompt_syntax: { type: "string", enum: ["danbooru", "natural", "xml"], description: "Syntax mode" }, tags: { type: "array", items: { type: "string" }, description: "Category tags for organization" }, instance_images: { type: "array", items: { type: "string" }, description: "Reference image paths" }, base_model: { type: "string", description: "Checkpoint/base model filename" }, vae_model: { type: "string", description: "VAE model filename" }, lora_configs: { type: "array", items: { type: "object", properties: { name: { type: "string", description: "LoRA filename" }, strength: { type: "number", description: "Strength 0.0-2.0 (default 1.0)" }, enabled: { type: "boolean", description: "Whether this LoRA is active" } }, required: ["name", "strength", "enabled"] } }, width: { type: "number", description: "Image width px (e.g. 512, 768, 1024)" }, height: { type: "number", description: "Image height px" }, steps: { type: "number", description: "Sampling steps (typically 20-40)" }, cfg_scale: { type: "number", description: "CFG scale 1.0-20.0 (typically 5-8)" }, seed: { type: "string", description: "Random seed as string. Use '-1' for random." }, sampler_name: { type: "string", description: "Sampler name (e.g. euler, dpmpp_2m)" }, scheduler: { type: "string", description: "Scheduler (e.g. karras, normal)" }, workflow_id: { type: "string", description: "Custom workflow ID" } }, required: ["content"] } } },
+    { type: "function", function: { name: "update_prompt_content", description: "Update the textual content of an existing project.", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The project ID to update" }, title: { type: "string", description: "New title" }, positive_prompt: { type: "string", description: "New positive prompt" }, negative_prompt: { type: "string", description: "New negative prompt" }, artist_prompt: { type: "string", description: "New artist tags" }, prompt_syntax: { type: "string", enum: ["danbooru", "natural", "xml"], description: "Syntax mode" }, tags: { type: "array", items: { type: "string" }, description: "New tags" } }, required: ["prompt_id"] } } },
+    { type: "function", function: { name: "update_prompt_settings", description: "Update configuration settings of an existing project.", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The project ID to update" }, base_model: { type: "string", description: "Checkpoint filename" }, vae_model: { type: "string", description: "VAE filename" }, lora_configs: { type: "array", items: { type: "object", properties: { name: { type: "string", description: "LoRA filename" }, strength: { type: "number", description: "Strength 0.0-2.0" }, enabled: { type: "boolean" } }, required: ["name", "strength", "enabled"] } }, width: { type: "number", description: "Width px" }, height: { type: "number", description: "Height px" }, steps: { type: "number", description: "Sampling steps" }, cfg_scale: { type: "number", description: "CFG scale" }, seed: { type: "string", description: "Seed string ('-1' = random)" }, sampler_name: { type: "string", description: "Sampler" }, scheduler: { type: "string", description: "Scheduler" }, workflow_id: { type: "string", description: "Workflow ID" } }, required: ["prompt_id"] } } },
+    { type: "function", function: { name: "delete_prompt", description: "Delete an existing prompt.", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "Project ID to delete" } }, required: ["prompt_id"] } } },
+    { type: "function", function: { name: "generate_image", description: "Generate an image. WAITS for completion and returns image paths. CRITICAL: Only pass prompt_id — all other params (model, size, steps, cfg, prompt, etc.) are read from the project's saved settings. Do NOT pass any optional param unless the user explicitly asked to change that specific param. Never invent or auto-fill parameters.", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The project to generate from" }, batch_count: { type: "number", description: "Number of images (default 1). Only set if user asks for multiple." }, base_model: { type: "string", description: "ONLY set if user explicitly asked to change the model. Otherwise omit — uses project's saved model." }, vae_model: { type: "string", description: "ONLY set if user explicitly asked to change VAE. Otherwise omit." }, lora_configs: { type: "array", items: { type: "object", properties: { name: { type: "string" }, strength: { type: "number" }, enabled: { type: "boolean" } }, required: ["name", "strength", "enabled"] } }, width: { type: "number", description: "ONLY set if user explicitly asked to change size. Otherwise omit." }, height: { type: "number", description: "ONLY set if user explicitly asked to change size. Otherwise omit." }, steps: { type: "number", description: "ONLY set if user explicitly asked to change steps. Otherwise omit." }, cfg_scale: { type: "number", description: "ONLY set if user explicitly asked to change CFG. Otherwise omit." }, seed: { type: "string", description: "ONLY set if user explicitly asked to use a specific seed. Otherwise omit (random)." }, sampler_name: { type: "string", description: "ONLY set if user explicitly asked to change sampler. Otherwise omit." }, scheduler: { type: "string", description: "ONLY set if user explicitly asked to change scheduler. Otherwise omit." }, positive_prompt: { type: "string", description: "ONLY set if user explicitly asked to modify the prompt. Otherwise omit — uses project's saved prompt." }, negative_prompt: { type: "string", description: "ONLY set if user explicitly asked to change negative prompt. Otherwise omit." }, artist_prompt: { type: "string", description: "ONLY set if user explicitly asked to change artist. Otherwise omit." }, workflow_id: { type: "string", description: "ONLY set if user explicitly asked to use a specific workflow. Otherwise omit." } }, required: ["prompt_id"] } } },
+    { type: "function", function: { name: "generate_video_from_image", description: "Generate a video from an image. Source image is taken from the most recently generated image in the conversation.", parameters: { type: "object", properties: { prompt: { type: "string", description: "Motion/action description for the video" }, duration: { type: "number", description: "Video duration in seconds" }, fps: { type: "number", description: "Frames per second" }, base_model: { type: "string", description: "Video model" }, workflow_id: { type: "string", description: "Custom workflow ID" } }, required: ["prompt"] } } },
     { type: "function", function: { name: "get_queue_status", description: "Get generation queue status.", parameters: { type: "object", properties: {} } } },
-    { type: "function", function: { name: "search_workflows", description: "Search workflows.", parameters: { type: "object", properties: { tags: { type: "array", items: { type: "string" } }, limit: { type: "number" } } } } },
-    { type: "function", function: { name: "get_workflow", description: "Get workflow by ID.", parameters: { type: "object", properties: { workflow_id: { type: "string" } }, required: ["workflow_id"] } } },
-    { type: "function", function: { name: "create_workflow", description: "Create a workflow.", parameters: { type: "object", properties: { title: { type: "string" }, description: { type: "string" }, workflow_json: { type: "object" }, tags: { type: "array", items: { type: "string" } } }, required: ["title"] } } },
-    { type: "function", function: { name: "update_workflow", description: "Update a workflow.", parameters: { type: "object", properties: { workflow_id: { type: "string" }, title: { type: "string" }, description: { type: "string" }, workflow_json: { type: "object" }, tags: { type: "array", items: { type: "string" } } }, required: ["workflow_id"] } } },
-    { type: "function", function: { name: "delete_workflow", description: "Delete a workflow.", parameters: { type: "object", properties: { workflow_id: { type: "string" } }, required: ["workflow_id"] } } },
-    { type: "function", function: { name: "get_generated_images", description: "Get generated images from history.", parameters: { type: "object", properties: { prompt_id: { type: "string" }, limit: { type: "number" } } } } },
-    { type: "function", function: { name: "add_instance_image", description: "Add image to prompt's instance images.", parameters: { type: "object", properties: { prompt_id: { type: "string" }, image_url: { type: "string" } }, required: ["prompt_id", "image_url"] } } },
-    { type: "function", function: { name: "auto_tag_all_prompts", description: "Batch auto-tag all prompts.", parameters: { type: "object", properties: {} } } },
-    { type: "function", function: { name: "list_local_models", description: "List local models.", parameters: { type: "object", properties: {} } } },
-    { type: "function", function: { name: "install_custom_node", description: "Install ComfyUI custom node.", parameters: { type: "object", properties: { node_url: { type: "string" }, comfy_dir: { type: "string" } }, required: ["node_url"] } } },
-    { type: "function", function: { name: "check_comfyui_status", description: "Check ComfyUI status.", parameters: { type: "object", properties: { url: { type: "string" } } } } },
-    { type: "function", function: { name: "list_character_series", description: "List character series.", parameters: { type: "object", properties: { search: { type: "string" }, limit: { type: "number" }, offset: { type: "number" } } } } },
-    { type: "function", function: { name: "search_characters_in_series", description: "Search characters in series.", parameters: { type: "object", properties: { series: { type: "string" }, search: { type: "string" }, limit: { type: "number" }, offset: { type: "number" } }, required: ["series"] } } },
-    { type: "function", function: { name: "search_artists", description: "Search artists.", parameters: { type: "object", properties: { search: { type: "string" }, limit: { type: "number" }, offset: { type: "number" } } } } },
-    { type: "function", function: { name: "random_character_and_artist", description: "Random character + artist.", parameters: { type: "object", properties: { series: { type: "string" }, use_artist: { type: "boolean" } } } } },
-    { type: "function", function: { name: "view_bookmarks", description: "ONLY for bookmarks.", parameters: { type: "object", properties: { tags: { type: "array", items: { type: "string" } }, tag_match: { type: "string", enum: ["or", "and"] }, search: { type: "string" }, limit: { type: "number" }, offset: { type: "number" } } } } },
-    { type: "function", function: { name: "add_favorite_character", description: "Add favorite character.", parameters: { type: "object", properties: { character_tag: { type: "string" }, source: { type: "string", enum: ["gallery", "lora", "custom", "unknown"] }, display_name: { type: "string" }, trigger: { type: "string" }, example_image: { type: "string" }, notes: { type: "string" }, tags: { type: "array", items: { type: "string" } } }, required: ["character_tag"] } } },
-    { type: "function", function: { name: "update_favorite_character", description: "Update favorite character.", parameters: { type: "object", properties: { id: { type: "string" }, display_name: { type: "string" }, trigger: { type: "string" }, example_image: { type: "string" }, notes: { type: "string" } }, required: ["id"] } } },
-    { type: "function", function: { name: "remove_favorite_character", description: "Remove favorite character.", parameters: { type: "object", properties: { id: { type: "string" }, character_tag: { type: "string" } } } } },
-    { type: "function", function: { name: "relink_favorite_character", description: "Relink favorite character.", parameters: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } } },
-    { type: "function", function: { name: "add_tags_to_favorite_character", description: "Add tags to favorite.", parameters: { type: "object", properties: { character_id: { type: "string" }, tags: { type: "array", items: { type: "string" } } }, required: ["character_id", "tags"] } } },
-    { type: "function", function: { name: "remove_tag_from_favorite_character", description: "Remove tag from favorite.", parameters: { type: "object", properties: { character_id: { type: "string" }, tag: { type: "string" } }, required: ["character_id", "tag"] } } },
-    { type: "function", function: { name: "set_favorite_character_tags", description: "Set favorite tags.", parameters: { type: "object", properties: { character_id: { type: "string" }, tags: { type: "array", items: { type: "string" } } }, required: ["character_id", "tags"] } } },
-    { type: "function", function: { name: "list_favorite_character_tags", description: "List favorite tags.", parameters: { type: "object", properties: {} } } },
-    { type: "function", function: { name: "view_bookmarked_artists", description: "Bookmarked artists.", parameters: { type: "object", properties: { search: { type: "string" }, limit: { type: "number" }, offset: { type: "number" } } } } },
-    { type: "function", function: { name: "add_favorite_artist", description: "Add favorite artist.", parameters: { type: "object", properties: { artist_tag: { type: "string" }, source: { type: "string", enum: ["gallery", "lora", "custom", "unknown"] }, display_name: { type: "string" }, trigger: { type: "string" }, example_image: { type: "string" }, notes: { type: "string" } }, required: ["artist_tag"] } } },
-    { type: "function", function: { name: "update_favorite_artist", description: "Update favorite artist.", parameters: { type: "object", properties: { id: { type: "string" }, display_name: { type: "string" }, trigger: { type: "string" }, example_image: { type: "string" }, notes: { type: "string" } }, required: ["id"] } } },
-    { type: "function", function: { name: "remove_favorite_artist", description: "Remove favorite artist.", parameters: { type: "object", properties: { id: { type: "string" }, artist_tag: { type: "string" } } } } },
+    { type: "function", function: { name: "search_workflows", description: "Search workflows.", parameters: { type: "object", properties: { tags: { type: "array", items: { type: "string" }, description: "Tags to filter" }, limit: { type: "number", description: "Max results" } } } } },
+    { type: "function", function: { name: "get_workflow", description: "Get workflow by ID.", parameters: { type: "object", properties: { workflow_id: { type: "string", description: "Workflow ID" } }, required: ["workflow_id"] } } },
+    { type: "function", function: { name: "create_workflow", description: "Create a workflow.", parameters: { type: "object", properties: { title: { type: "string", description: "Workflow name" }, description: { type: "string", description: "Description" }, workflow_json: { type: "object", description: "ComfyUI API JSON" }, tags: { type: "array", items: { type: "string" } } }, required: ["title"] } } },
+    { type: "function", function: { name: "update_workflow", description: "Update a workflow.", parameters: { type: "object", properties: { workflow_id: { type: "string", description: "Workflow ID" }, title: { type: "string" }, description: { type: "string" }, workflow_json: { type: "object", description: "New ComfyUI API JSON" }, tags: { type: "array", items: { type: "string" } } }, required: ["workflow_id"] } } },
+    { type: "function", function: { name: "delete_workflow", description: "Delete a workflow.", parameters: { type: "object", properties: { workflow_id: { type: "string", description: "Workflow ID" } }, required: ["workflow_id"] } } },
+    { type: "function", function: { name: "get_generated_images", description: "Get generated images from history.", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "Filter by project ID" }, limit: { type: "number", description: "Max images to return" } } } } },
+    { type: "function", function: { name: "add_instance_image", description: "Add image to prompt's instance images (for img2img reference).", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "Project ID" }, image_url: { type: "string", description: "Image file path or URL" } }, required: ["prompt_id", "image_url"] } } },
+    { type: "function", function: { name: "auto_tag_all_prompts", description: "Batch auto-tag all prompts using the tagger model.", parameters: { type: "object", properties: {} } } },
+    { type: "function", function: { name: "list_local_models", description: "List all local ComfyUI models (checkpoints, VAEs, LoRAs).", parameters: { type: "object", properties: {} } } },
+    { type: "function", function: { name: "install_custom_node", description: "Install a ComfyUI custom node from a Git URL.", parameters: { type: "object", properties: { node_url: { type: "string", description: "Git repository URL" }, comfy_dir: { type: "string", description: "ComfyUI installation directory" } }, required: ["node_url"] } } },
+    { type: "function", function: { name: "check_comfyui_status", description: "Check if ComfyUI is online and get system stats.", parameters: { type: "object", properties: { url: { type: "string", description: "Optional ComfyUI URL override (defaults to user settings)" } } } } },
+    { type: "function", function: { name: "list_character_series", description: "List all available character series/copyrights (e.g. genshin_impact, blue_archive).", parameters: { type: "object", properties: { search: { type: "string", description: "Filter by name" }, limit: { type: "number", description: "Max results" }, offset: { type: "number", description: "Pagination offset" } } } } },
+    { type: "function", function: { name: "search_characters_in_series", description: "Search for characters within a specific series.", parameters: { type: "object", properties: { series: { type: "string", description: "Series tag (e.g. genshin_impact)" }, search: { type: "string", description: "Character name to search" }, limit: { type: "number", description: "Max results" }, offset: { type: "number", description: "Pagination offset" } }, required: ["series"] } } },
+    { type: "function", function: { name: "search_artists", description: "Search artists in the local database (15,000+ artists).", parameters: { type: "object", properties: { search: { type: "string", description: "Artist name to search" }, limit: { type: "number", description: "Max results" }, offset: { type: "number", description: "Pagination offset" } } } } },
+    { type: "function", function: { name: "random_character_and_artist", description: "Get a random character and optionally a matching artist.", parameters: { type: "object", properties: { series: { type: "string", description: "Optional series to pick from" }, use_artist: { type: "boolean", description: "Also return a matching artist" } } } } },
+    { type: "function", function: { name: "view_bookmarks", description: "View bookmarked/favorite characters ONLY.", parameters: { type: "object", properties: { tags: { type: "array", items: { type: "string" }, description: "Filter by tags" }, tag_match: { type: "string", enum: ["or", "and"], description: "Tag matching mode" }, search: { type: "string", description: "Search query" }, limit: { type: "number", description: "Max results" }, offset: { type: "number", description: "Pagination offset" } } } } },
+    { type: "function", function: { name: "add_favorite_character", description: "Add a character to the favorites/bookmarks library.", parameters: { type: "object", properties: { character_tag: { type: "string", description: "Danbooru character tag" }, source: { type: "string", enum: ["gallery", "lora", "custom", "unknown"], description: "Where the character was sourced from" }, display_name: { type: "string", description: "Display name" }, trigger: { type: "string", description: "Trigger words for LoRA" }, example_image: { type: "string", description: "Example image path (must already exist)" }, notes: { type: "string", description: "Notes" }, tags: { type: "array", items: { type: "string" }, description: "Tags" } }, required: ["character_tag"] } } },
+    { type: "function", function: { name: "update_favorite_character", description: "Update a favorite character entry.", parameters: { type: "object", properties: { id: { type: "string", description: "Entry ID" }, display_name: { type: "string" }, trigger: { type: "string" }, example_image: { type: "string" }, notes: { type: "string" } }, required: ["id"] } } },
+    { type: "function", function: { name: "remove_favorite_character", description: "Remove a character from favorites.", parameters: { type: "object", properties: { id: { type: "string", description: "Entry ID" }, character_tag: { type: "string", description: "Character tag (alternative to ID)" } } } } },
+    { type: "function", function: { name: "relink_favorite_character", description: "Relink a favorite character to its source.", parameters: { type: "object", properties: { id: { type: "string", description: "Entry ID" } }, required: ["id"] } } },
+    { type: "function", function: { name: "add_tags_to_favorite_character", description: "Add tags to a favorite character.", parameters: { type: "object", properties: { character_id: { type: "string", description: "Entry ID" }, tags: { type: "array", items: { type: "string" }, description: "Tags to add" } }, required: ["character_id", "tags"] } } },
+    { type: "function", function: { name: "remove_tag_from_favorite_character", description: "Remove a tag from a favorite character.", parameters: { type: "object", properties: { character_id: { type: "string", description: "Entry ID" }, tag: { type: "string", description: "Tag to remove" } }, required: ["character_id", "tag"] } } },
+    { type: "function", function: { name: "set_favorite_character_tags", description: "Set (replace) all tags for a favorite character.", parameters: { type: "object", properties: { character_id: { type: "string", description: "Entry ID" }, tags: { type: "array", items: { type: "string" }, description: "New tag list" } }, required: ["character_id", "tags"] } } },
+    { type: "function", function: { name: "list_favorite_character_tags", description: "List all tags used across favorite characters.", parameters: { type: "object", properties: {} } } },
+    { type: "function", function: { name: "view_bookmarked_artists", description: "View bookmarked/favorite artists ONLY.", parameters: { type: "object", properties: { search: { type: "string", description: "Search query" }, limit: { type: "number", description: "Max results" }, offset: { type: "number", description: "Pagination offset" } } } } },
+    { type: "function", function: { name: "add_favorite_artist", description: "Add an artist to favorites.", parameters: { type: "object", properties: { artist_tag: { type: "string", description: "Danbooru artist tag" }, source: { type: "string", enum: ["gallery", "lora", "custom", "unknown"], description: "Source" }, display_name: { type: "string" }, trigger: { type: "string" }, example_image: { type: "string" }, notes: { type: "string" } }, required: ["artist_tag"] } } },
+    { type: "function", function: { name: "update_favorite_artist", description: "Update a favorite artist entry.", parameters: { type: "object", properties: { id: { type: "string", description: "Entry ID" }, display_name: { type: "string" }, trigger: { type: "string" }, example_image: { type: "string" }, notes: { type: "string" } }, required: ["id"] } } },
+    { type: "function", function: { name: "remove_favorite_artist", description: "Remove an artist from favorites.", parameters: { type: "object", properties: { id: { type: "string", description: "Entry ID" }, artist_tag: { type: "string", description: "Artist tag" } } } } },
     // ── 人机交互工具（client-defined tools）──
     // 这些工具由 AI 主动调用来触发前端 UI 交互。前端拦截这些调用，
     // 弹出对应的选择器/预览/建议 UI，用户交互后结果通过新消息返回给 AI。
     { type: "function", function: { name: "select_characters", description: "Open the character/artist library picker for the user to select from the local database of 36,000+ characters or 15,000+ artists. Use this when the user needs to choose specific characters or artists from search results. The picker supports multi-select, search, and series filtering.", parameters: { type: "object", properties: { kind: { type: "string", enum: ["character", "artist"], description: "Whether to show the character picker or artist picker" }, series: { type: "string", description: "Optional series/copyright filter to pre-select (e.g. 'genshin_impact', 'wuthering_waves')" } }, required: ["kind"] } } },
-    { type: "function", function: { name: "confirm_generation", description: "Show a generation preview card for the user to review and edit image generation parameters before executing. Use this in focus mode before calling generate_image, or whenever you want the user to confirm/edit the generation settings (model, size, steps, CFG, LoRA, prompts).", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The prompt project ID to generate from" }, prompt: { type: "string" }, negative_prompt: { type: "string" }, artist_prompt: { type: "string" }, model: { type: "string" }, width: { type: "number" }, height: { type: "number" }, steps: { type: "number" }, cfg_scale: { type: "number" }, sampler: { type: "string" }, scheduler: { type: "string" }, loras: { type: "array", items: { type: "object", properties: { name: { type: "string" }, strength: { type: "number" }, enabled: { type: "boolean" } } } } }, required: ["prompt_id"] } } },
     { type: "function", function: { name: "show_suggestions", description: "Display a set of clickable suggestion buttons to the user. Each suggestion has a title (short Chinese name) and a message (full modification instruction with Danbooru tags). The user clicks one to apply it. Use this when you want to offer the user multiple differentiated options (e.g. different poses, scenes, outfits, expressions).", parameters: { type: "object", properties: { suggestions: { type: "array", items: { type: "object", properties: { title: { type: "string", description: "Short Chinese name (2-5 chars)" }, message: { type: "string", description: "Full modification instruction with Danbooru English tags, e.g. 'Change scene to bathroom, add tiles, shower, wet_skin and regenerate'" } }, required: ["title", "message"] } } }, required: ["suggestions"] } } },
-    { type: "function", function: { name: "select_model", description: "Open a model picker for the user to choose a base model (checkpoint) from their local ComfyUI models. Use this when the user wants to change/switch the base model (e.g. '换个模型', '用xx模型生成'). The user selects a model and it will be applied to the current prompt project.", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The prompt project to apply the selected model to" }, kind: { type: "string", enum: ["checkpoint", "vae", "lora"], description: "Type of model to pick. Default: checkpoint (base model)." } }, required: [] } } },
+    { type: "function", function: { name: "select_model", description: "Open a model picker for the user to choose a base model (checkpoint), VAE, or LoRA from their local ComfyUI models. ONLY use when the user explicitly mentions changing the MODEL ('换个模型', '换base model', '换checkpoint', '换VAE'). Do NOT use this for changing art style — '换画师风格'/'换画风' means changing the artist_prompt tags, use update_prompt_content instead.", parameters: { type: "object", properties: { prompt_id: { type: "string", description: "The prompt project to apply the selected model to" }, kind: { type: "string", enum: ["checkpoint", "vae", "lora"], description: "Type of model to pick. Default: checkpoint (base model)." } }, required: [] } } },
   ];
 }
 
@@ -165,6 +164,12 @@ export function useTauriAgent() {
       systemContext += buildOutputSpec("danbooru");
     }
     return agentSettings.systemPrompt + systemContext
+      + "\n\n## ⛔ 生成参数保护规则（最高优先级）"
+      + "\n**调用 generate_image 时，严禁擅自修改任何参数。** 只传 prompt_id，其余参数（model/width/height/steps/cfg/seed/sampler/prompt 等）全部留空，让系统从项目保存的设置读取。"
+      + "\n只有在以下情况才能传某个参数：用户**明确**说了要改那个参数（如『把尺寸改成1024』『换个seed』）。"
+      + "\n❌ 错误：generate_image(prompt_id=\"xxx\", width=1024, height=1024, steps=30) — 用户没要求改这些！"
+      + "\n✅ 正确：generate_image(prompt_id=\"xxx\") — 用项目已有设置生成。"
+      + "\n⚠️ 即使你觉得某个参数值不理想，也绝对不要自作主张调整——除非用户说了。"
       + "\n\n## 工具路由规则"
       + "\n用户问\"有什么角色\" → list_character_series"
       + "\n用户问\"有什么画师\" → search_artists"
@@ -176,7 +181,7 @@ export function useTauriAgent() {
       + "\n3. 都搜不到 → 用你自己的 Danbooru 知识推断角色 tag，创建 prompt 生成，告诉用户'用了推断的 tag，不准请纠正'"
       + "\n⚠️ 绝对不要因为搜不到角色就卡住问用户——先用自己的知识生成，让用户看结果再说。"
       + "\n\n## 人机交互工具（client-defined tools）"
-      + "\n你有 3 个专门的交互工具，用于在需要时让用户参与决策。**由你决定何时调用**，不要等待用户指令。"
+      + "\n你有 4 个专门的交互工具，用于在需要时让用户参与决策。**由你决定何时调用**，不要等待用户指令。"
       + "\n"
       + "\n### select_characters（角色/画师选择器）"
       + "\n**搜索到角色后，直接调用 select_characters 让用户选。** 不要用文本列表展示角色让用户打字选——文本列表体验差，选择器支持搜索、多选、图片预览。"
@@ -185,11 +190,14 @@ export function useTauriAgent() {
       + "\n⚠️ 搜索返回空数组时不调 select_characters（空的选择器没意义）。"
       + "\n⚠️ 不要问用户\"要不要打开选择器\"——直接调。"
       + "\n"
-      + "\n### confirm_generation（生图参数确认）"
+      + "\n### 生图流程（专注模式）"
       + (agentSettings.focusMode
-        ? "\n专注模式已开启：生成图片前，【必须先调用 confirm_generation】让用户确认/编辑参数（模型、尺寸、步数、CFG、LoRA 等）。"
-        + "\n用户确认后会发消息让你继续，你再调 generate_image 执行生成。"
-        : "\n当你想给用户一个确认/编辑参数的机会时调用。非专注模式下可选。")
+        ? "\n⚠️ 专注模式已开启。当你准备好生成图片时，【直接调用 generate_image 工具】，只传 prompt_id，不要传其他参数。"
+        + "\n系统会自动拦截 generate_image 调用，从项目数据库读取真实参数弹出预览卡片让用户确认/修改，用户确认后系统自动执行生成。"
+        + "\n你不需要等用户回复\"确认\"，也不需要调任何额外工具。直接调 generate_image(prompt_id=...) 即可。"
+        + "\n❌ 错误做法：输出\"确认没问题跟我说\"然后等用户回复，或调用 confirm_generation"
+        + "\n✅ 正确做法：直接调用 generate_image(prompt_id=...) 工具"
+        : "\n当你准备调用 generate_image 时，直接调用即可，只传 prompt_id。系统会从项目读取已有参数，不需要你传。")
       + "\n"
       + "\n### show_suggestions（推荐方案）"
       + "\n当你想给用户展示多个可选的修改方案时调用（如推荐不同姿势/场景/服装/表情/玩法）。"
@@ -200,7 +208,9 @@ export function useTauriAgent() {
       + "\n⚠️ 调用 show_suggestions 时不要同时调用 generate_image 或其他修改工具。"
       + "\n"
       + "\n### select_model（模型选择器）"
-      + "\n当用户想换基础模型/VAE/LoRA 时调用。用户说\"换个模型\"、\"用XX模型\"时，调 select_model(prompt_id=\"xxx\", kind=\"checkpoint\") 弹出模型列表让用户选。"
+      + "\n当用户想换基础模型/VAE/LoRA 时调用。**仅在用户明确提到『模型』二字时使用**，例如\"换个模型\"、\"用XX模型\"、\"换个checkpoint\"。"
+      + "\n⚠️ 区分：用户说\"换画师风格\"、\"换画风\"、\"换个风格\" → 这是改 artist_prompt（画师标签），用 update_prompt_content，**不是** select_model。"
+      + "\n⚠️ 区分：用户说\"换LoRA\"、\"换个角色LoRA\" → 可以用 select_model(kind=\"lora\")。"
       + "\n用户选好后会发消息告诉你选了哪个模型，你再据此 update_prompt_settings。";
   }, [agentSettings.systemPrompt, agentSettings.focusMode]);
 
@@ -218,7 +228,10 @@ export function useTauriAgent() {
       getSystemPrompt: () => systemPromptRef.current(),
       getTools: getToolDefinitions,
       getMcpTools: () => mcpTools,
-      getAgentSettings: () => agentSettingsRef.current,
+      getAgentSettings: () => {
+        const s = agentSettingsRef.current;
+        return { effort: s.effort, maxRounds: s.maxRounds, focusMode: s.focusMode };
+      },
       onTokenUsage: (usage) => {
         tokenUsageRef.current = tokenUsageRef.current
           ? { promptTokens: tokenUsageRef.current.promptTokens + usage.promptTokens, completionTokens: tokenUsageRef.current.completionTokens + usage.completionTokens, totalTokens: tokenUsageRef.current.totalTokens + usage.totalTokens }
@@ -255,17 +268,24 @@ export function useTauriAgent() {
     }
     if (!text.trim() && attachments.length === 0) return;
 
-    const inlineTextExtensions = ["txt", "md", "json", "yaml", "yml", "csv", "html", "css", "js", "ts", "tsx", "jsx", "py", "rs", "java", "c", "cpp", "h", "sh", "xml", "svg", "log"];
+    const inlineTextExtensions = ["txt", "md", "json", "yaml", "yml", "csv", "html", "css", "js", "ts", "tsx", "jsx", "py", "rs", "java", "c", "cpp", "h", "sh", "xml", "svg", "log", "go", "kt", "swift", "php", "rb", "toml", "ini", "conf"];
     // LLM 收到的内容（含文件内容）；UI 显示只用原始 text
     let llmContent = text;
     const imagePaths: string[] = [];
+    // 文件截断阈值 — 根据用户 maxTokens 设置动态计算，避免小 context 时上传大文件撑爆
+    // 20000 字符 ≈ 5000 token（英文）/ 10000 token（中文），约占 8192 maxTokens 的 60-120%
+    // 对小 context 用户适当降低，大 context 用户适当提高
+    const maxTokens = useSettingsStore.getState().settings.llm.maxTokens ?? 8192;
+    const fileCharLimit = Math.min(100000, Math.max(20000, Math.floor(maxTokens * 4)));
     for (const att of attachments) {
       if (att.isImage) { imagePaths.push(att.path); continue; }
       const ext = att.name.split(".").pop()?.toLowerCase() || "";
       if (inlineTextExtensions.includes(ext)) {
         try {
           const fileContent = await invoke<string>("read_text_file", { path: att.path });
-          const truncated = fileContent.length > 20000 ? fileContent.substring(0, 20000) + `\n... [truncated]` : fileContent;
+          const truncated = fileContent.length > fileCharLimit
+            ? fileContent.substring(0, fileCharLimit) + `\n... [truncated, original ${fileContent.length} chars, showed ${fileCharLimit}]`
+            : fileContent;
           llmContent += `\n\n--- ${att.name} ---\n\`\`\`\n${truncated}\n\`\`\`\n`;
         } catch (e) { llmContent += `\n\n[Attachment ${att.name} read failed]`; }
       } else {
@@ -397,9 +417,25 @@ export function useTauriAgent() {
           onCustomEvent: ({ event }: any) => {
             if (event.name === "suggestion") {
               const val = event.value;
-              // 自动注入（generate_image 后兜底）：只有固定维度，不追加
+              const FIXED_DIMS = [
+                { title: "推荐场景", message: "推荐场景", confirm: true },
+                { title: "推荐姿势", message: "推荐姿势", confirm: true },
+                { title: "推荐服装", message: "推荐服装", confirm: true },
+                { title: "推荐表情", message: "推荐表情", confirm: true },
+                { title: "推荐玩法", message: "推荐玩法", confirm: true },
+              ];
               if (val?._auto) {
-                setSuggestions([...val.items]);
+                // generate_image 后兜底注入：只追加固定维度，不清空已有建议
+                // （AI 可能已经通过 show_suggestions 给了具体建议，不应被覆盖）
+                setSuggestions((prev) => {
+                  // 如果已有 AI 给的具体建议（非纯固定维度），只追加固定维度中尚未出现的
+                  if (prev.length > 0) {
+                    const existingTitles = new Set(prev.map((s) => s.title));
+                    const newDims = FIXED_DIMS.filter((d) => !existingTitles.has(d.title));
+                    return newDims.length > 0 ? [...prev, ...newDims] : prev;
+                  }
+                  return [...val.items];
+                });
               } else {
                 // AI 通过 show_suggestions 给的具体建议 + 追加固定维度
                 const aiSuggestions = [...(val || [])];
@@ -411,14 +447,7 @@ export function useTauriAgent() {
                   );
                   refineDimRef.current = null;
                 }
-                const fixedDims = [
-                  { title: "推荐场景", message: "推荐场景", confirm: true },
-                  { title: "推荐姿势", message: "推荐姿势", confirm: true },
-                  { title: "推荐服装", message: "推荐服装", confirm: true },
-                  { title: "推荐表情", message: "推荐表情", confirm: true },
-                  { title: "推荐玩法", message: "推荐玩法", confirm: true },
-                ];
-                setSuggestions([...aiSuggestions, ...fixedDims]);
+                setSuggestions([...aiSuggestions, ...FIXED_DIMS]);
               }
             } else if (event.name === "gen_preview") {
               setActivePreview(event.value);
@@ -435,6 +464,11 @@ export function useTauriAgent() {
                 kind: event.value?.kind || "checkpoint",
                 promptId: event.value?.promptId || null,
               });
+            } else if (event.name === "tool_images") {
+              // 工具执行返回的图片路径 — 挂到 toolImagesMap 供后续 syncAgentMessagesToStore 使用
+              if (event.value?.toolCallId && Array.isArray(event.value?.images)) {
+                toolImagesMap.set(event.value.toolCallId, event.value.images);
+              }
             }
           },
         },
@@ -522,6 +556,12 @@ export function useTauriAgent() {
     setSuggestions([]);
     setActivePreview(null);
     setCharacterModal(null);
+    setModelModal(null);
+    refineDimRef.current = null;
+    // 切会话时清空 agent 实例（释放 _imageCache 内存，避免旧会话图片缓存串扰新会话）
+    if (agentRef.current) {
+      agentRef.current = null;
+    }
   }, [activeSessionId]);
 
   // ── 审批操作 ──
@@ -561,13 +601,17 @@ export function useTauriAgent() {
       }
     }
 
+    // 设置 skipNextPreview 标记 — 下次 generate_image 直接执行不再拦截弹预览
+    const agent = getOrCreateAgent();
+    agent.skipNextPreview = true;
+
     // 发消息让 LLM 直接执行 generate_image（不再弹预览）
     let msg = "已确认参数，请直接调用 generate_image 执行生成。";
     if (userNote) {
       msg += `\n用户额外需求：${userNote}`;
     }
     sendMessage(msg);
-  }, [activePreview, sendMessage]);
+  }, [activePreview, sendMessage, getOrCreateAgent]);
 
   const rejectPreview = useCallback(() => {
     setActivePreview(null);

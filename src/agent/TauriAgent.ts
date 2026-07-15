@@ -47,15 +47,15 @@ export interface ToolDef {
 
 export interface TauriAgentConfig {
   /** 获取当前 LLM 配置（每次 run 时动态读取，因为用户可能随时改设置） */
-  getLlmConfig: () => { apiUrl: string; apiKey: string; model: string; temperature: number; maxTokens: number; provider: string; reasoningEnabled: boolean };
+  getLlmConfig: () => { apiUrl: string; apiKey: string; model: string; temperature: number; maxTokens: number | undefined; provider: string; reasoningEnabled: boolean };
   /** 获取 system prompt */
   getSystemPrompt: () => string;
   /** 获取工具定义列表 */
   getTools: () => ToolDef[];
   /** 获取 MCP 工具列表 */
   getMcpTools: () => any[];
-  /** 获取当前 agent 设置（effort, maxRounds, reasoningEffort, focusMode） */
-  getAgentSettings: () => { effort: string; maxRounds: number; reasoningEffort: string; focusMode: boolean };
+  /** 获取当前 agent 设置（effort, maxRounds, focusMode） */
+  getAgentSettings: () => { effort: string; maxRounds: number; focusMode: boolean };
   /** 回调：token 使用量更新 */
   onTokenUsage?: (usage: TokenUsage) => void;
   /** 回调：添加消息到 store */
@@ -137,6 +137,13 @@ export class TauriAgent extends AbstractAgent {
   private config: TauriAgentConfig;
   // 图片路径 → data URL 缓存，避免同一轮 / 跨轮重复读取文件
   private _imageCache = new Map<string, string>();
+  // LRU 限制：最多缓存 8 张图（避免 OOM）。Android 上 base64 data URL 每张数 MB。
+  private static readonly IMAGE_CACHE_MAX = 8;
+  // 当前活跃请求的取消通道 — detachActiveRun() 时调用 cancel 命令通知 Rust 中断流
+  private _cancelRunId: string | null = null;
+  // 专注模式：用户确认预览后设为 true，下次 generate_image 直接执行不拦截。
+  // approvePreview 设置，generate_image 执行完毕后重置。
+  public skipNextPreview = false;
 
   constructor(config: TauriAgentConfig) {
     super({
@@ -179,10 +186,15 @@ export class TauriAgent extends AbstractAgent {
           });
       }, 0);
 
-      // teardown: abort + clear timer
+      // teardown: abort + clear timer + 通知 Rust 后端中断 HTTP 流
       return () => {
         aborted = true;
         clearTimeout(timer);
+        // 通知 Rust 后端中断流式读取，避免"用户停了但 token 继续烧"
+        if (this._cancelRunId) {
+          invoke("cancel_llm_run", { runId: this._cancelRunId }).catch(() => {});
+          this._cancelRunId = null;
+        }
       };
     });
   }
@@ -273,19 +285,32 @@ export class TauriAgent extends AbstractAgent {
           const contentParts: any[] = [];
           if (msg.content) contentParts.push({ type: "text", text: msg.content });
           for (const imgPath of imagePaths) {
-            try {
-              let dataUrl = imgPath;
-              if (!imgPath.startsWith("data:")) {
-                const cached = this._imageCache.get(imgPath);
-                if (cached) {
-                  dataUrl = cached;
-                } else {
+            let dataUrl = imgPath;
+            if (!imgPath.startsWith("data:")) {
+              const cached = this._imageCache.get(imgPath);
+              if (cached) {
+                dataUrl = cached;
+                // LRU: 命中后移到最新（删除再插入，保持插入顺序 = 最近使用顺序）
+                this._imageCache.delete(imgPath);
+                this._imageCache.set(imgPath, cached);
+              } else {
+                try {
                   dataUrl = await invoke<string>("read_image_base64", { path: imgPath });
-                  if (dataUrl && dataUrl.startsWith("data:")) this._imageCache.set(imgPath, dataUrl);
+                } catch {
+                  console.warn(`[TauriAgent] Failed to read image: ${imgPath}`);
+                  continue; // skip broken image
+                }
+                if (dataUrl && dataUrl.startsWith("data:")) {
+                  // LRU 淘汰：超过上限删除最老的条目
+                  if (this._imageCache.size >= TauriAgent.IMAGE_CACHE_MAX) {
+                    const oldestKey = this._imageCache.keys().next().value;
+                    if (oldestKey) this._imageCache.delete(oldestKey);
+                  }
+                  this._imageCache.set(imgPath, dataUrl);
                 }
               }
-              contentParts.push({ type: "image_url", image_url: { url: dataUrl } });
-            } catch { /* skip broken image */ }
+            }
+            contentParts.push({ type: "image_url", image_url: { url: dataUrl } });
           }
           if (contentParts.length === 0) contentParts.push({ type: "text", text: msg.content || "" });
           apiMessages.push({ role: msg.role, content: contentParts });
@@ -305,11 +330,17 @@ export class TauriAgent extends AbstractAgent {
       model: llmConfig.model || "agnes-2.0-flash",
       messages: apiMessages,
       stream: true,
+      // stream_options.include_usage: 让 API 在最后一个 chunk 返回真实 token 用量
+      // 不加这个的话 NVIDIA/OpenAI 兼容 API 不返回 usage，只能用 chars/2.5 估算（中文严重偏低）
+      stream_options: { include_usage: true },
       temperature: llmConfig.temperature ?? 0.7,
-      max_tokens: llmConfig.maxTokens || 8192,
       // 思考模型开关 — false 时 API 不返回 reasoning_content，节省大量 token
       enable_thinking: llmConfig.reasoningEnabled ?? true,
     };
+    // max_tokens 仅在用户显式设置时才传，留空则让模型用默认值（与 NextChat/Open WebUI 一致）
+    if (llmConfig.maxTokens != null && llmConfig.maxTokens > 0) {
+      payload.max_tokens = llmConfig.maxTokens;
+    }
     if (round < effectiveMaxRounds) {
       payload.tools = allTools.map((t: any) => {
         const { _mcp, ...rest } = t;
@@ -318,6 +349,23 @@ export class TauriAgent extends AbstractAgent {
     }
 
     const bodyJson = JSON.stringify(payload);
+
+    // 发送前校验 JSON 合法性 — 如果 bodyJson 无效，记录详细错误
+    try {
+      JSON.parse(bodyJson);
+    } catch (e: any) {
+      console.error("[TauriAgent] bodyJson is INVALID JSON!", e.message);
+      console.error("[TauriAgent] payload.tools count:", payload.tools?.length);
+      console.error("[TauriAgent] payload.messages count:", payload.messages?.length);
+      // 找到包含非法字符的消息
+      for (let i = 0; i < apiMessages.length; i++) {
+        const m = apiMessages[i];
+        const mStr = JSON.stringify(m);
+        try { JSON.parse(mStr); } catch {
+          console.error(`[TauriAgent] Message ${i} (role=${m.role}) has invalid JSON:`, mStr.substring(0, 300));
+        }
+      }
+    }
 
     // ── 流式调用（通过 Tauri call_llm_proxy Channel）──
     const channel = new Channel<string>();
@@ -371,18 +419,28 @@ export class TauriAgent extends AbstractAgent {
           }
           if (delta.tool_calls) {
             for (const tc of delta.tool_calls) {
+              // OpenAI 协议：每个 delta 带 index 标识属于哪个 tool_call
+              // 用 index 索引而非依赖顺序，避免多工具交错时 arguments 拼错
+              const idx = (typeof tc.index === "number") ? tc.index : toolCalls.length;
               if (tc.id) {
+                // 新 tool_call — START
                 const tcId = tc.id;
                 const tcName = tc.function?.name || "";
-                toolCalls.push({ id: tcId, type: "function", function: { name: tcName, arguments: tc.function?.arguments || "" } });
-                toolCallState = toolCalls[toolCalls.length - 1];
+                // 填充到 index 位置（可能需要先填充空位）
+                while (toolCalls.length <= idx) toolCalls.push(null as any);
+                toolCalls[idx] = { id: tcId, type: "function", function: { name: tcName, arguments: tc.function?.arguments || "" } };
+                toolCallState = toolCalls[idx];
                 observer.next({ type: EventType.TOOL_CALL_START, toolCallId: tcId, toolCallName: tcName, parentMessageId: messageId } as BaseEvent);
                 if (tc.function?.arguments) {
                   observer.next({ type: EventType.TOOL_CALL_ARGS, toolCallId: tcId, delta: tc.function.arguments } as BaseEvent);
                 }
-              } else if (tc.function?.arguments && toolCallState) {
-                toolCallState.function.arguments += tc.function.arguments;
-                observer.next({ type: EventType.TOOL_CALL_ARGS, toolCallId: toolCallState.id, delta: tc.function.arguments } as BaseEvent);
+              } else if (tc.function?.arguments) {
+                // arguments 增量 — 按 index 找到对应的 tool_call
+                const target = toolCalls[idx] || toolCallState;
+                if (target) {
+                  target.function.arguments += tc.function.arguments;
+                  observer.next({ type: EventType.TOOL_CALL_ARGS, toolCallId: target.id, delta: tc.function.arguments } as BaseEvent);
+                }
               }
             }
           }
@@ -392,8 +450,12 @@ export class TauriAgent extends AbstractAgent {
 
     channel.onmessage = processChunk;
 
+    // 生成唯一 run_id，传给 Rust 后端用于取消信号关联
+    const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    this._cancelRunId = runId;
+
     try {
-      await invoke("call_llm_proxy", { apiUrl, apiKey: llmConfig.apiKey || "", bodyJson, onChunk: channel });
+      await invoke("call_llm_proxy", { apiUrl, apiKey: llmConfig.apiKey || "", bodyJson, onChunk: channel, runId });
     } catch (e: any) {
       // 错误信息提取 — 优先从 HTTP 错误体中解析 API 返回的具体错误，展示给用户
       const raw = e.toString();
@@ -418,10 +480,12 @@ export class TauriAgent extends AbstractAgent {
         this.config.onTokenUsage?.(tokenUsage);
         observer.next({ type: EventType.CUSTOM, name: "token_usage", value: tokenUsage } as BaseEvent);
       }
+      this._cancelRunId = null;
       return;
     }
 
     // ── Token 使用量通过 CUSTOM 事件发射 ──
+    this._cancelRunId = null; // 流已正常结束，清理取消标记
     if (tokenUsage) {
       this.config.onTokenUsage?.(tokenUsage);
       observer.next({ type: EventType.CUSTOM, name: "token_usage", value: tokenUsage } as BaseEvent);
@@ -457,10 +521,8 @@ export class TauriAgent extends AbstractAgent {
 
     // ── 工具执行 ──
     if (toolCalls.length > 0 && !isAborted()) {
-      // 为已完成的 tool_call 发射 END
-      for (const tc of toolCalls) {
-        observer.next({ type: EventType.TOOL_CALL_END, toolCallId: tc.id } as BaseEvent);
-      }
+      // 注意：TOOL_CALL_END 在每个工具执行完毕后发射（而非提前批量发射），
+      // 确保事件顺序为 START → ARGS → END → RESULT，避免 UI 看到"已结束但还没结果"。
 
       const currentMessages = this.config.getMessages();
 
@@ -481,7 +543,7 @@ export class TauriAgent extends AbstractAgent {
         }
 
         // ── Client-defined tools 拦截 ──
-        // 这 3 个工具不执行 executeTool，而是发 CUSTOM 事件触发前端 UI，
+        // 这些工具不执行 executeTool，而是发 CUSTOM 事件触发前端 UI，
         // 用户交互后结果通过新消息返回给 AI。
         if (!resultStr) {
           if (call.function.name === "select_characters") {
@@ -497,49 +559,7 @@ export class TauriAgent extends AbstractAgent {
             } as BaseEvent);
             resultStr = JSON.stringify({ status: "pending", message: "已弹出角色选择器，等待用户选择。" });
             toolResults.push({ id: call.id, content: resultStr });
-            observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
-            continue;
-          }
-
-          if (call.function.name === "confirm_generation") {
-            // 生图参数确认 — 从 DB 补全参数（LLM 可能只传 prompt_id）
-            let dbPrompt: any = null;
-            if (parsedArgs.prompt_id) {
-              try {
-                dbPrompt = await invoke("get_prompt", { id: parsedArgs.prompt_id });
-              } catch {}
-            }
-            let loraConfigs: any[] | undefined;
-            if (Array.isArray(parsedArgs.loras)) {
-              loraConfigs = parsedArgs.loras;
-            } else if (dbPrompt?.loraConfigs) {
-              try {
-                const parsed = typeof dbPrompt.loraConfigs === "string"
-                  ? JSON.parse(dbPrompt.loraConfigs)
-                  : dbPrompt.loraConfigs;
-                loraConfigs = Array.isArray(parsed) ? parsed : undefined;
-              } catch {}
-            }
-            const previewValue = {
-              type: "generation_preview",
-              previewId: `preview_${call.id}`,
-              prompt: parsedArgs.prompt || dbPrompt?.positivePrompt || "",
-              negativePrompt: parsedArgs.negative_prompt || dbPrompt?.negativePrompt,
-              artistPrompt: parsedArgs.artist_prompt || dbPrompt?.artistPrompt,
-              model: parsedArgs.model || dbPrompt?.baseModel,
-              width: parsedArgs.width || dbPrompt?.width,
-              height: parsedArgs.height || dbPrompt?.height,
-              steps: parsedArgs.steps || dbPrompt?.steps,
-              cfgScale: parsedArgs.cfg_scale || dbPrompt?.cfgScale,
-              sampler: parsedArgs.sampler || dbPrompt?.samplerName || dbPrompt?.sampler,
-              scheduler: parsedArgs.scheduler || dbPrompt?.scheduler,
-              loras: loraConfigs,
-              promptId: parsedArgs.prompt_id,
-              status: "pending" as const,
-            };
-            observer.next({ type: EventType.CUSTOM, name: "gen_preview", value: previewValue } as BaseEvent);
-            resultStr = JSON.stringify({ status: "pending", message: "已弹出参数预览，等待用户确认后执行生成。" });
-            toolResults.push({ id: call.id, content: resultStr });
+            observer.next({ type: EventType.TOOL_CALL_END, toolCallId: call.id } as BaseEvent);
             observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
             continue;
           }
@@ -555,6 +575,7 @@ export class TauriAgent extends AbstractAgent {
               resultStr = JSON.stringify({ status: "shown", message: "已向用户展示建议按钮。" });
             }
             toolResults.push({ id: call.id, content: resultStr });
+            observer.next({ type: EventType.TOOL_CALL_END, toolCallId: call.id } as BaseEvent);
             observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
             continue;
           }
@@ -572,9 +593,63 @@ export class TauriAgent extends AbstractAgent {
             } as BaseEvent);
             resultStr = JSON.stringify({ status: "pending", message: "已弹出模型选择器，等待用户选择。" });
             toolResults.push({ id: call.id, content: resultStr });
+            observer.next({ type: EventType.TOOL_CALL_END, toolCallId: call.id } as BaseEvent);
             observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
             continue;
           }
+        }
+
+        // ── 专注模式拦截：generate_image 调用前弹出预览卡片让用户确认 ──
+        // 不依赖 LLM 传参 — 在工具执行层强制拦截，从 DB 读取项目真实参数。
+        // skipNextPreview 标记：用户已确认预览，直接执行不拦截（执行后重置）。
+        if (!resultStr && call.function.name === "generate_image" && agentSettings.focusMode && !this.skipNextPreview) {
+          let dbPrompt: any = null;
+          if (parsedArgs.prompt_id) {
+            try {
+              dbPrompt = await invoke("get_prompt", { id: parsedArgs.prompt_id });
+            } catch {}
+          }
+          let loraConfigs: any[] | undefined;
+          if (dbPrompt?.loraConfigs) {
+            try {
+              const parsed = typeof dbPrompt.loraConfigs === "string"
+                ? JSON.parse(dbPrompt.loraConfigs)
+                : dbPrompt.loraConfigs;
+              loraConfigs = Array.isArray(parsed) ? parsed : undefined;
+            } catch {}
+          }
+          const previewValue = {
+            type: "generation_preview",
+            previewId: `preview_${call.id}`,
+            prompt: dbPrompt?.positivePrompt || "",
+            negativePrompt: dbPrompt?.negativePrompt,
+            artistPrompt: dbPrompt?.artistPrompt,
+            model: dbPrompt?.baseModel,
+            width: dbPrompt?.width,
+            height: dbPrompt?.height,
+            steps: dbPrompt?.steps,
+            cfgScale: dbPrompt?.cfgScale,
+            sampler: dbPrompt?.samplerName || dbPrompt?.sampler,
+            scheduler: dbPrompt?.scheduler,
+            loras: loraConfigs,
+            promptId: parsedArgs.prompt_id,
+            status: "pending" as const,
+          };
+          observer.next({ type: EventType.CUSTOM, name: "gen_preview", value: previewValue } as BaseEvent);
+          resultStr = JSON.stringify({ status: "pending", message: "已弹出生成预览，等待用户确认参数后执行。" });
+          toolResults.push({ id: call.id, content: resultStr });
+          observer.next({ type: EventType.TOOL_CALL_END, toolCallId: call.id } as BaseEvent);
+          observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
+          continue;
+        }
+
+        // ── 用户已确认预览（skipNextPreview=true）：剥掉 LLM 传的所有参数，
+        // 只留 prompt_id + batch_count，强制从 DB 读取用户确认后的真实参数。
+        if (call.function.name === "generate_image" && this.skipNextPreview) {
+          parsedArgs = {
+            prompt_id: parsedArgs.prompt_id,
+            ...(parsedArgs.batch_count != null ? { batch_count: parsedArgs.batch_count } : {}),
+          };
         }
 
         if (!resultStr) {
@@ -593,10 +668,23 @@ export class TauriAgent extends AbstractAgent {
 
         toolResults.push({ id: call.id, content: resultStr });
 
+        // generate_image 执行完毕后重置 skipNextPreview
+        if (call.function.name === "generate_image" && this.skipNextPreview) {
+          this.skipNextPreview = false;
+        }
+
         // generate_image 成功后自动注入固定维度建议按钮（兜底）
-        // 不管 AI 是否调了 show_suggestions，用户都能看到推荐场景/姿势等入口。
-        // 如果 AI 也调了 show_suggestions，onCustomEvent 会覆盖这组（AI 的在前 + 固定的在后）。
-        if (call.function.name === "generate_image" && !resultStr.includes('"status":"pending"') && !resultStr.includes('"error"')) {
+        // 用结构化判断而非字符串匹配，避免误判
+        let genSuccess = false;
+        if (call.function.name === "generate_image") {
+          try {
+            const parsed = JSON.parse(resultStr);
+            genSuccess = parsed.status !== "pending" && !parsed.error && !parsed.errors;
+          } catch {
+            genSuccess = true; // 非 JSON 结果视为成功
+          }
+        }
+        if (genSuccess) {
           observer.next({
             type: EventType.CUSTOM,
             name: "suggestion",
@@ -611,6 +699,14 @@ export class TauriAgent extends AbstractAgent {
               ],
             },
           } as BaseEvent);
+        }
+
+        // 发射 TOOL_CALL_END（执行完毕后才标记结束）
+        observer.next({ type: EventType.TOOL_CALL_END, toolCallId: call.id } as BaseEvent);
+
+        // 如果工具有图片输出，通过 CUSTOM 事件转发给前端（让 UI 能渲染）
+        if (images && images.length > 0) {
+          observer.next({ type: EventType.CUSTOM, name: "tool_images", value: { toolCallId: call.id, images } } as BaseEvent);
         }
 
         // 发射 TOOL_CALL_RESULT
