@@ -1,10 +1,14 @@
 import { Sparkles, Activity, Server, Image as ImageIcon, Search, MessageSquare, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useQueueStore } from "../../stores/queueStore";
 import { useAppVersion } from "../../hooks/useAppVersion";
+import { useSettingsStore } from "../../stores/settingsStore";
 
 export function StatusBar() {
   const { jobs, isConnected } = useQueueStore();
   const appVersion = useAppVersion();
+  const comfyUrl = useSettingsStore((s) => s.settings.comfyUrl) || '127.0.0.1:8188';
+  // 提取 host:port 用于状态栏显示
+  const displayUrl = comfyUrl.replace(/^https?:\/\//, '');
   
   const pendingJobs = jobs.filter(j => j.status === 'pending');
   const generatingJobs = jobs.filter(j => j.status === 'generating');
@@ -20,7 +24,7 @@ export function StatusBar() {
         {/* Connection Status with Tooltip */}
         <div className="group relative flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--glass-border)] border border-[var(--glass-border)] cursor-pointer hover:bg-[var(--glass-border-active)] transition-colors">
           <span className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "#4CAF50", boxShadow: "0 0 8px #4CAF50" }} />
-          <span className="text-[var(--text-secondary)]">127.0.0.1:8188</span>
+          <span className="text-[var(--text-secondary)]">{displayUrl}</span>
           
           {/* Tooltip Popup */}
           <div className="absolute bottom-full left-0 mb-2 w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 translate-y-2 group-hover:translate-y-0">

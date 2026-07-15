@@ -522,7 +522,9 @@ export async function executeTool(
       res = { status: "success", message: `Custom node installed: ${nodeUrl}` };
 
     } else if (fnName === 'check_comfyui_status') {
-      res = await invoke<any>('check_comfyui_status', { url: parsedArgs.url || null });
+      // 从设置读取用户的 comfyUrl，而非让 Rust 兜底到 127.0.0.1
+      const comfyUrl = useSettingsStore.getState().settings.comfyUrl || null;
+      res = await invoke<any>('check_comfyui_status', { url: parsedArgs.url || comfyUrl });
 
     } else if (fnName === 'view_bookmarks') {
       res = await invoke<any[]>('list_favorite_characters', {
