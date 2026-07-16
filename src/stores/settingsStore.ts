@@ -7,21 +7,25 @@ export interface McpServerConfig {
   url: string;
 }
 
+export interface LlmProfile {
+  enabled: boolean;
+  provider: 'openai' | 'ollama' | 'agnes';
+  apiKey: string;
+  apiUrl: string;
+  model: string;
+  temperature: number;
+  maxTokens: number | undefined;
+  reasoningEnabled: boolean;
+}
+
 export interface AppSettings {
   comfyUrl: string;
   videoComfyUrl: string;
   comfyDir: string;
   autoSave: boolean;
-  llm: {
-    provider: 'openai' | 'ollama' | 'agnes';
-    apiKey: string;
-    apiUrl: string;
-    model: string;
-    temperature: number;
-    maxTokens: number | undefined;
-    // 思考模型开关 — 开启后 LLM 返回 reasoning_content（深度推理），消耗更多 token。默认开启。
-    reasoningEnabled: boolean;
-  };
+  llm: LlmProfile;
+  visionLlm: LlmProfile;
+  fallbackLlm: LlmProfile;
   mcpServers: McpServerConfig[];
   // MCP server (exposing this app's tools to external AI clients like Claude Desktop / Cursor).
   // The actual running state + token live in the Rust backend (persisted in mcp_server.json);
@@ -73,6 +77,7 @@ const defaultSettings: AppSettings = {
   comfyDir: import.meta.env.VITE_COMFY_DIR || 'C:\\ComfyUI',
   autoSave: true,
   llm: {
+    enabled: true,
     provider: 'agnes',
     // SECURITY: apiKey MUST stay empty here. Never read it from import.meta.env at build time —
     // Vite inlines VITE_* vars into the JS bundle, which gets shipped inside the APK. Anyone who
@@ -84,6 +89,26 @@ const defaultSettings: AppSettings = {
     temperature: 0.7,
     maxTokens: undefined as number | undefined,
     reasoningEnabled: true,
+  },
+  visionLlm: {
+    enabled: false,
+    provider: 'agnes',
+    apiKey: '',
+    apiUrl: import.meta.env.VITE_VISION_LLM_API_URL || import.meta.env.VITE_LLM_API_URL || 'https://apihub.agnes-ai.com/v1',
+    model: import.meta.env.VITE_VISION_LLM_MODEL || import.meta.env.VITE_LLM_MODEL || 'agnes-2.0-flash',
+    temperature: 0.1,
+    maxTokens: 2048,
+    reasoningEnabled: false,
+  },
+  fallbackLlm: {
+    enabled: false,
+    provider: 'agnes',
+    apiKey: '',
+    apiUrl: import.meta.env.VITE_FALLBACK_LLM_API_URL || import.meta.env.VITE_LLM_API_URL || 'https://apihub.agnes-ai.com/v1',
+    model: import.meta.env.VITE_FALLBACK_LLM_MODEL || 'agnes-2.0-flash',
+    temperature: 0.7,
+    maxTokens: undefined,
+    reasoningEnabled: false,
   },
   slimToolsMode: false,
   saveFolder: 'Eishougi',
@@ -144,10 +169,18 @@ export const useSettingsStore = create<SettingsState>()(
         },
       };
       // 确保 llm 子对象的字段完整性（旧版本持久化数据可能缺少新字段如 reasoningEnabled）
-      merged.settings.llm = {
-        ...current.settings.llm,
-        ...(p?.settings?.llm || {}),
-      };
+       merged.settings.llm = {
+         ...current.settings.llm,
+         ...(p?.settings?.llm || {}),
+       };
+       merged.settings.visionLlm = {
+         ...current.settings.visionLlm,
+         ...(p?.settings?.visionLlm || {}),
+       };
+       merged.settings.fallbackLlm = {
+         ...current.settings.fallbackLlm,
+         ...(p?.settings?.fallbackLlm || {}),
+       };
       return merged;
     },
     }

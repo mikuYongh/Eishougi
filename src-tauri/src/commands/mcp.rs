@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use once_cell::sync::Lazy;
+use tokio::sync::Mutex;
+
+static SESSION_POOL: Lazy<Mutex<HashMap<String, McpSession>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct McpToolDef {
@@ -239,10 +243,18 @@ impl McpSession {
 
 #[tauri::command]
 pub async fn list_mcp_tools(url: String) -> Result<Vec<McpToolDef>, String> {
-    let mut session = McpSession::new(url);
-    session.connect().await?;
-    session.send_initialized().await?;
-    session.list_tools().await
+    let mut pool = SESSION_POOL.lock().await;
+    let session = pool.entry(url.clone()).or_insert_with(|| McpSession::new(url));
+    if session.session_id.is_none() {
+        session.connect().await?;
+        session.send_initialized().await?;
+    }
+    let session_url = session.url.clone();
+    let result = session.list_tools().await;
+    if result.is_err() {
+        pool.remove(&session_url);
+    }
+    result
 }
 
 #[tauri::command]
@@ -251,8 +263,16 @@ pub async fn call_mcp_tool(
     name: String,
     arguments: HashMap<String, serde_json::Value>,
 ) -> Result<String, String> {
-    let mut session = McpSession::new(url);
-    session.connect().await?;
-    session.send_initialized().await?;
-    session.call_tool(&name, arguments).await
+    let mut pool = SESSION_POOL.lock().await;
+    let session = pool.entry(url.clone()).or_insert_with(|| McpSession::new(url));
+    if session.session_id.is_none() {
+        session.connect().await?;
+        session.send_initialized().await?;
+    }
+    let session_url = session.url.clone();
+    let result = session.call_tool(&name, arguments).await;
+    if result.is_err() {
+        pool.remove(&session_url);
+    }
+    result
 }

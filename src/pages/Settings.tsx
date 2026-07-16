@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSettingsStore, type McpServerConfig } from "../stores/settingsStore";
+import { useSettingsStore, type LlmProfile, type McpServerConfig } from "../stores/settingsStore";
 import { useQueueStore } from "../stores/queueStore";
 import { useModelStore } from "../stores/modelStore";
 import { appLog } from "../utils/appLog";
@@ -898,6 +898,20 @@ export function Settings() {
                 </div>
               </div>
 
+              <ModelProfileEditor
+                profileKey="visionLlm"
+                profile={settings.visionLlm}
+                title="独立识图模型"
+                description="用于图片理解、图片反推和带图片附件的 Agent 请求。关闭时回退到主模型。"
+              />
+
+              <ModelProfileEditor
+                profileKey="fallbackLlm"
+                profile={settings.fallbackLlm}
+                title="Agent 兜底模型"
+                description="主模型请求失败且尚未产生输出时自动切换，建议配置不同服务商或更稳定的轻量模型。"
+              />
+
               {/* MCP Server — expose the app's tools to external AI clients */}
               <McpServerPanel />
             </div>
@@ -1055,6 +1069,93 @@ export function Settings() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModelProfileEditor({
+  profileKey,
+  profile,
+  title,
+  description,
+}: {
+  profileKey: "visionLlm" | "fallbackLlm";
+  profile: LlmProfile;
+  title: string;
+  description: string;
+}) {
+  const updateSettings = useSettingsStore((state) => state.updateSettings);
+  const update = (patch: Partial<LlmProfile>) => {
+    updateSettings({ [profileKey]: { ...profile, ...patch } } as any);
+  };
+
+  const selectProvider = (provider: LlmProfile["provider"]) => {
+    const defaults = provider === "ollama"
+      ? { apiUrl: "http://127.0.0.1:11434/v1", model: "qwen2.5:7b" }
+      : provider === "openai"
+        ? { apiUrl: "https://api.openai.com/v1", model: "gpt-4o" }
+        : { apiUrl: "https://apihub.agnes-ai.com/v1", model: "agnes-2.0-flash" };
+    update({ provider, ...defaults });
+  };
+
+  return (
+    <div className="glass-panel p-6">
+      <div className="flex items-center justify-between gap-3 mb-5 border-b border-[var(--glass-border)] pb-4">
+        <div>
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">{title}</h3>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">{description}</p>
+        </div>
+        <button
+          onClick={() => update({ enabled: !profile.enabled })}
+          className={`relative w-12 h-6 rounded-full transition-colors cursor-pointer ${profile.enabled ? "bg-[var(--accent-1)]" : "bg-[var(--bg-layer-2)] border border-[var(--glass-border)]"}`}
+          title={profile.enabled ? "已启用" : "已停用"}
+        >
+          <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${profile.enabled ? "left-7" : "left-1"}`} />
+        </button>
+      </div>
+      <div className="max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-bold text-[var(--text-secondary)] mb-2 block">服务商</label>
+          <GlassDropdown
+            value={profile.provider}
+            onChange={(value) => selectProvider(value as LlmProfile["provider"])}
+            options={[
+              { label: "Agnes AI", value: "agnes" },
+              { label: "OpenAI Compatible", value: "openai" },
+              { label: "Ollama (Local)", value: "ollama" },
+            ]}
+            accentColor="pink"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-bold text-[var(--text-secondary)] mb-2 block">模型名称</label>
+          <input
+            value={profile.model}
+            onChange={(event) => update({ model: event.target.value })}
+            className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 font-mono"
+            placeholder="例如 gpt-4o-mini / qwen2.5vl"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-xs font-bold text-[var(--text-secondary)] mb-2 block">API 接口地址</label>
+          <input
+            value={profile.apiUrl}
+            onChange={(event) => update({ apiUrl: event.target.value })}
+            className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 font-mono"
+            placeholder="https://api.openai.com/v1"
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="text-xs font-bold text-[var(--text-secondary)] mb-2 block">API 密钥</label>
+          <input
+            type="password"
+            value={profile.apiKey}
+            onChange={(event) => update({ apiKey: event.target.value })}
+            className="w-full px-4 py-3 rounded-xl bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--accent-1)]/50 font-mono"
+            placeholder="可留空，使用本地 Ollama"
+          />
         </div>
       </div>
     </div>

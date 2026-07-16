@@ -47,7 +47,12 @@ export interface ToolDef {
 
 export interface TauriAgentConfig {
   /** 获取当前 LLM 配置（每次 run 时动态读取，因为用户可能随时改设置） */
-  getLlmConfig: () => { apiUrl: string; apiKey: string; model: string; temperature: number; maxTokens: number | undefined; provider: string; reasoningEnabled: boolean };
+  getLlmConfig: () => {
+    apiUrl: string; apiKey: string; model: string; temperature: number;
+    maxTokens: number | undefined; provider: string; reasoningEnabled: boolean;
+    vision?: { enabled: boolean; apiUrl: string; apiKey: string; model: string; temperature: number; maxTokens: number | undefined; provider: string; reasoningEnabled: boolean };
+    fallback?: { enabled: boolean; apiUrl: string; apiKey: string; model: string; temperature: number; maxTokens: number | undefined; provider: string; reasoningEnabled: boolean };
+  };
   /** 获取 system prompt */
   getSystemPrompt: () => string;
   /** 获取工具定义列表 */
@@ -143,8 +148,9 @@ export class TauriAgent extends AbstractAgent {
   private _cancelRunId: string | null = null;
   private pendingPreview: {
     previewId: string;
-    resolve: (approved: boolean) => void;
+    resolve: (approval: { approved: boolean; userNote?: string }) => void;
   } | null = null;
+  private bypassNextPreview = false;
 
   constructor(config: TauriAgentConfig) {
     super({
@@ -154,11 +160,11 @@ export class TauriAgent extends AbstractAgent {
     this.config = config;
   }
 
-  public resolveGenerationPreview(previewId: string, approved: boolean): boolean {
+  public resolveGenerationPreview(previewId: string, approved: boolean, userNote?: string): boolean {
     if (!this.pendingPreview || this.pendingPreview.previewId !== previewId) return false;
     const pending = this.pendingPreview;
     this.pendingPreview = null;
-    pending.resolve(approved);
+    pending.resolve({ approved, userNote });
     return true;
   }
 
@@ -182,12 +188,14 @@ export class TauriAgent extends AbstractAgent {
       const timer = setTimeout(() => {
         this.runAgentLoop(input, observer, () => aborted)
           .then(() => {
+            this.bypassNextPreview = false;
             if (!aborted) {
               observer.next({ type: EventType.RUN_FINISHED, threadId, runId } as BaseEvent);
               observer.complete();
             }
           })
           .catch((error) => {
+            this.bypassNextPreview = false;
             if (!aborted) {
               observer.next({ type: EventType.RUN_ERROR, message: error.message || String(error) } as BaseEvent);
               observer.error(error);
@@ -213,7 +221,7 @@ export class TauriAgent extends AbstractAgent {
     if (!this.pendingPreview) return;
     const pending = this.pendingPreview;
     this.pendingPreview = null;
-    pending.resolve(approved);
+    pending.resolve({ approved });
   }
 
   /**
@@ -228,7 +236,10 @@ export class TauriAgent extends AbstractAgent {
   ): Promise<void> {
     if (isAborted()) return;
 
-    const llmConfig = this.config.getLlmConfig();
+    const configuredLlm = this.config.getLlmConfig();
+    const hasImages = input.messages.some((message: any) => Array.isArray(message.images) && message.images.length > 0);
+    const llmConfig = hasImages && configuredLlm.vision?.enabled ? configuredLlm.vision : configuredLlm;
+    const fallbackConfig = configuredLlm.fallback?.enabled ? configuredLlm.fallback : null;
     const agentSettings = this.config.getAgentSettings();
     const configuredMaxRounds = agentSettings.maxRounds;
     const effectiveMaxRounds = agentSettings.effort === "low"
@@ -358,7 +369,7 @@ export class TauriAgent extends AbstractAgent {
       });
     }
 
-    const bodyJson = JSON.stringify(payload);
+    let bodyJson = JSON.stringify(payload);
 
     // 发送前校验 JSON 合法性 — 如果 bodyJson 无效，记录详细错误
     try {
@@ -392,6 +403,7 @@ export class TauriAgent extends AbstractAgent {
 
     // SSE 缓冲
     let sseBuffer = "";
+    let streamError: string | null = null;
 
     const flushText = (text: string) => {
       if (!text) return;
@@ -410,6 +422,10 @@ export class TauriAgent extends AbstractAgent {
         if (!line.startsWith("data: ")) continue;
         try {
           const data = JSON.parse(line.slice(6));
+          if (data.error) {
+            streamError = typeof data.error === "string" ? data.error : data.error.message || JSON.stringify(data.error);
+            continue;
+          }
           if (data.usage) {
             tokenUsage = {
               promptTokens: data.usage.prompt_tokens || 0,
@@ -465,7 +481,44 @@ export class TauriAgent extends AbstractAgent {
     this._cancelRunId = runId;
 
     try {
-      await invoke("call_llm_proxy", { apiUrl, apiKey: llmConfig.apiKey || "", bodyJson, onChunk: channel, runId });
+      try {
+        await invoke("call_llm_proxy", { apiUrl, apiKey: llmConfig.apiKey || "", bodyJson, onChunk: channel, runId });
+        if (streamError) throw new Error(streamError);
+        if (!assistantContent && !assistantReasoning && toolCalls.length === 0 && fallbackConfig) {
+          throw new Error("Primary model returned an empty response");
+        }
+      } catch (primaryError: any) {
+        const canFallback = fallbackConfig
+          && fallbackConfig.apiUrl
+          && fallbackConfig.model
+          && fallbackConfig.model !== llmConfig.model
+          && !isAborted()
+          && !assistantContent
+          && toolCalls.length === 0;
+        if (!canFallback) throw primaryError;
+
+        console.warn(`[TauriAgent] primary model failed, retrying with fallback model ${fallbackConfig.model}`);
+        apiUrl = fallbackConfig.apiUrl.endsWith("/chat/completions")
+          ? fallbackConfig.apiUrl
+          : fallbackConfig.apiUrl.replace(/\/$/, "") + "/chat/completions";
+        payload.model = fallbackConfig.model;
+        payload.temperature = fallbackConfig.temperature ?? 0.7;
+        payload.enable_thinking = fallbackConfig.reasoningEnabled ?? false;
+        if (fallbackConfig.maxTokens != null && fallbackConfig.maxTokens > 0) payload.max_tokens = fallbackConfig.maxTokens;
+        else delete payload.max_tokens;
+        bodyJson = JSON.stringify(payload);
+        sseBuffer = "";
+        assistantContent = "";
+        assistantReasoning = "";
+        toolCalls = [];
+        toolCallState = null;
+        tokenUsage = null;
+        streamError = null;
+        const fallbackRunId = `${runId}_fallback`;
+        this._cancelRunId = fallbackRunId;
+        await invoke("call_llm_proxy", { apiUrl, apiKey: fallbackConfig.apiKey || "", bodyJson, onChunk: channel, runId: fallbackRunId });
+        if (streamError) throw new Error(streamError);
+      }
     } catch (e: any) {
       // 错误信息提取 — 优先从 HTTP 错误体中解析 API 返回的具体错误，展示给用户
       const raw = e.toString();
@@ -539,6 +592,7 @@ export class TauriAgent extends AbstractAgent {
 
       // 收集每个 tool call 的执行结果，用于递归时传给下一轮 LLM
       const toolResults: { id: string; content: string }[] = [];
+      let followUpUserMessage: Message | null = null;
 
       for (const call of toolCalls) {
         if (isAborted()) break;
@@ -612,7 +666,7 @@ export class TauriAgent extends AbstractAgent {
 
         // ── 专注模式拦截：generate_image 调用前弹出预览卡片让用户确认 ──
         // 不依赖 LLM 传参 — 在工具执行层强制拦截，从 DB 读取项目真实参数。
-        if (!resultStr && call.function.name === "generate_image" && agentSettings.focusMode) {
+        if (!resultStr && call.function.name === "generate_image" && agentSettings.focusMode && !this.bypassNextPreview) {
           let dbPrompt: any = null;
           if (parsedArgs.prompt_id) {
             try {
@@ -646,16 +700,41 @@ export class TauriAgent extends AbstractAgent {
             status: "pending" as const,
           };
           observer.next({ type: EventType.CUSTOM, name: "gen_preview", value: previewValue } as BaseEvent);
-          const approved = await new Promise<boolean>((resolve) => {
+          const approval = await new Promise<{ approved: boolean; userNote?: string }>((resolve) => {
             this.pendingPreview = { previewId: previewValue.previewId, resolve };
           });
-          if (!approved || isAborted()) {
+          if (!approval.approved || isAborted()) {
             resultStr = JSON.stringify({ status: "rejected", message: "用户取消了本次生成。" });
             toolResults.push({ id: call.id, content: resultStr });
             observer.next({ type: EventType.TOOL_CALL_END, toolCallId: call.id } as BaseEvent);
             observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
             continue;
           }
+          if (approval.userNote?.trim()) {
+            this.bypassNextPreview = true;
+            resultStr = JSON.stringify({
+              status: "needs_revision",
+              message: "用户在生成确认时提出了修改要求，请先处理该要求，再重新调用 generate_image。",
+              user_note: approval.userNote.trim(),
+            });
+            followUpUserMessage = {
+              id: `preview_note_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              role: "user",
+              content: `用户在确认生成时提出了额外修改要求：${approval.userNote.trim()}。请先更新创作项目，再重新调用 generate_image。`,
+            } as Message;
+            toolResults.push({ id: call.id, content: resultStr });
+            observer.next({ type: EventType.TOOL_CALL_END, toolCallId: call.id } as BaseEvent);
+            observer.next({ type: EventType.TOOL_CALL_RESULT, messageId, toolCallId: call.id, content: resultStr, role: "tool" } as BaseEvent);
+            continue;
+          }
+          parsedArgs = {
+            prompt_id: parsedArgs.prompt_id,
+            ...(parsedArgs.batch_count != null ? { batch_count: parsedArgs.batch_count } : {}),
+          };
+        }
+
+        if (!resultStr && call.function.name === "generate_image" && this.bypassNextPreview) {
+          this.bypassNextPreview = false;
           parsedArgs = {
             prompt_id: parsedArgs.prompt_id,
             ...(parsedArgs.batch_count != null ? { batch_count: parsedArgs.batch_count } : {}),
@@ -752,6 +831,7 @@ export class TauriAgent extends AbstractAgent {
               toolCallId: tc.id,
             } as Message;
           }),
+          ...(followUpUserMessage ? [followUpUserMessage] : []),
         ];
 
         await this.runAgentLoop({ ...input, messages: newMessages }, observer, isAborted, round + 1);

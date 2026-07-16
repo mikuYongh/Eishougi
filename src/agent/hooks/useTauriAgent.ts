@@ -223,8 +223,18 @@ export function useTauriAgent() {
     if (agentRef.current) return agentRef.current;
     const agent = new TauriAgent({
       getLlmConfig: () => {
-        const { llm } = useSettingsStore.getState().settings;
-        return { apiUrl: llm.apiUrl, apiKey: llm.apiKey, model: llm.model, temperature: llm.temperature, maxTokens: llm.maxTokens, provider: llm.provider, reasoningEnabled: llm.reasoningEnabled ?? true };
+        const { llm, visionLlm, fallbackLlm } = useSettingsStore.getState().settings;
+        return {
+          apiUrl: llm.apiUrl,
+          apiKey: llm.apiKey,
+          model: llm.model,
+          temperature: llm.temperature,
+          maxTokens: llm.maxTokens,
+          provider: llm.provider,
+          reasoningEnabled: llm.reasoningEnabled ?? true,
+          vision: visionLlm,
+          fallback: fallbackLlm,
+        };
       },
       getSystemPrompt: () => systemPromptRef.current(),
       getTools: getToolDefinitions,
@@ -430,17 +440,15 @@ export function useTauriAgent() {
                 { title: "推荐玩法", message: "推荐玩法", confirm: true },
               ];
               const mergeSuggestions = (items: Suggestion[]) => {
-                const result: Suggestion[] = [];
-                for (const item of items) {
-                  if (!item?.title || result.some((existing) => existing.title === item.title)) continue;
-                  result.push(item);
-                  if (result.length >= 5) break;
-                }
-                return result;
+                const fixedTitles = new Set(FIXED_DIMS.map((item) => item.title));
+                const aiSuggestions = items
+                  .filter((item) => item?.title && !fixedTitles.has(item.title))
+                  .slice(0, 5);
+                return [...aiSuggestions, ...FIXED_DIMS];
               };
               if (val?._auto) {
                 setSuggestions((prev) => {
-                  return mergeSuggestions([...prev, ...FIXED_DIMS.slice(0, 2)]);
+                  return mergeSuggestions(prev);
                 });
               } else {
                 // AI 通过 show_suggestions 给的具体建议 + 追加固定维度
@@ -453,7 +461,7 @@ export function useTauriAgent() {
                   );
                   refineDimRef.current = null;
                 }
-                setSuggestions(mergeSuggestions([...aiSuggestions, ...FIXED_DIMS.slice(0, 2)]));
+                setSuggestions(mergeSuggestions(aiSuggestions));
               }
             } else if (event.name === "gen_preview") {
               setActivePreview(event.value);
@@ -571,7 +579,7 @@ export function useTauriAgent() {
   // ── 审批操作 ──
   // approvePreview: 用户确认预览后，把用户编辑过的参数先持久化到 DB，
   // 再唤醒当前等待中的 generate_image 工具调用。
-  const approvePreview = useCallback(async (editedPreview?: GenerationPreviewAttachment) => {
+  const approvePreview = useCallback(async (editedPreview?: GenerationPreviewAttachment, userNote?: string) => {
     const preview = editedPreview || activePreview;
     if (!preview) return;
     setActivePreview(null);
@@ -606,7 +614,7 @@ export function useTauriAgent() {
     }
 
     const agent = getOrCreateAgent();
-    const resumed = agent.resolveGenerationPreview(preview.previewId, true);
+    const resumed = agent.resolveGenerationPreview(preview.previewId, true, userNote);
     if (!resumed) {
       console.warn("[approvePreview] 预览请求已结束，未发送重复确认请求", preview.previewId);
     }

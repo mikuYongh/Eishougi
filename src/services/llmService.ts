@@ -5,11 +5,12 @@ export class LLMService {
   private model = "agnes-2.0-flash";
 
   async tagImage(imageBase64: string): Promise<{ tag: string, confidence: number }[]> {
-    const { llm } = useSettingsStore.getState().settings;
-    const currentApiUrl = llm.apiUrl || this.baseUrl;
-    const currentApiKey = llm.apiKey;
-    const currentModel = llm.model || this.model;
-    const currentTemperature = llm.temperature !== undefined ? llm.temperature : 0.1;
+    const { llm, visionLlm } = useSettingsStore.getState().settings;
+    const profile = visionLlm?.enabled ? visionLlm : llm;
+    const currentApiUrl = profile.apiUrl || this.baseUrl;
+    const currentApiKey = profile.apiKey;
+    const currentModel = profile.model || this.model;
+    const currentTemperature = profile.temperature !== undefined ? profile.temperature : 0.1;
 
     const prompt = `You are a highly accurate image tagger system. Look at the provided image and extract Danbooru-style tags. Return ONLY a JSON list of objects in this exact format, with no markdown, no \`\`\`json blocks, and no extra text:
 [
