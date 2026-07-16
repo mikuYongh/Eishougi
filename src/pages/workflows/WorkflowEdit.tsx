@@ -22,6 +22,7 @@ import { WorkflowGraph } from "../../components/workflows/WorkflowGraph";
 import { ValidationReport } from "../../components/workflows/ValidationReport";
 import { validateWorkflow, fetchComfyuiInventory, type ValidationReport as ValidationReportData, type NodeIssue } from "../../services/comfyValidator";
 import { inferWorkflowType } from "../../services/workflowCapabilities";
+import { convertUiWorkflowToApi } from "../../services/workflowRenderModel";
 
 const SDXL_RESOLUTIONS = [
   { label: "1024x1024 (1:1 方幅)", value: "1024x1024" },
@@ -52,6 +53,9 @@ export function WorkflowEdit() {
     baseModel: null,
     width: null,
     height: null,
+    dimensionsFromInputImage: false,
+    fps: null,
+    duration: null,
     steps: null,
     cfgScale: null,
     sampler: null,
@@ -67,15 +71,30 @@ export function WorkflowEdit() {
   const [validationReport, setValidationReport] = useState<ValidationReportData | null>(null);
   const [isValidating, setIsValidating] = useState(false);
 
-  const handleExportJson = () => {
-    if (!workflow.jsonContent) return;
-    const blob = new Blob([workflow.jsonContent], { type: 'application/json' });
+  const downloadWorkflowJson = (content: string, suffix: string) => {
+    const blob = new Blob([content], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${workflow.name || 'workflow'}.json`;
+    a.download = `${workflow.name || 'workflow'}${suffix}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportJson = () => {
+    if (!workflow.jsonContent) return;
+    downloadWorkflowJson(workflow.jsonContent, '-workflow');
+  };
+
+  const handleExportApiJson = () => {
+    if (!workflow.jsonContent) return;
+    try {
+      const parsed = JSON.parse(workflow.jsonContent);
+      downloadWorkflowJson(JSON.stringify(convertUiWorkflowToApi(parsed), null, 2), '-api');
+      toast.success("API 工作流已导出");
+    } catch (error) {
+      toast.error(`API 导出失败：${error instanceof Error ? error.message : "JSON 格式无效"}`);
+    }
   };
 
   useEffect(() => {
@@ -108,6 +127,9 @@ export function WorkflowEdit() {
       baseModel: parsed.baseModel,
       width: parsed.width,
       height: parsed.height,
+      dimensionsFromInputImage: parsed.dimensionsFromInputImage,
+      fps: parsed.fps,
+      duration: parsed.duration,
       steps: parsed.steps,
       cfgScale: parsed.cfgScale,
       sampler: parsed.samplerName,
@@ -211,6 +233,11 @@ export function WorkflowEdit() {
       toast.warning('工作流内容不能为空，请先导入 JSON');
       return;
     }
+    if (isImg2Video && draftParams.width && draftParams.height &&
+      (draftParams.width % 32 !== 0 || draftParams.height % 32 !== 0)) {
+      toast.warning('图生视频尺寸必须为 32 的倍数，请调整宽高后再保存');
+      return;
+    }
 
     let finalJson = workflow.jsonContent;
     if (finalJson) {
@@ -268,13 +295,23 @@ export function WorkflowEdit() {
   };
 
   const currentResStr = (draftParams.width && draftParams.height) ? `${draftParams.width}x${draftParams.height}` : "";
+  const detectedWorkflowType = useMemo(() => {
+    if (!workflow.jsonContent) return workflow.type || "text2img";
+    try {
+      return inferWorkflowType(JSON.parse(workflow.jsonContent));
+    } catch {
+      return workflow.type || "text2img";
+    }
+  }, [workflow.jsonContent, workflow.type]);
+  const effectiveWorkflowType = workflow.type && workflow.type !== "text2img"
+    ? workflow.type
+    : detectedWorkflowType || "text2img";
+  const isImg2Video = effectiveWorkflowType === "img2video";
 
   const typeOptions = [
     { label: "基础文生图 (Text2Img)", value: "text2img" },
     { label: "图生视频 (Img2Video)", value: "img2video" },
-    { label: "反推工具 (Tagger)", value: "tagger" },
-    { label: "放大/修复 (Upscale)", value: "upscale" },
-    { label: "自定义 (Custom)", value: "custom" }
+    { label: "高级导入（仅保存，不保证可直接运行）", value: "custom" }
   ];
 
   const modelOptions = useMemo(() => {
@@ -413,10 +450,19 @@ export function WorkflowEdit() {
               </button>
               <button
                 onClick={handleExportJson}
-                className="flex items-center justify-center w-8 h-8 bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] rounded-lg text-[var(--text-primary)] transition-colors cursor-pointer"
-                title="导出 JSON 文件"
+                disabled={!workflow.jsonContent}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[var(--text-primary)] text-[12px] font-bold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                title="导出当前工作流 JSON"
               >
-                <Download size={14} className="text-[var(--accent-2)]" />
+                <Download size={14} className="text-[var(--accent-2)]" /> 导出工作流
+              </button>
+              <button
+                onClick={handleExportApiJson}
+                disabled={!workflow.jsonContent}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--accent-2)]/10 hover:bg-[var(--accent-2)]/20 text-[var(--accent-2)] text-[12px] font-bold transition-colors cursor-pointer border border-[var(--accent-2)]/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="导出 ComfyUI API 工作流"
+              >
+                <Code2 size={14} /> 导出 API
               </button>
               <button
                 onClick={handleImportJson}
@@ -496,17 +542,17 @@ export function WorkflowEdit() {
                       isError={isError}
                     />
                   </div>
-                  <div>
+                  {!isImg2Video && <div>
                     <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">采样步数 (Steps)</label>
                     <input
                       type="number" value={draftParams.steps || ""} onChange={e => updateDraft('steps', parseInt(e.target.value) || undefined)}
                       className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-sm outline-none text-[var(--text-primary)]"
                     />
-                  </div>
+                  </div>}
                 </div>
 
                 {/* Sampler / Scheduler / CFG / VAE / Seed */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                {!isImg2Video && <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                   <div>
                     <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">采样器 (Sampler)</label>
                     <GlassDropdown
@@ -552,7 +598,24 @@ export function WorkflowEdit() {
                       className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2 text-sm outline-none text-[var(--text-primary)] font-mono"
                     />
                   </div>
-                </div>
+                </div>}
+
+                {isImg2Video && (draftParams.fps || draftParams.duration) && <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">帧率 (FPS)</label>
+                    <input
+                      type="number" min="1" step="1" value={draftParams.fps || ""} onChange={e => updateDraft('fps', parseInt(e.target.value) || undefined)}
+                      className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-sm outline-none text-[var(--text-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">时长 (秒)</label>
+                    <input
+                      type="number" min="1" step="1" value={draftParams.duration || ""} onChange={e => updateDraft('duration', parseInt(e.target.value) || undefined)}
+                      className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2.5 text-sm outline-none text-[var(--text-primary)]"
+                    />
+                  </div>
+                </div>}
               </div>
 
               {/* Resolution */}
@@ -560,32 +623,37 @@ export function WorkflowEdit() {
                 <h4 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
                   <Maximize2 size={14} /> 分辨率与尺寸
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="relative z-[50]">
+                {isImg2Video && draftParams.dimensionsFromInputImage ? (
+                  <div className="rounded-xl border border-blue-400/20 bg-blue-400/10 px-4 py-3 text-xs leading-5 text-[var(--text-secondary)]">
+                    当前图生视频工作流的宽高由输入图片尺寸驱动，不使用文生图的 SDXL 分辨率预设。输入图片应先缩放到宽高均为 32 的倍数，工作流再按自身节点链路生成视频尺寸。
+                  </div>
+                ) : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {!isImg2Video && <div className="relative z-[50]">
                     <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">预设分辨率</label>
                     <GlassDropdown 
                       value={SDXL_RESOLUTIONS.some(r => r.value.startsWith(currentResStr)) ? SDXL_RESOLUTIONS.find(r => r.value.startsWith(currentResStr))?.value || "" : ""}
                       onChange={v => updateResolution(v)}
                       options={SDXL_RESOLUTIONS}
                     />
-                  </div>
+                  </div>}
                   <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex-1">
                       <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">宽 (Width)</label>
                       <input 
-                        type="number" value={draftParams.width || ""} onChange={e => updateDraft('width', parseInt(e.target.value) || undefined)}
+                        type="number" min={isImg2Video ? 32 : undefined} step={isImg2Video ? 32 : undefined} value={draftParams.width || ""} onChange={e => updateDraft('width', parseInt(e.target.value) || undefined)}
                         className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2 text-sm outline-none text-[var(--text-primary)]"
                       />
                     </div>
                     <div className="flex-1">
                       <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">高 (Height)</label>
                       <input 
-                        type="number" value={draftParams.height || ""} onChange={e => updateDraft('height', parseInt(e.target.value) || undefined)}
+                        type="number" min={isImg2Video ? 32 : undefined} step={isImg2Video ? 32 : undefined} value={draftParams.height || ""} onChange={e => updateDraft('height', parseInt(e.target.value) || undefined)}
                         className="w-full bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl px-4 py-2 text-sm outline-none text-[var(--text-primary)]"
                       />
                     </div>
                   </div>
-                </div>
+                  {isImg2Video && <p className="md:col-span-2 text-[10px] text-[var(--text-secondary)]">图生视频宽高需为正数且通常按 32 对齐，不能使用仅适用于 SDXL 文生图的预设尺寸。</p>}
+                </div>}
               </div>
 
               {/* LoRAs */}

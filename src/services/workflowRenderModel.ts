@@ -75,6 +75,30 @@ export function createRenderWorkflow(workflow: any): RenderWorkflow | null {
   return { format: "api", graph: { nodes, links, groups: [], last_node_id: nodes.length, last_link_id: links.length }, subgraphs: new Map() };
 }
 
+export function convertUiWorkflowToApi(workflow: any): Record<string, { class_type: string; inputs: Record<string, any> }> {
+  if (!isUiWorkflow(workflow)) return workflow;
+  const links = new Map<number, any>();
+  for (const link of workflow.links || []) {
+    if (Array.isArray(link) && link.length >= 5) links.set(Number(link[0]), link);
+  }
+  const api: Record<string, { class_type: string; inputs: Record<string, any> }> = {};
+  for (const node of workflow.nodes || []) {
+    if (!node?.type || node.type === "Reroute") continue;
+    const inputs: Record<string, any> = {};
+    let widgetIndex = 0;
+    for (const input of node.inputs || []) {
+      if (input.link != null) {
+        const link = links.get(Number(input.link));
+        if (link) inputs[input.name] = [String(link[1]), Number(link[2])];
+      } else if (input.widget && Array.isArray(node.widgets_values) && widgetIndex < node.widgets_values.length) {
+        inputs[input.widget.name || input.name] = node.widgets_values[widgetIndex++];
+      }
+    }
+    api[String(node.id)] = { class_type: node.type, inputs };
+  }
+  return api;
+}
+
 function isConnection(value: any): boolean {
   return Array.isArray(value) && typeof value[0] === "string" && typeof value[1] === "number";
 }

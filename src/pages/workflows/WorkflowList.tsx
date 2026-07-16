@@ -3,10 +3,9 @@ import { useState } from "react";
 import { useWorkflowStore, type WorkflowType, type WorkflowProject } from "../../stores/workflowStore";
 import { usePromptStore } from "../../stores/promptStore";
 import { useNavigate } from "react-router-dom";
-import { useSettingsStore } from "../../stores/settingsStore";
-import { convertFileSrc } from "@tauri-apps/api/core";
-import { getImgSrc } from "../../utils/imageUtils";
 import { toast } from "sonner";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { WorkflowGraph } from "../../components/workflows/WorkflowGraph";
 
 
 
@@ -25,13 +24,13 @@ const TypeBadge = ({ type }: { type: WorkflowType }) => {
 };
 
 export function WorkflowList() {
-  const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   const workflows = useWorkflowStore(state => state.workflows);
   const setDefaultWorkflow = useWorkflowStore(state => state.setDefaultWorkflow);
   const removeWorkflow = useWorkflowStore(state => state.removeWorkflow);
   const addWorkflow = useWorkflowStore(state => state.addWorkflow);
   const addPrompt = usePromptStore(state => state.addPrompt);
   const navigate = useNavigate();
+  const [deleteTarget, setDeleteTarget] = useState<WorkflowProject | null>(null);
 
   // Category filter + search — previously these UI controls had no state and did nothing.
   const [activeCategory, setActiveCategory] = useState<'all' | 'text2img' | 'video' | 'utility'>('all');
@@ -185,11 +184,10 @@ export function WorkflowList() {
               
               {/* Thumbnail */}
               <div className="h-32 w-full relative overflow-hidden flex-shrink-0 bg-[var(--glass-bg)] flex items-center justify-center">
-                {wf.thumbnail ? (
-                  <>
-                    <div className="absolute inset-0 bg-[var(--bg-layer-1)] group-hover:bg-transparent transition-colors z-10" />
-                    <img src={getImgSrc(wf.thumbnail)} alt={wf.name} className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 ${privacyMode ? 'blur-2xl group-hover:blur-none' : ''}`} />
-                  </>
+                {wf.jsonContent ? (
+                  <div className="absolute inset-0 opacity-80 transition-opacity group-hover:opacity-100" aria-label={`${wf.name} 工作流预览`}>
+                    <WorkflowGraph workflow={wf.jsonContent} compact />
+                  </div>
                 ) : (
                   <Cpu size={32} className="text-[var(--text-secondary)] opacity-30 group-hover:scale-110 group-hover:text-yellow-400/30 group-hover:opacity-100 transition-all" />
                 )}
@@ -233,11 +231,7 @@ export function WorkflowList() {
                       <Copy size={14} />
                     </button>
                     <button
-                      onClick={() => {
-                        if (confirm(`确定要删除工作流 "${wf.name}" 吗？`)) {
-                          removeWorkflow(wf.id);
-                        }
-                      }}
+                       onClick={() => setDeleteTarget(wf)}
                       className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/5 hover:bg-red-500/10 text-red-400/70 hover:text-red-400 transition-colors cursor-pointer"
                       title="删除工作流"
                     >
@@ -266,6 +260,18 @@ export function WorkflowList() {
         </div>
         )}
       </div>
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除工作流？"
+        description={deleteTarget ? `将删除“${deleteTarget.name}”及其本地配置。已经绑定到创作项目的记录不会被删除，但之后会回退到默认工作流。` : ""}
+        confirmLabel="删除工作流"
+        tone="danger"
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          if (deleteTarget) removeWorkflow(deleteTarget.id);
+          setDeleteTarget(null);
+        }}
+      />
 
     </div>
   );

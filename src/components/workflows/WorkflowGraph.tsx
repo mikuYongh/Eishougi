@@ -19,6 +19,7 @@ interface WorkflowGraphProps {
   workflow: any;
   report?: ValidationReport | null;
   onChange?: (workflow: string) => void;
+  compact?: boolean;
 }
 
 function parseWorkflow(value: any) {
@@ -27,7 +28,7 @@ function parseWorkflow(value: any) {
   try { return JSON.parse(value); } catch { return null; }
 }
 
-function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) {
+function WorkflowGraphInner({ workflow, report, onChange, compact = false }: WorkflowGraphProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const graphRef = useRef<any>(null);
@@ -59,9 +60,11 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
     if (!canvasRef.current) return;
     const graph = new LGraph();
     const canvas = new LGraphCanvas(canvasRef.current, graph);
-    canvas.allow_interaction = true;
-    canvas.allow_dragcanvas = true;
-    canvas.allow_dragnodes = true;
+     canvas.allow_interaction = !compact;
+     canvas.allow_dragcanvas = !compact;
+     canvas.allow_dragnodes = !compact;
+     (canvas as any).read_only = compact;
+     canvas.show_info = !compact;
     (canvas as any).round_links = true;
     (canvas as any).allow_searchbox = false;
     graphRef.current = graph;
@@ -72,13 +75,13 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
       const currentWorkflow = workflowObjectRef.current;
       const serialized = serializeWorkflow(currentWorkflow, graph, activeSubgraphRef.current);
       if (!serialized) return;
-      lastEmittedWorkflowRef.current = serialized;
+       lastEmittedWorkflowRef.current = workflowSignature(serialized);
       onChangeRef.current(serialized);
     };
 
     const resizeObserver = new ResizeObserver(() => {
       canvas.resize();
-      if ((graph as any)._nodes?.length) fitCanvas(canvas, graph);
+       if ((graph as any)._nodes?.length) fitCanvas(canvas, graph, compact ? "compact" : "editor");
       graph.setDirtyCanvas(true, true);
     });
     if (wrapperRef.current) resizeObserver.observe(wrapperRef.current);
@@ -130,12 +133,11 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
     });
     if (!render || !graphRef.current) return;
     rootRenderRef.current = render;
-    const serialized = JSON.stringify(workflowObject);
-    if (lastEmittedWorkflowRef.current === serialized && activeSubgraphRef.current) {
+    const serialized = workflowSignature(workflowObject);
+    if (lastEmittedWorkflowRef.current === serialized) {
       return;
-    } else {
-      setActiveSubgraph(null);
     }
+    setActiveSubgraph(null);
   }, [workflowObject]);
 
   useEffect(() => {
@@ -143,7 +145,7 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
     const graph = graphRef.current;
     const canvas = canvasInstanceRef.current;
     if (!render || !graph || !canvas) return;
-    if (lastEmittedWorkflowRef.current === JSON.stringify(workflowObject)) {
+    if (lastEmittedWorkflowRef.current === workflowSignature(workflowObject)) {
       lastEmittedWorkflowRef.current = null;
       return;
     }
@@ -156,7 +158,8 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
       setLoadingMessage("解析工作流...");
       await nextFrame();
       if (cancelled) return;
-      const currentGraph = activeSubgraph ? getSubgraphGraph(activeSubgraph) : render.graph;
+       const currentGraph = activeSubgraph ? getSubgraphGraph(activeSubgraph) : render.graph;
+       const graphConfig = structuredClone(currentGraph);
       const rawNodes = currentGraph.nodes;
       const nodeTypes = [...new Set(rawNodes.map((node: any) => node.type).filter((type: any): type is string => Boolean(type)))];
       console.info("[WorkflowGraph] configure start", {
@@ -190,13 +193,13 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
       setLoadingMessage(`配置画布 ${nodeTypes.length}/${nodeTypes.length}`);
       graph.clear();
       configuredRef.current = false;
-      graph.configure(currentGraph);
+       graph.configure(graphConfig);
       console.info("[WorkflowGraph] graph configured", {
         configuredNodes: graph._nodes?.length ?? 0,
         configuredLinks: graph.links ? Object.keys(graph.links).length : 0,
         canvas: { width: canvas.canvas.width, height: canvas.canvas.height },
       });
-      graph._nodes?.forEach((node: any) => {
+       graph._nodes?.forEach((node: any) => {
         if (node.computeSize && node.size) {
           const computed = node.computeSize();
           node.size[0] = Math.max(node.size[0], computed[0]);
@@ -207,7 +210,7 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
       await nextFrame();
       if (cancelled) return;
       canvas.resize();
-      fitCanvas(canvas, graph);
+       fitCanvas(canvas, graph, isFullscreen ? "fullscreen" : compact ? "compact" : "editor");
       console.info("[WorkflowGraph] canvas fitted", JSON.stringify({
         element: {
           width: canvas.canvas.width,
@@ -237,7 +240,7 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [activeSubgraph, report, workflowObject]);
+  }, [activeSubgraph, compact, report, workflowObject]);
 
   useEffect(() => {
     const canvas = canvasInstanceRef.current;
@@ -245,7 +248,7 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
     if (!canvas || !graph) return;
     requestAnimationFrame(() => {
       canvas.resize();
-      fitCanvas(canvas, graph);
+       fitCanvas(canvas, graph, isFullscreen ? "fullscreen" : compact ? "compact" : "editor");
       graph.setDirtyCanvas(true, true);
     });
   }, [isFullscreen]);
@@ -332,17 +335,17 @@ function WorkflowGraphInner({ workflow, report, onChange }: WorkflowGraphProps) 
   return (
     <div
       ref={wrapperRef}
-       className={`relative w-full h-full min-w-0 overflow-hidden ${isFullscreen ? "rounded-none bg-[#202020]" : "rounded-2xl border border-[var(--glass-border)] bg-[#202020]"}`}
+       className={`relative w-full h-full min-w-0 overflow-hidden ${isFullscreen ? "rounded-none bg-[#202020]" : compact ? "bg-[#202020]" : "rounded-2xl border border-[var(--glass-border)] bg-[#202020]"}`}
       style={isFullscreen ? { position: "fixed", inset: 0, zIndex: 500, width: "100vw", height: "100vh" } : undefined}
     >
        {loading && <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-[#202020]"><Loader2 size={28} className="animate-spin text-[var(--accent-1)]" /><span className="text-[11px] text-[var(--text-muted)]">{loadingMessage}</span></div>}
        {renderError && !loading && <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-2 bg-[#202020] px-6 text-center"><span className="text-[12px] font-bold text-red-300">工作流预览加载失败</span><span className="max-w-lg break-words text-[10px] text-[var(--text-muted)]">{renderError}</span></div>}
        {activeSubgraph && <div className="absolute top-3 left-3 z-20 flex items-center gap-2 rounded-lg border border-[var(--glass-border)] bg-[var(--bg-layer-1)]/90 px-2 py-1.5 text-[11px] text-[var(--text-primary)]"><button onClick={leaveSubgraph} className="flex items-center gap-1 cursor-pointer"><ChevronLeft size={14} />返回根画布</button><span className="text-[var(--text-muted)]">/ {activeSubgraph.name || "Subgraph"}</span></div>}
-       <canvas ref={canvasRef} className="block h-full w-full" />
-       <button onClick={(event) => { event.preventDefault(); event.stopPropagation(); void toggleFullscreen(); }} className="absolute top-3 right-3 z-20 flex h-8 items-center gap-1.5 rounded-lg border border-[var(--glass-border)] bg-[var(--bg-layer-1)]/90 px-2.5 text-[11px] text-[var(--text-primary)] shadow-lg cursor-pointer" title={isFullscreen ? "退出全屏 (ESC)" : "全屏预览"}>
-         {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-         <span>{isFullscreen ? "退出全屏" : "全屏"}</span>
-       </button>
+        <canvas ref={canvasRef} className={`block h-full w-full ${compact ? "pointer-events-none" : ""}`} />
+        {!compact && <button onClick={(event) => { event.preventDefault(); event.stopPropagation(); void toggleFullscreen(); }} className="absolute top-3 right-3 z-20 flex h-8 items-center gap-1.5 rounded-lg border border-[var(--glass-border)] bg-[var(--bg-layer-1)]/90 px-2.5 text-[11px] text-[var(--text-primary)] shadow-lg cursor-pointer" title={isFullscreen ? "退出全屏 (ESC)" : "全屏预览"}>
+          {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          <span>{isFullscreen ? "退出全屏" : "全屏"}</span>
+        </button>}
       <LoraPickerModal isOpen={loraNodeId !== null} onClose={() => setLoraNodeId(null)} selectedLoras={selectedLoras} onToggle={toggleLora} />
     </div>
   );
@@ -352,7 +355,7 @@ function nextFrame() {
   return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 }
 
-function fitCanvas(canvas: any, graph: any) {
+function fitCanvas(canvas: any, graph: any, mode: "compact" | "editor" | "fullscreen" = "editor") {
   const nodes = graph?._nodes || [];
   if (!nodes.length || !canvas.canvas) return;
   const bounds = nodes.reduce((result: { minX: number; minY: number; maxX: number; maxY: number }, node: any) => {
@@ -365,18 +368,26 @@ function fitCanvas(canvas: any, graph: any) {
       maxX: Math.max(result.maxX, x + width), maxY: Math.max(result.maxY, y + height),
     };
   }, { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
-  const margin = 50;
+  const viewportWidth = Number(canvas.canvas.clientWidth) || Number(canvas.canvas.width) || 1;
+  const viewportHeight = Number(canvas.canvas.clientHeight) || Number(canvas.canvas.height) || 1;
+  const margin = Math.min(36, Math.max(16, Math.min(viewportWidth, viewportHeight) * 0.08));
   const width = Math.max(1, bounds.maxX - bounds.minX);
   const height = Math.max(1, bounds.maxY - bounds.minY);
-  const fittedScale = Math.min((canvas.canvas.width - margin * 2) / width, (canvas.canvas.height - margin * 2) / height);
-  const minimumScale = nodes.length <= 8 ? 0.2 : 0.1;
-  const scale = Math.min(2, Math.max(minimumScale, fittedScale));
+  const fittedScale = Math.min((viewportWidth - margin * 2) / width, (viewportHeight - margin * 2) / height);
+  const scale = Math.min(1.2, Math.max(0.05, fittedScale));
   canvas.ds.scale = scale;
   canvas.ds.offset = [
-    (canvas.canvas.width - width * scale) / 2 - bounds.minX * scale,
-    (canvas.canvas.height - height * scale) / 2 - bounds.minY * scale,
+    (viewportWidth / scale - width) / 2 - bounds.minX,
+    (viewportHeight / scale - height) / 2 - bounds.minY,
   ];
   canvas.setDirty(true, true);
+}
+
+function workflowSignature(value: any) {
+  if (typeof value === "string") {
+    try { return JSON.stringify(JSON.parse(value)); } catch { return value; }
+  }
+  return JSON.stringify(value);
 }
 
 function applyValidationColors(graph: any, report: ValidationReport | null | undefined) {
