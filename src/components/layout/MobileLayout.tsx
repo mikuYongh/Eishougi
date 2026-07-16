@@ -10,13 +10,13 @@ interface MobileLayoutProps {
 
 export function MobileLayout({ children }: MobileLayoutProps) {
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
+    <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden relative">
       <MobileTopBar />
       <CompletionToast />
       
       {/* Main Scrollable Content Area */}
       {/* We add pb-24 to ensure the content is not hidden behind the bottom nav */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-28 scroll-smooth">
+      <div className="flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto px-4 py-4 pb-28 scroll-smooth">
         {children}
       </div>
 

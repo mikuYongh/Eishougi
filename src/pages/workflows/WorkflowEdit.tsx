@@ -95,6 +95,7 @@ export function WorkflowEdit() {
       updateField('jsonContent', location.state.importJson);
       try {
         parseAndSetParams(location.state.importJson);
+        setShowGraph(true);
       } catch (e) {
         console.error("Failed to parse imported json", e);
       }
@@ -133,12 +134,22 @@ export function WorkflowEdit() {
         const content = await file.text();
         updateField('jsonContent', content);
         parseAndSetParams(content);
+        setShowGraph(true);
       } catch (err) {
         console.error("Failed to parse JSON file", err);
       }
     };
     input.click();
   };
+
+  const handleGraphChange = useCallback((content: string) => {
+    updateField("jsonContent", content);
+    try {
+      parseAndSetParams(content);
+    } catch (error) {
+      console.warn("[WorkflowEdit] failed to sync parameters after graph edit:", error);
+    }
+  }, []);
 
   const handleValidate = async () => {
     if (!workflow.jsonContent?.trim()) {
@@ -275,9 +286,9 @@ export function WorkflowEdit() {
   }, [loras]);
 
   return (
-    <div className="flex flex-col h-full relative z-10 gap-6 max-w-6xl mx-auto w-full">
+    <div className="flex flex-col h-full min-w-0 relative z-10 gap-4 sm:gap-6 max-w-6xl mx-auto w-full">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 bg-[var(--bg-layer-1)] p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between flex-shrink-0 bg-[var(--bg-layer-1)] p-3 sm:p-4 rounded-2xl border border-[var(--glass-border)] backdrop-blur-md gap-3 sm:gap-4">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate('/workflows')}
@@ -302,10 +313,10 @@ export function WorkflowEdit() {
         </button>
       </div>
 
-      <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden pb-[20vh] xl:pb-0 custom-scrollbar">
+      <div className="flex flex-col xl:flex-row gap-4 sm:gap-6 flex-1 min-h-0 overflow-y-auto xl:overflow-hidden pb-[20vh] xl:pb-0 custom-scrollbar">
         
         {/* Left Column */}
-        <div className="w-full md:w-[320px] flex flex-col gap-6 flex-shrink-0 relative z-20">
+        <div className="w-full md:w-[320px] flex flex-col gap-4 sm:gap-6 flex-shrink-0 relative z-20">
           
           {/* Metadata */}
           <div className="glass-panel p-5 space-y-5 relative z-50">
@@ -360,11 +371,11 @@ export function WorkflowEdit() {
 
         {/* Right Column - Parameters / Editor */}
         <div className="flex-1 flex flex-col min-w-0 glass-panel xl:overflow-hidden bg-[var(--bg-layer-1)] min-h-[500px] h-full">
-          <div className="flex items-center justify-between p-4 border-b border-[var(--glass-border)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 border-b border-[var(--glass-border)]">
             <h3 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
               <Sliders size={18} className="text-yellow-400" /> 默认参数配置
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={handleValidate}
                 disabled={isValidating || !workflow.jsonContent}
@@ -418,12 +429,13 @@ export function WorkflowEdit() {
 
           {/* ── 可视化预览 + 校验报告区 ── */}
           {workflow.jsonContent && showGraph && (
-            <div className="flex flex-col gap-3 p-4 border-b border-[var(--glass-border)] animate-in fade-in slide-in-from-top-2 duration-300 flex-shrink-0">
+            <div className="flex flex-col gap-3 p-3 sm:p-4 border-b border-[var(--glass-border)] animate-in fade-in slide-in-from-top-2 duration-300 flex-shrink-0">
               {/* litegraph 画布 */}
-              <div className="h-[300px] flex-shrink-0">
+              <div className="h-[min(55vh,420px)] min-h-[260px] sm:h-[300px] flex-shrink-0">
                 <WorkflowGraph
                   workflow={workflow.jsonContent}
                   report={validationReport}
+                  onChange={handleGraphChange}
                 />
               </div>
               {/* 校验报告面板 */}
@@ -465,7 +477,7 @@ export function WorkflowEdit() {
               </button>
             </div>
           ) : (
-            <div className="flex-1 xl:overflow-y-auto overflow-visible p-6 space-y-8">
+            <div className="flex-1 xl:overflow-y-auto overflow-visible p-4 sm:p-6 space-y-6 sm:space-y-8">
               {/* Models */}
               <div className="space-y-4">
                 <h4 className="text-[12px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-2 border-b border-[var(--glass-border)] pb-2">
@@ -494,7 +506,7 @@ export function WorkflowEdit() {
                 </div>
 
                 {/* Sampler / Scheduler / CFG / VAE / Seed */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
                   <div>
                     <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">采样器 (Sampler)</label>
                     <GlassDropdown
@@ -557,7 +569,7 @@ export function WorkflowEdit() {
                       options={SDXL_RESOLUTIONS}
                     />
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <div className="flex-1">
                       <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block">宽 (Width)</label>
                       <input 
@@ -634,7 +646,7 @@ export function WorkflowEdit() {
                           </div>
                         </div>
 
-                        <div className="flex gap-4 items-start relative" style={{ zIndex: 50 }}>
+                        <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-start relative" style={{ zIndex: 50 }}>
                           <div className="flex-1 min-w-0 relative">
                             <label className="text-[10px] font-bold text-[var(--text-secondary)] mb-1.5 block uppercase tracking-wider">选择模型 (Model)</label>
                             <SearchableDropdown 

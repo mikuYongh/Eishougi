@@ -123,7 +123,7 @@ export function WorkflowList() {
   };
 
   return (
-    <div className="flex flex-col h-full relative z-10 gap-6">
+    <div className="flex flex-col h-full min-w-0 relative z-10 gap-4 sm:gap-6">
       
       {/* PageHeader */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 flex-shrink-0">
@@ -133,13 +133,13 @@ export function WorkflowList() {
           </h2>
           <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">配置并保存 ComfyUI JSON 渲染节点图，与创作项目绑定</p>
         </div>
-        <div className="flex gap-3">
-          <button onClick={handleImportClipboard} className="px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)]">
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <button onClick={handleImportClipboard} className="w-full sm:w-auto px-4 py-2 rounded-xl text-[13px] font-bold border border-[var(--glass-border)] text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors cursor-pointer bg-[var(--bg-layer-1)] shadow-[inset_0_2px_10px_rgba(255,255,255,0.02)]">
             从剪贴板导入 JSON
           </button>
           <button 
             onClick={() => navigate('/workflows/new/edit')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(255,213,79,0.3)] hover:scale-[1.02] transition-all text-black cursor-pointer"
+            className="flex w-full sm:w-auto items-center justify-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold shadow-[0_4px_15px_rgba(255,213,79,0.3)] hover:scale-[1.02] transition-all text-black cursor-pointer"
             style={{ background: "linear-gradient(135deg, #FFCA28, #FF9800)", border: "1px solid rgba(255,255,255,0.4)" }}
           >
             <Plus size={16} /> 新建工作流
@@ -147,7 +147,7 @@ export function WorkflowList() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--glass-border)] pb-2">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 border-b border-[var(--glass-border)] pb-2">
         <div className="flex items-center gap-2 flex-shrink-0 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
           {categoryTabs.map((tab) => (
             <button
@@ -159,7 +159,7 @@ export function WorkflowList() {
             </button>
           ))}
         </div>
-        <div className="glass-panel flex items-center gap-2 px-3 py-1.5 w-64 focus-within:border-yellow-400/50 transition-colors rounded-full">
+        <div className="glass-panel flex items-center gap-2 px-3 py-1.5 w-full md:w-64 focus-within:border-yellow-400/50 transition-colors rounded-full">
           <Search size={14} className="text-[var(--text-secondary)]" />
           <input
             type="text"
