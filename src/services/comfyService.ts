@@ -298,10 +298,9 @@ export class ComfyService {
     }
   }
 
-  async interrupt() {
+  async interrupt(url = getComfyUrl()) {
     try {
-      const comfyUrl = getComfyUrl();
-      return await invoke<boolean>('interrupt_comfy', { url: comfyUrl || null });
+      return await invoke<boolean>('interrupt_comfy', { url: url || null });
     } catch (e: any) {
       console.error(`Failed to interrupt ComfyUI execution: ${e.message || e}`);
       return false;
@@ -412,6 +411,8 @@ export class ComfyService {
     baseModel?: string
   ) {
     const finalJson = JSON.parse(JSON.stringify(workflow));
+    const alignedWidth = Math.max(32, Math.floor(width / 32) * 32);
+    const alignedHeight = Math.max(32, Math.floor(height / 32) * 32);
 
     if (isUiWorkflow(finalJson)) {
       return injectUiWorkflow(finalJson, {
@@ -419,15 +420,15 @@ export class ComfyService {
         positivePrompt: prompt,
         fps,
         duration,
-        width,
-        height,
+        width: alignedWidth,
+        height: alignedHeight,
         baseModel,
       });
     }
 
     for (const key in finalJson) {
       const node = finalJson[key];
-         if (!node?.inputs || typeof node.class_type !== "string") continue;
+      if (!node?.inputs || typeof node.class_type !== "string") continue;
 
       const classType = node.class_type;
       const title = node._meta?.title || '';
@@ -442,8 +443,8 @@ export class ComfyService {
 
       if (classType === "PrimitiveInt" && node.inputs.value !== undefined) {
         if (!Array.isArray(node.inputs.value)) {
-          if (title === "Width") node.inputs.value = width;
-          if (title === "Height") node.inputs.value = height;
+          if (title === "Width") node.inputs.value = alignedWidth;
+          if (title === "Height") node.inputs.value = alignedHeight;
           if (title === "Frame Rate") node.inputs.value = fps;
           if (title === "Duration") node.inputs.value = duration;
         }
@@ -451,10 +452,10 @@ export class ComfyService {
 
       if (["EmptyLatentVideo", "EmptyLTXVLatentVideo", "EmptyLatentImage"].includes(classType)) {
         if (node.inputs.width !== undefined && !Array.isArray(node.inputs.width)) {
-          node.inputs.width = width;
+          node.inputs.width = alignedWidth;
         }
         if (node.inputs.height !== undefined && !Array.isArray(node.inputs.height)) {
-          node.inputs.height = height;
+          node.inputs.height = alignedHeight;
         }
         if (node.inputs.length !== undefined && !Array.isArray(node.inputs.length)) {
           node.inputs.length = duration;
@@ -484,6 +485,9 @@ export class ComfyService {
     scheduler: string | null;
     width: number | null;
     height: number | null;
+    dimensionsFromInputImage: boolean;
+    fps: number | null;
+    duration: number | null;
     steps: number | null;
     cfgScale: number | null;
     loras: { name: string; strength: number; enabled: boolean }[];
@@ -496,6 +500,9 @@ export class ComfyService {
       scheduler: null as string | null,
       width: null as number | null,
       height: null as number | null,
+      dimensionsFromInputImage: false,
+      fps: null as number | null,
+      duration: null as number | null,
       steps: null as number | null,
       cfgScale: null as number | null,
       loras: [] as { name: string; strength: number; enabled: boolean }[]
@@ -527,6 +534,14 @@ export class ComfyService {
           }
         });
         return result;
+      };
+
+      const resolveLinkedValue = (value: any, depth = 0): any => {
+        if (!Array.isArray(value) || depth > 10) return value;
+        const source = raw[String(value[0])];
+        if (!source?.inputs) return undefined;
+        const sourceValue = source.inputs.value ?? source.inputs.string;
+        return Array.isArray(sourceValue) ? resolveLinkedValue(sourceValue, depth + 1) : sourceValue;
       };
 
       // 收集所有节点，统一为 { classType, title, inputs, widgets } 结构
@@ -605,8 +620,10 @@ export class ComfyService {
         if (ct.includes("EmptyLatent") || (ct.includes("Latent") && !ct.includes("SizePicker"))) {
           if (typeof inp.empty_latent_width === "number") result.width = inp.empty_latent_width;
           else if (typeof inp.width === "number") result.width = inp.width;
+          else if (Array.isArray(inp.empty_latent_width) || Array.isArray(inp.width)) result.dimensionsFromInputImage = true;
           if (typeof inp.empty_latent_height === "number") result.height = inp.empty_latent_height;
           else if (typeof inp.height === "number") result.height = inp.height;
+          else if (Array.isArray(inp.empty_latent_height) || Array.isArray(inp.height)) result.dimensionsFromInputImage = true;
         }
 
         // Power Lora Loader (rgthree) — UI 格式的 lora 数据在 widgets_values 的对象里
@@ -652,9 +669,12 @@ export class ComfyService {
 
         if (ct === "PrimitiveInt" && inp.value !== undefined) {
           const lowerTitle = node.title.toLowerCase();
-          const value = Number(inp.value);
+          const resolvedValue = resolveLinkedValue(inp.value);
+          const value = Number(resolvedValue);
           if (lowerTitle.includes("width") && Number.isFinite(value)) result.width = value;
           if (lowerTitle.includes("height") && Number.isFinite(value)) result.height = value;
+          if ((lowerTitle.includes("frame rate") || lowerTitle.includes("fps")) && Number.isFinite(value)) result.fps = value;
+          if (lowerTitle.includes("duration") && Number.isFinite(value)) result.duration = value;
         }
       }
     } catch (e) {
@@ -841,8 +861,10 @@ export class ComfyService {
         if ((node.class_type === "PrimitiveInt" || node.class_type === "PrimitiveNode") && node.inputs.value !== undefined) {
           if (!Array.isArray(node.inputs.value)) {
             const title = (node._meta?.title || "").toLowerCase();
-            if (title.includes("width") && project.width !== undefined) node.inputs.value = project.width;
-            if (title.includes("height") && project.height !== undefined) node.inputs.value = project.height;
+            if (title.includes("width") && Number(project.width) > 0) node.inputs.value = project.width;
+            if (title.includes("height") && Number(project.height) > 0) node.inputs.value = project.height;
+            if ((title.includes("frame rate") || title.includes("fps")) && Number(project.fps) > 0) node.inputs.value = project.fps;
+            if (title.includes("duration") && Number(project.duration) > 0) node.inputs.value = project.duration;
           }
         }
 

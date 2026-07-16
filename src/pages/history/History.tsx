@@ -9,6 +9,8 @@ import { useQueueStore } from "../../stores/queueStore";
 import { downloadImage } from "../../utils/download";
 import { getImgSrc, isVideoFile } from "../../utils/imageUtils";
 import type { GeneratedImage } from "../../types";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { toast } from "sonner";
 
 
 
@@ -37,6 +39,10 @@ export function History() {
   const [previewImage, setPreviewImage] = useState<HistoryImage | null>(null);
   const [addingToPrompt, setAddingToPrompt] = useState<HistoryImage | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<HistoryImage | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const prompts = usePromptStore(state => state.prompts);
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   const historyUpdateTick = useQueueStore(state => state.historyUpdateTick);
@@ -46,9 +52,8 @@ export function History() {
   }, [prompts, historyUpdateTick]);
 
   useEffect(() => {
-    if (allData.length > 0) {
-      processData(allData);
-    }
+    if (allData.length > 0) processData(allData);
+    else setHistory([]);
   }, [limit, allData, prompts]);
 
   const fetchHistory = async () => {
@@ -104,12 +109,18 @@ export function History() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("确定要删除这张生成的图片吗？")) return;
+    if (isDeleting) return;
+    setIsDeleting(true);
     try {
       await invoke('delete_generated_image', { id });
       await fetchHistory();
+      setDeleteTarget(null);
+      toast.success("已删除生成文件");
     } catch (e) {
       console.error("Failed to delete instance image:", e);
+      toast.error(`删除失败：${String(e)}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -160,17 +171,22 @@ export function History() {
   };
 
   const handleClearHistory = async () => {
-    if (!confirm("Are you sure you want to clear all history?")) return;
+    if (isClearing) return;
+    setIsClearing(true);
     try {
-      // Loop delete (ideally a bulk delete endpoint)
-      for (const group of history) {
-        for (const img of group.images) {
-          await invoke('delete_generated_image', { id: img.id });
-        }
-      }
+      const result = await invoke<{ recordsDeleted: number; filesDeleted: number; filesFailed: number }>('clear_generated_images');
+      setClearDialogOpen(false);
+      setAllData([]);
+      setHistory([]);
+      setPreviewImage(null);
       await fetchHistory();
+      toast.success(`已清空 ${result.recordsDeleted} 条历史记录`);
+      if (result.filesFailed > 0) toast.warning(`${result.filesFailed} 个文件未能删除，请稍后手动清理`);
     } catch (e) {
       console.error("Failed to clear history:", e);
+      toast.error(`清空历史失败：${String(e)}`);
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -186,7 +202,7 @@ export function History() {
           <p className="text-sm mt-1 text-[var(--text-secondary)] font-medium">回顾所有的创造轨迹，支持查看详细参数与 Seed</p>
         </div>
         <button 
-          onClick={handleClearHistory}
+          onClick={() => setClearDialogOpen(true)}
           className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all cursor-pointer w-full md:w-auto shadow-[0_0_15px_rgba(239,68,68,0.1)]"
         >
           <Trash2 size={16} /> 彻底清空历史
@@ -243,7 +259,7 @@ export function History() {
                           <BookmarkPlus size={14} />
                         </button>
                         <button 
-                          onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }}
+                         onClick={(e) => { e.stopPropagation(); setDeleteTarget(img); }}
                           className="w-8 h-8 rounded-full bg-red-500/80 text-[var(--text-primary)] flex items-center justify-center hover:bg-red-500 transition-colors cursor-pointer"
                           title="删除"
                         >
@@ -281,7 +297,7 @@ export function History() {
                       <button onClick={(e) => { e.stopPropagation(); handleToggleSave(img); }} className={`w-7 h-7 rounded-full flex items-center justify-center ${img.isSaved ? 'bg-[var(--accent-1)] text-white' : 'bg-white/10 text-[var(--text-secondary)]'}`}>
                         <Sparkles size={14} className={img.isSaved ? 'fill-white' : ''} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(img.id); }} className="w-7 h-7 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
+                       <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(img); }} className="w-7 h-7 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -445,6 +461,29 @@ export function History() {
         </div>,
         document.getElementById('main-content-area') || document.body
       )}
+
+      <ConfirmDialog
+        open={clearDialogOpen}
+        title="彻底清空生成历史"
+        description={`这会删除全部历史记录和本地生成文件，包含图片与视频。\n当前共有 ${allData.length} 条记录，此操作不可恢复。`}
+        confirmLabel="永久清空"
+        tone="danger"
+        busy={isClearing}
+        confirmText="清空历史"
+        onCancel={() => !isClearing && setClearDialogOpen(false)}
+        onConfirm={handleClearHistory}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="删除这条生成记录？"
+        description="生成文件和历史记录都会被删除，但不会影响原始创作项目。"
+        confirmLabel="删除文件"
+        tone="danger"
+        busy={isDeleting}
+        onCancel={() => !isDeleting && setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget.id)}
+      />
 
     </div>
   );

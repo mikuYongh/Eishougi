@@ -53,8 +53,21 @@ pub mod jvm_plugin {
                         )
                         .map_err(|e| e.to_string())?;
 
-                    let res_string = result.l().unwrap();
-                    let rust_string: String = env.get_string((&res_string).into()).unwrap().into();
+                    if env.exception_check().unwrap_or(false) {
+                        let _ = env.exception_describe();
+                        let _ = env.exception_clear();
+                        return Err("Android saveImageToGallery threw a Java exception".to_string());
+                    }
+                    let res_string = result
+                        .l()
+                        .map_err(|e| format!("saveImageToGallery returned an invalid value: {}", e))?;
+                    if res_string.is_null() {
+                        return Err("Android saveImageToGallery returned null".to_string());
+                    }
+                    let rust_string: String = env
+                        .get_string((&res_string).into())
+                        .map_err(|e| format!("Failed to read Android save result: {}", e))?
+                        .into();
                     return Ok(rust_string);
                 }
                 return Err("MAIN_ACTIVITY_CLASS not initialized".to_string());
@@ -326,6 +339,7 @@ pub fn run() {
             commands::auto_deploy::check_environment,
             commands::auto_deploy::fetch_comfy_models,
             commands::auto_deploy::interrupt_comfy,
+            commands::auto_deploy::cancel_comfy_job,
             commands::auto_deploy::download_model_file,
             commands::auto_deploy::check_file_exists,
             commands::logging::write_log,
@@ -347,6 +361,7 @@ pub fn run() {
             commands::history::get_generated_image,
             commands::history::list_generated_images,
             commands::history::delete_generated_image,
+            commands::history::clear_generated_images,
             commands::history::toggle_save_image,
             commands::files::save_base64_image,
             commands::files::save_base64_file,

@@ -1,14 +1,30 @@
 import { Sparkles, Activity, Server, Image as ImageIcon, Search, MessageSquare, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useQueueStore } from "../../stores/queueStore";
 import { useAppVersion } from "../../hooks/useAppVersion";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { invoke } from "@tauri-apps/api/core";
 
 export function StatusBar() {
-  const { jobs, isConnected } = useQueueStore();
+  const { jobs } = useQueueStore();
   const appVersion = useAppVersion();
-  const comfyUrl = useSettingsStore((s) => s.settings.comfyUrl) || '127.0.0.1:8188';
-  // 提取 host:port 用于状态栏显示
-  const displayUrl = comfyUrl.replace(/^https?:\/\//, '');
+  const settings = useSettingsStore((s) => s.settings);
+  const [engineConnected, setEngineConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const result = await invoke<{ online?: boolean }>("check_comfyui_status", { url: settings.comfyUrl || null });
+        if (alive) setEngineConnected(result?.online === true);
+      } catch {
+        if (alive) setEngineConnected(false);
+      }
+    };
+    check();
+    const timer = window.setInterval(check, 10000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [settings.comfyUrl]);
   
   const pendingJobs = jobs.filter(j => j.status === 'pending');
   const generatingJobs = jobs.filter(j => j.status === 'generating');
@@ -23,8 +39,8 @@ export function StatusBar() {
       <div className="flex items-center gap-3 flex-1 font-medium tracking-wide">
         {/* Connection Status with Tooltip */}
         <div className="group relative flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--glass-border)] border border-[var(--glass-border)] cursor-pointer hover:bg-[var(--glass-border-active)] transition-colors">
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse-glow" style={{ background: "#4CAF50", boxShadow: "0 0 8px #4CAF50" }} />
-          <span className="text-[var(--text-secondary)]">{displayUrl}</span>
+           <span className={`w-1.5 h-1.5 rounded-full ${engineConnected === true ? 'animate-pulse-glow bg-green-500' : engineConnected === false ? 'bg-red-500' : 'bg-gray-500'}`} />
+          <span className="text-[var(--text-secondary)]">{activeCount > 0 ? `生成中 · ${activeCount} 个任务` : engineConnected === true ? '引擎就绪' : engineConnected === false ? '引擎未连接' : '正在检测引擎'}</span>
           
           {/* Tooltip Popup */}
           <div className="absolute bottom-full left-0 mb-2 w-52 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 translate-y-2 group-hover:translate-y-0">
@@ -46,19 +62,19 @@ export function StatusBar() {
                   <span>ComfyUI 生图</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className={`w-1.5 h-1.5 rounded-full shadow-[0_0_5px_currentColor] ${isConnected ? 'bg-green-500 text-green-500' : 'bg-red-500 text-red-500'}`} />
-                  <span className={`text-[10px] ${isConnected ? 'text-green-400' : 'text-red-400'}`}>{isConnected ? '已连接' : '未连接'}</span>
+                   <span className={`w-1.5 h-1.5 rounded-full shadow-[0_0_5px_currentColor] ${engineConnected === true ? 'bg-green-500 text-green-500' : engineConnected === false ? 'bg-red-500 text-red-500' : 'bg-gray-500 text-gray-500'}`} />
+                   <span className={`text-[10px] ${engineConnected === true ? 'text-green-400' : engineConnected === false ? 'text-red-400' : 'text-[var(--text-secondary)]'}`}>{engineConnected === true ? '已连接' : engineConnected === false ? '未连接' : '检测中'}</span>
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-[var(--text-primary)]">
                 <div className="flex items-center gap-1.5">
                   <Search size={12} className="text-[var(--accent-2)]" />
-                  <span>WD14 反推</span>
+                  <span>识图模型</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#4CAF50]" />
-                  <span className="text-[10px] text-green-400">已连接</span>
+                  <div className="flex items-center gap-1">
+                  <span className={`w-1.5 h-1.5 rounded-full ${settings.visionLlm.enabled ? 'bg-green-500 shadow-[0_0_5px_#4CAF50]' : 'bg-gray-500'}`} />
+                  <span className={`text-[10px] ${settings.visionLlm.enabled ? 'text-green-400' : 'text-[var(--text-secondary)]'}`}>{settings.visionLlm.enabled ? '已启用' : '未启用'}</span>
                 </div>
               </div>
 
@@ -67,9 +83,9 @@ export function StatusBar() {
                   <MessageSquare size={12} className="text-blue-400" />
                   <span>LLM 大模型</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_#4CAF50]" />
-                  <span className="text-[10px] text-green-400">已连接</span>
+                  <div className="flex items-center gap-1">
+                  <span className={`w-1.5 h-1.5 rounded-full ${settings.llm.enabled ? 'bg-green-500 shadow-[0_0_5px_#4CAF50]' : 'bg-gray-500'}`} />
+                  <span className={`text-[10px] ${settings.llm.enabled ? 'text-green-400' : 'text-[var(--text-secondary)]'}`}>{settings.llm.enabled ? '已启用' : '未启用'}</span>
                 </div>
               </div>
             </div>
@@ -121,13 +137,14 @@ export function StatusBar() {
                         {job.status === 'generating' && (
                           <div className="flex items-center gap-2">
                             <span className="text-[9px] text-[var(--accent-2)] bg-[var(--accent-2)]/10 px-1.5 py-0.5 rounded flex items-center gap-1"><Loader2 size={8} className="animate-spin" /> {job.progress}%</span>
-                            <button onClick={(e) => { e.stopPropagation(); useQueueStore.getState().interruptJob(); }} className="text-red-500 hover:text-red-400 p-1 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors" title="强制停止">
+                            <button onClick={(e) => { e.stopPropagation(); useQueueStore.getState().interruptJob(job.id); }} className="text-red-500 hover:text-red-400 p-1 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors" title="强制停止">
                               <div className="w-2 h-2 bg-current rounded-sm" />
                             </button>
                           </div>
                         )}
                         {job.status === 'completed' && <span className="text-[9px] text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded flex items-center gap-1"><CheckCircle2 size={8} /> 完成</span>}
                         {job.status === 'failed' && <span className="text-[9px] text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded flex items-center gap-1"><XCircle size={8} /> 失败</span>}
+                        {job.status === 'cancelled' && <span className="text-[9px] text-[var(--text-secondary)] bg-white/5 px-1.5 py-0.5 rounded">已停止</span>}
                       </div>
                       {job.status === 'generating' && job.node && (
                         <div className="w-full bg-[var(--glass-border)] h-1 rounded-full overflow-hidden">

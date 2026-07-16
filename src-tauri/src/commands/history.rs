@@ -101,10 +101,69 @@ pub async fn list_generated_images(
 #[tauri::command]
 pub async fn delete_generated_image(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let db = state.db.lock().await;
+    let output_path: Option<String> = db
+        .conn
+        .query_row(
+            "SELECT output_path FROM generated_images WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
     db.conn
         .execute("DELETE FROM generated_images WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
+    drop(db);
+
+    if let Some(path) = output_path {
+        if let Err(error) = std::fs::remove_file(path) {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                return Err(format!("历史记录已删除，但生成文件删除失败：{}", error));
+            }
+        }
+    }
     Ok(())
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClearHistoryResult {
+    pub records_deleted: usize,
+    pub files_deleted: usize,
+    pub files_failed: usize,
+}
+
+#[tauri::command]
+pub async fn clear_generated_images(state: State<'_, AppState>) -> Result<ClearHistoryResult, String> {
+    let db = state.db.lock().await;
+    let mut stmt = db
+        .conn
+        .prepare("SELECT output_path FROM generated_images")
+        .map_err(|e| e.to_string())?;
+    let paths: Vec<String> = stmt
+        .query_map([], |row| row.get(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<String>, _>>()
+        .map_err(|e| e.to_string())?;
+    drop(stmt);
+
+    let records_deleted = db
+        .conn
+        .execute("DELETE FROM generated_images", [])
+        .map_err(|e| e.to_string())?;
+    drop(db);
+
+    let mut files_deleted = 0;
+    let mut files_failed = 0;
+    for path in paths {
+        match std::fs::remove_file(path) {
+            Ok(()) => files_deleted += 1,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => files_failed += 1,
+        }
+    }
+
+    Ok(ClearHistoryResult { records_deleted, files_deleted, files_failed })
 }
 
 #[tauri::command]

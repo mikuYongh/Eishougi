@@ -10,7 +10,7 @@ export interface QueueJob {
   id: string;
   projectId: string;
   projectTitle: string;
-  status: 'pending' | 'generating' | 'completed' | 'failed';
+  status: 'pending' | 'generating' | 'completed' | 'failed' | 'cancelled';
   progress: number;
   node?: string;
   images?: string[];
@@ -18,6 +18,7 @@ export interface QueueJob {
   workflowId?: string;
   comfyPromptId?: string;
   createdAt: number;
+  comfyUrl?: string;
 }
 
 export interface CompletionNotification {
@@ -40,7 +41,7 @@ interface QueueStore {
   connect: () => Promise<void>;
   disconnect: () => void;
   dismissNotification: (id: string) => void;
-  interruptJob: () => Promise<void>;
+  interruptJob: (jobId?: string) => Promise<void>;
   historyUpdateTick: number;
 }
 
@@ -102,6 +103,7 @@ export const useQueueStore = create<QueueStore>((set, get) => {
 
       set(state => {
         const activeIndex = state.jobs.findIndex(j => j.id === job_id);
+        if (activeIndex !== -1 && state.jobs[activeIndex].status === 'cancelled') return state;
         if (activeIndex === -1) return state;
         
         const newJobs = [...state.jobs];
@@ -119,7 +121,7 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           projectId: job.projectId,
           projectTitle: job.projectTitle,
           images: images,
-          createdAt: Date.now()
+          createdAt: Date.now(),
         };
 
         return { 
@@ -237,7 +239,8 @@ export const useQueueStore = create<QueueStore>((set, get) => {
           status: 'pending',
           progress: 0,
           workflowId: workflowId,
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          comfyUrl,
         });
       }
 
@@ -356,7 +359,8 @@ export const useQueueStore = create<QueueStore>((set, get) => {
         status: 'pending',
         progress: 0,
         workflowId: workflowId,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        comfyUrl: videoComfyUrl,
       };
 
       set(state => ({ jobs: [...state.jobs, job] }));
@@ -423,6 +427,11 @@ export const useQueueStore = create<QueueStore>((set, get) => {
     },
 
     removeJob: (id) => {
+      const resolver = _jobResolvers.get(id);
+      if (resolver) {
+        resolver.reject(new Error('任务已取消'));
+        _jobResolvers.delete(id);
+      }
       set(state => ({ jobs: state.jobs.filter(j => j.id !== id) }));
     },
 
@@ -434,9 +443,27 @@ export const useQueueStore = create<QueueStore>((set, get) => {
       set(state => ({ completedNotifications: state.completedNotifications.filter(n => n.id !== id) }));
     },
 
-    interruptJob: async () => {
+    interruptJob: async (jobId) => {
+      const state = get();
+      const target = jobId
+        ? state.jobs.find(job => job.id === jobId)
+        : state.jobs.find(job => job.status === 'generating') || state.jobs.find(job => job.status === 'pending');
+      if (!target || (target.status !== 'pending' && target.status !== 'generating')) return;
       try {
-        await comfyService.interrupt();
+        if (target.status === 'generating') await comfyService.interrupt(target.comfyUrl);
+        if (target.comfyPromptId) {
+          await invoke('cancel_comfy_job', { url: target.comfyUrl || getComfyUrl(), promptId: target.comfyPromptId });
+        }
+        const resolver = _jobResolvers.get(target.id);
+        if (resolver) {
+          resolver.reject(new Error('任务已取消'));
+          _jobResolvers.delete(target.id);
+        }
+        set(current => ({
+          jobs: current.jobs.map(job => job.id === target.id
+            ? { ...job, status: 'cancelled', error: '用户已停止任务' }
+            : job),
+        }));
       } catch (e) {
         console.error("[Queue] Failed to interrupt job", e);
       }

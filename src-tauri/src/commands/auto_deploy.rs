@@ -292,6 +292,23 @@ pub async fn interrupt_comfy(url: Option<String>) -> Result<bool, String> {
     }
 }
 
+#[tauri::command]
+pub async fn cancel_comfy_job(url: String, prompt_id: String) -> Result<bool, String> {
+    let base = url.trim_end_matches('/');
+    let client = reqwest::Client::new();
+    let response = client
+        .post(format!("{}/queue", base))
+        .json(&serde_json::json!({ "delete": [prompt_id] }))
+        .send()
+        .await
+        .map_err(|e| format!("请求失败: {}", e))?;
+    if response.status().is_success() {
+        Ok(true)
+    } else {
+        Err(format!("HTTP {}", response.status()))
+    }
+}
+
 // ========== download_model_file (streaming with progress) ==========
 #[tauri::command]
 pub async fn download_model_file(
