@@ -103,7 +103,7 @@ export default function App() {
         {!isMobile && <TitleBar />}
 
         <ToastProvider />
-        {!hasCompletedOnboarding && !isMobile && <OnboardingWizard />}
+        {!hasCompletedOnboarding && <OnboardingWizard />}
         <GlobalPhotoProvider>
           {isMobile ? (
             <MobileLayout>

@@ -110,22 +110,36 @@ export function McpServerPanel() {
     }
   };
 
-  const copyConnectString = () => {
+  const copyConnectString = async (format: "mcpServers" | "streamableHttp") => {
     if (!status || !status.token) {
       toast.error("请先生成 Token");
       return;
     }
-    // Claude Desktop / Cursor mcpServers config snippet.
-    const config = {
-      mcpServers: {
-        "prompt-muse": {
+    const authorization = `Bearer ${status.token}`;
+    const config = format === "streamableHttp"
+      ? {
+          transport: "streamable_http",
           url: status.url,
-          token: status.token,
-        },
-      },
-    };
-    navigator.clipboard.writeText(JSON.stringify(config, null, 2));
-    toast.success("已复制 MCP 连接配置到剪贴板");
+          headers: { Authorization: authorization },
+          timeout: 5,
+          sse_read_timeout: 300,
+        }
+      : {
+          mcpServers: {
+            "prompt-muse": {
+              transport: "streamable_http",
+              url: status.url,
+              headers: { Authorization: authorization },
+            },
+          },
+        };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(config, null, 2));
+      toast.success(format === "streamableHttp" ? "已复制 Streamable HTTP 配置" : "已复制 mcpServers 配置");
+    } catch (e) {
+      console.error("Failed to copy MCP config:", e);
+      toast.error("复制失败，请检查剪贴板权限");
+    }
   };
 
   const token = status?.token;
@@ -172,14 +186,24 @@ export function McpServerPanel() {
             <code className="flex-1 px-3 py-2 rounded-lg bg-[var(--bg-layer-1)] border border-[var(--glass-border)] text-[12px] font-mono text-[var(--accent-1)] truncate">
               {status?.url || `http://127.0.0.1:${settings.mcpServer.port}/mcp`}
             </code>
-            <button
-              onClick={copyConnectString}
-              disabled={!status?.running}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[12px] font-bold text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              title="复制 Claude Desktop / Cursor 用的连接配置 JSON"
-            >
-              <Copy size={13} /> 复制配置
-            </button>
+             <div className="flex flex-wrap items-center justify-end gap-2">
+               <button
+                 onClick={() => void copyConnectString("streamableHttp")}
+                 disabled={!status?.running}
+                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[12px] font-bold text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                 title="复制 transport/url/headers/timeout 格式"
+               >
+                 <Copy size={13} /> 通用配置
+               </button>
+               <button
+                 onClick={() => void copyConnectString("mcpServers")}
+                 disabled={!status?.running}
+                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--glass-bg)] hover:bg-[var(--glass-bg-hover)] border border-[var(--glass-border)] text-[12px] font-bold text-[var(--text-primary)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                 title="复制 Claude Desktop / Cursor 的 mcpServers 配置"
+               >
+                 <Copy size={13} /> mcpServers
+               </button>
+             </div>
           </div>
         </div>
 
@@ -257,7 +281,7 @@ export function McpServerPanel() {
           <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
             <Check size={11} className="inline text-[var(--accent-2)] mr-1" />
             <strong className="text-[var(--text-primary)]">使用方式：</strong>
-            启动服务后，点击「复制配置」把 JSON 粘贴到 Claude Desktop 的 <code className="text-[var(--accent-1)]">claude_desktop_config.json</code> 即可。AI 助手就能帮你管理创作项目并触发生图。
+             启动服务后，可复制「通用配置」或「mcpServers」配置。前者适用于支持 <code className="text-[var(--accent-1)]">streamable_http</code> 的客户端，后者可直接放入 Claude Desktop / Cursor 的配置文件。
           </p>
         </div>
       </div>

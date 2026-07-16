@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
-import { UploadCloud, Image as ImageIcon, Video, Play, FastForward, Clock, Maximize, Film, Layers, Loader2, Cpu } from "lucide-react";
+import { UploadCloud, Image as ImageIcon, Video, Play, FastForward, Clock, Maximize, Layers, Loader2, Cpu, History as HistoryIcon, Wand2, Sparkles, X } from "lucide-react";
 import { GlassDropdown } from "../../components/ui/GlassDropdown";
 import { SearchableDropdown } from "../../components/ui/SearchableDropdown";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -7,16 +7,25 @@ import { useWorkflowStore } from "../../stores/workflowStore";
 import { useModelStore } from "../../stores/modelStore";
 import { useQueueStore } from "../../stores/queueStore";
 import { comfyService } from "../../services/comfyService";
+import { aiService } from "../../services/aiService";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { getImgSrc } from "../../utils/imageUtils";
+import type { GeneratedImage } from "../../types";
 
 export function VideoGenerate() {
   const privacyMode = useSettingsStore(state => state.settings.privacyMode);
   const [image, setImage] = useState<string | null>(null);
+  const [imageSource, setImageSource] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
   const [fps, setFps] = useState(16);
   const [duration, setDuration] = useState(2); // in seconds
   const [resolution, setResolution] = useState("512x512");
   const [baseModel, setBaseModel] = useState("");
+  const [historyImages, setHistoryImages] = useState<GeneratedImage[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [aiPlan, setAiPlan] = useState("");
+  const [isPlanning, setIsPlanning] = useState(false);
+  const [aiError, setAiError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const checkpoints = useModelStore(state => state.checkpoints);
@@ -44,12 +53,43 @@ export function VideoGenerate() {
     }
   }, [videoWorkflows, selectedWorkflowId]);
 
+  useEffect(() => {
+    invoke<GeneratedImage[]>("list_generated_images")
+      .then(items => setHistoryImages(items.filter(item => item.outputType === "image" && item.status === "completed").slice(0, 40)))
+      .catch(() => setHistoryImages([]));
+  }, []);
+
   const isGenerating = !!activeJob;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImage(URL.createObjectURL(file));
+      const objectUrl = URL.createObjectURL(file);
+      setImage(objectUrl);
+      setImageSource(objectUrl);
+      setAiPlan("");
+    }
+  };
+
+  const selectHistoryImage = (item: GeneratedImage) => {
+    setImage(getImgSrc(item.outputPath));
+    setImageSource(item.outputPath);
+    setAiPlan("");
+    setHistoryOpen(false);
+  };
+
+  const handleAiPlan = async () => {
+    if (!image || !imageSource || isPlanning) return;
+    setIsPlanning(true);
+    setAiError("");
+    try {
+      const plan = await aiService.generateVideoMotionPlan(imageSource, prompt);
+      setAiPlan(plan);
+      setPrompt(plan);
+    } catch (error: any) {
+      setAiError(error?.message || "AI 动作设计失败，可继续手动输入");
+    } finally {
+      setIsPlanning(false);
     }
   };
 
@@ -66,7 +106,6 @@ export function VideoGenerate() {
       const [wStr, hStr] = resolution.split('x');
       const width = parseInt(wStr);
       const height = parseInt(hStr);
-      const totalFrames = fps * duration;
 
       const response = await fetch(image);
       const blob = await response.blob();
@@ -78,7 +117,7 @@ export function VideoGenerate() {
         selectedWorkflowId,
         uploadedFilename,
         fps,
-        totalFrames,
+         duration,
         width,
         height,
         prompt,
@@ -140,7 +179,16 @@ export function VideoGenerate() {
                 <p className="text-xs text-[var(--text-secondary)]">支持 JPG, PNG 作为首帧参考</p>
               </div>
             )}
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3 py-2.5 text-xs font-bold text-[var(--text-secondary)] transition-all hover:border-[var(--accent-2)]/40 hover:text-[var(--text-primary)]">
+              <UploadCloud size={14} /> 上传首帧
+            </button>
+            <button onClick={() => setHistoryOpen(true)} className="flex items-center justify-center gap-2 rounded-xl border border-[var(--accent-2)]/25 bg-[var(--accent-2)]/10 px-3 py-2.5 text-xs font-bold text-[var(--accent-2)] transition-all hover:bg-[var(--accent-2)]/20">
+              <HistoryIcon size={14} /> 使用历史图片
+            </button>
           </div>
 
           <div className="glass-panel p-5 rounded-2xl space-y-5 flex-shrink-0">
@@ -172,15 +220,23 @@ export function VideoGenerate() {
                 />
               </div>
 
-              <div className="relative z-[40]">
-                <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 flex items-center gap-1.5">提示词 (Prompt)</label>
-                <textarea 
-                  value={prompt}
-                  onChange={e => setPrompt(e.target.value)}
-                  placeholder="可选，描述视频画面内容..."
-                  className="w-full h-16 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-2)]/50 resize-none"
-                />
-              </div>
+               <div className="relative z-[40]">
+                 <div className="mb-2 flex items-center justify-between gap-2">
+                   <label className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-widest flex items-center gap-1.5">动作描述</label>
+                   <button onClick={handleAiPlan} disabled={!image || isPlanning} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--accent-1)]/30 bg-[var(--accent-1)]/10 px-2.5 py-1.5 text-[10px] font-bold text-[var(--accent-1)] transition-all hover:bg-[var(--accent-1)]/20 disabled:cursor-not-allowed disabled:opacity-40">
+                     {isPlanning ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
+                     {isPlanning ? "AI 设计中" : "AI 优化动作"}
+                   </button>
+                 </div>
+                 <textarea
+                   value={prompt}
+                   onChange={e => setPrompt(e.target.value)}
+                   placeholder="描述你希望图片如何动起来，例如：人物轻轻转身，镜头缓慢推进..."
+                   className="w-full h-16 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-xl p-3 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-2)]/50 resize-none"
+                 />
+                 {aiPlan && <div className="mt-2 rounded-xl border border-[var(--accent-1)]/20 bg-[var(--accent-1)]/5 p-2.5 text-[10px] leading-5 text-[var(--text-secondary)]"><span className="font-bold text-[var(--accent-1)]">AI 动作方案：</span>{aiPlan}</div>}
+                 {aiError && <p className="mt-1 text-[10px] text-amber-300">{aiError}</p>}
+               </div>
               
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -255,6 +311,30 @@ export function VideoGenerate() {
         </div>
 
       </div>
+
+      {historyOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md" onClick={() => setHistoryOpen(false)}>
+          <div className="flex max-h-[82vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-[var(--glass-border)] bg-[var(--bg-layer-1)]/95 shadow-[0_24px_100px_rgba(0,0,0,0.55)]" onClick={event => event.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[var(--glass-border)] p-5">
+              <div>
+                <h3 className="flex items-center gap-2 text-base font-bold text-[var(--text-primary)]"><HistoryIcon size={17} className="text-[var(--accent-2)]" />选择历史首帧</h3>
+                <p className="mt-1 text-xs text-[var(--text-secondary)]">选择一张已经生成的图片作为视频起始画面</p>
+              </div>
+              <button onClick={() => setHistoryOpen(false)} className="rounded-lg p-2 text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]"><X size={18} /></button>
+            </div>
+            <div className="grid flex-1 grid-cols-2 gap-3 overflow-y-auto p-5 sm:grid-cols-3 md:grid-cols-4">
+              {historyImages.length === 0 ? (
+                <div className="col-span-full flex min-h-48 flex-col items-center justify-center text-center text-[var(--text-secondary)]"><ImageIcon size={32} className="mb-3 opacity-30" /><p className="text-sm">还没有可用的历史图片</p><p className="mt-1 text-xs">先生成一张图片，它会出现在这里</p></div>
+              ) : historyImages.map(item => (
+                <button key={item.id} onClick={() => selectHistoryImage(item)} className="group overflow-hidden rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)] text-left transition-all hover:-translate-y-1 hover:border-[var(--accent-2)]/60 hover:shadow-[0_10px_30px_rgba(var(--accent-2-rgb),0.18)]">
+                  <div className="aspect-square overflow-hidden bg-black/20"><img src={getImgSrc(item.outputPath)} alt="历史生成图片" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /></div>
+                  <div className="p-2.5"><p className="truncate text-[10px] font-bold text-[var(--text-primary)]">{item.workflowId || "历史生成"}</p><p className="mt-1 text-[9px] text-[var(--text-secondary)]">{new Date(item.createdAt).toLocaleString()}</p></div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

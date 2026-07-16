@@ -1,5 +1,6 @@
 import { useSettingsStore } from "../stores/settingsStore";
 import { usePromptStore } from "../stores/promptStore";
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * Robust tag parser for LLM outputs. Handles:
@@ -47,6 +48,59 @@ function parseTagsFromLLM(content: string): string[] {
 }
 
 export const aiService = {
+  async generateVideoMotionPlan(imagePath: string, userDescription: string): Promise<string> {
+    const { visionLlm } = useSettingsStore.getState().settings;
+    if (!visionLlm.enabled || !visionLlm.apiKey) {
+      throw new Error("请先在设置中启用独立识图模型并配置 API Key");
+    }
+
+    let imageData = imagePath;
+    if (!imagePath.startsWith("data:")) {
+      if (/^(blob:|https?:\/\/)/.test(imagePath)) {
+        const response = await fetch(imagePath);
+        const blob = await response.blob();
+        imageData = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("读取图片失败"));
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        imageData = await invoke<string>("read_image_base64", { path: imagePath });
+      }
+    }
+
+    let apiUrl = visionLlm.apiUrl || "https://apihub.agnes-ai.com/v1";
+    if (!apiUrl.endsWith("/chat/completions")) apiUrl = apiUrl.replace(/\/$/, "") + "/chat/completions";
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${visionLlm.apiKey}` },
+      body: JSON.stringify({
+        model: visionLlm.model,
+        temperature: visionLlm.temperature ?? 0.3,
+        max_tokens: visionLlm.maxTokens || 500,
+        messages: [
+          {
+            role: "system",
+            content: "你是图生视频导演。分析首帧图片和用户想法，输出一段简洁的英文视频动作提示词。必须保护主体身份、脸部、服装和构图，只补充自然的主体运动、镜头运动、光影和环境变化。只输出最终英文提示词，不要解释。",
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: userDescription.trim() || "请根据这张图片设计自然、克制的图生视频动作。" },
+              { type: "image_url", image_url: { url: imageData } },
+            ],
+          },
+        ],
+      }),
+    });
+    if (!response.ok) throw new Error(`AI 请求失败：${response.status}`);
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (!content) throw new Error("AI 没有返回动作方案");
+    return content.replace(/^```(?:text|英文)?\s*/i, "").replace(/```$/i, "").trim();
+  },
+
   async generateTags(promptText: string): Promise<string[]> {
     const { llm } = useSettingsStore.getState().settings;
     if (!llm.apiKey) {
